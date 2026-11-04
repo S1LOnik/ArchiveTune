@@ -1,0 +1,211 @@
+/*
+ * ArchiveTune (2026)
+ * © Rukamori — github.com/rukamori
+ * GPL-3.0 License | Contributors: see git history
+ * Do not remove or alter this notice. - Per GPL-3.0 Section 4 & Section 5
+ */
+
+package moe.rukamori.archivetune.ui.component
+
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import moe.rukamori.archivetune.R
+import moe.rukamori.archivetune.constants.SearchProvider
+import moe.rukamori.archivetune.constants.SearchSource
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+
+// [FIX-ZCODE] Wave 8: shared icon mapping so the search-bar picker and the results
+// header cycler always render the same provider glyphs.
+fun searchProviderIconRes(
+    currentScope: SearchSource,
+    currentProvider: SearchProvider,
+): Int =
+    if (currentScope == SearchSource.LOCAL) {
+        R.drawable.library_music
+    } else if (currentProvider == SearchProvider.SPOTIFY) {
+        R.drawable.spotify_icon
+    } else if (currentProvider == SearchProvider.APPLE_MUSIC) {
+        R.drawable.apple_music_icon
+    } else if (currentProvider == SearchProvider.SOUNDCLOUD) {
+        R.drawable.solar_music_note_2_linear
+    } else if (currentProvider == SearchProvider.TIDAL) {
+        R.drawable.provider_tidal
+    } else {
+        R.drawable.youtube_icon
+    }
+
+fun searchProviderIconRes(currentProvider: SearchProvider): Int =
+    searchProviderIconRes(SearchSource.ONLINE, currentProvider)
+
+@Composable
+fun SearchSourcePicker(
+    currentScope: SearchSource,
+    currentProvider: SearchProvider,
+    onSelection: (SearchSource, SearchProvider) -> Unit,
+    includeLocal: Boolean = true,
+) {
+    var expanded by rememberSaveable { mutableStateOf(false) }
+
+    Box {
+        IconButton(onClick = { expanded = true }) {
+            Icon(
+                painter = painterResource(searchProviderIconRes(currentScope, currentProvider)),
+                contentDescription = stringResource(R.string.search_source_picker),
+
+                modifier = Modifier.size(26.dp),
+            )
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            shape = RoundedCornerShape(20.dp),
+            containerColor =
+                LocalUnglassColorScheme.current?.surfaceContainerHigh
+                    ?: MaterialTheme.colorScheme.surfaceContainerHigh,
+        ) {
+            if (includeLocal) {
+                SearchSourceMenuItem(
+                    label = stringResource(R.string.search_library),
+                    iconRes = R.drawable.library_music,
+                    selected = currentScope == SearchSource.LOCAL,
+                ) {
+                    expanded = false
+                    onSelection(SearchSource.LOCAL, currentProvider)
+                }
+            }
+            SearchSourceMenuItem(
+                label = stringResource(R.string.search_source_youtube),
+                iconRes = R.drawable.youtube_icon,
+                selected = currentScope == SearchSource.ONLINE && currentProvider == SearchProvider.YOUTUBE,
+            ) {
+                expanded = false
+                onSelection(SearchSource.ONLINE, SearchProvider.YOUTUBE)
+            }
+            SearchSourceMenuItem(
+                label = stringResource(R.string.search_source_spotify),
+                iconRes = R.drawable.spotify_icon,
+                selected = currentScope == SearchSource.ONLINE && currentProvider == SearchProvider.SPOTIFY,
+            ) {
+                expanded = false
+                onSelection(SearchSource.ONLINE, SearchProvider.SPOTIFY)
+            }
+            SearchSourceMenuItem(
+                label = stringResource(R.string.search_source_apple_music),
+                iconRes = R.drawable.apple_music_icon,
+                selected = currentScope == SearchSource.ONLINE && currentProvider == SearchProvider.APPLE_MUSIC,
+            ) {
+                expanded = false
+                onSelection(SearchSource.ONLINE, SearchProvider.APPLE_MUSIC)
+            }
+            SearchSourceMenuItem(
+                label = stringResource(R.string.search_source_soundcloud),
+                iconRes = R.drawable.solar_music_note_2_linear,
+                selected = currentScope == SearchSource.ONLINE && currentProvider == SearchProvider.SOUNDCLOUD,
+            ) {
+                expanded = false
+                onSelection(SearchSource.ONLINE, SearchProvider.SOUNDCLOUD)
+            }
+            SearchSourceMenuItem(
+                label = stringResource(R.string.source_tidal),
+                iconRes = R.drawable.provider_tidal,
+                selected = currentScope == SearchSource.ONLINE && currentProvider == SearchProvider.TIDAL,
+            ) {
+                expanded = false
+                onSelection(SearchSource.ONLINE, SearchProvider.TIDAL)
+            }
+        }
+    }
+}
+
+// [FIX-ZCODE] Wave 8 (owner request): one-button source cycler for the online search
+// results header. The icon always shows the current provider; tapping advances to the
+// next one, so only one source is visible at a time. Only providers that actually
+// produce results on the results screen are in the cycle (Tidal has no search yet).
+@Composable
+fun SearchSourceCycler(
+    currentProvider: SearchProvider,
+    onAdvance: (SearchProvider) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val next =
+        when (currentProvider) {
+            SearchProvider.YOUTUBE -> SearchProvider.SPOTIFY
+            SearchProvider.SPOTIFY -> SearchProvider.APPLE_MUSIC
+            SearchProvider.APPLE_MUSIC -> SearchProvider.SOUNDCLOUD
+            else -> SearchProvider.YOUTUBE
+        }
+    IconButton(
+        onClick = { onAdvance(next) },
+        modifier = modifier,
+    ) {
+        Icon(
+            painter = painterResource(searchProviderIconRes(currentProvider)),
+            contentDescription = stringResource(R.string.search_source_picker),
+            modifier = Modifier.size(26.dp),
+        )
+    }
+}
+
+@Composable
+private fun SearchSourceMenuItem(
+    label: String,
+    iconRes: Int,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {    DropdownMenuItem(
+        text = {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                color =
+                    if (selected) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
+                    },
+            )
+        },
+        onClick = onClick,
+        leadingIcon = {
+            Icon(
+                painter = painterResource(iconRes),
+                contentDescription = null,
+                tint =
+                    if (selected) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        LocalContentColor.current
+                    },
+                modifier = Modifier.size(20.dp),
+            )
+        },
+        trailingIcon = {
+            if (selected) {
+                Icon(
+                    painter = painterResource(R.drawable.solar_check_circle_linear),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+        },
+    )
+}

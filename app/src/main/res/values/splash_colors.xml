@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- [FIX-ZCODE] Wave 9: base (light) declaration for the splash window background;
+         values-night overrides it. Without a default here lint-vital fails the release
+         build with MissingDefaultResource. -->
+    <color name="splash_window_background">#FFFFFF</color>
+</resources>

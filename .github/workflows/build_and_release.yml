@@ -1,0 +1,148 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Release Tag (leave empty to use versionName from app/build.gradle.kts)'
+        required: false
+        default: ''
+      release_title:
+        description: 'Release Title (e.g. ArchiveTune v16.0)'
+        required: false
+        default: ''
+      is_prerelease:
+        description: 'Mark as Pre-release'
+        type: boolean
+        default: false
+      is_draft:
+        description: 'Create as Draft Release'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build Release APKs
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+          fetch-depth: 0
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-cleanup: on-success
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Generate translation contributor credits
+        run: |
+          if [ -f scripts/generate_translation_contributors.py ]; then
+            python scripts/generate_translation_contributors.py || true
+          fi
+
+      - name: Determine Version & Tag
+        id: version_step
+        shell: bash
+        run: |
+          EXTRACTED_VER=$(grep -oP 'versionName\s*=\s*"\K[^"]+' app/build.gradle.kts || echo "16.0")
+          INPUT_TAG="${{ github.event.inputs.tag_name }}"
+          RELEASE_TAG="${{ github.event.release.tag_name }}"
+          if [ -n "$INPUT_TAG" ]; then
+            TAG="$INPUT_TAG"
+          elif [ -n "$RELEASE_TAG" ]; then
+            TAG="$RELEASE_TAG"
+          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+          else
+            TAG="v$EXTRACTED_VER"
+          fi
+
+          DISPLAY_VER="${TAG#v}"
+
+          INPUT_TITLE="${{ github.event.inputs.release_title }}"
+          if [ -n "$INPUT_TITLE" ]; then
+            TITLE="$INPUT_TITLE"
+          else
+            TITLE="ArchiveTune v$DISPLAY_VER"
+          fi
+
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$DISPLAY_VER" >> "$GITHUB_OUTPUT"
+          echo "title=$TITLE" >> "$GITHUB_OUTPUT"
+
+      - name: Build Release APKs
+        shell: bash
+        run: |
+          ./gradlew :app:assembleGmsMobileUniversalRelease :app:assembleGmsMobileArm64Release --no-daemon
+        env:
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD || secrets.KEYSTORE_PASSWORD }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+
+      - name: Prepare Artifacts & Checksums
+        id: prepare_artifacts
+        shell: bash
+        run: |
+          mkdir -p release_assets
+          VER="${{ steps.version_step.outputs.version }}"
+
+          # Universal APK
+          find app/build/outputs/apk -name "*Universal*release*.apk" -exec cp {} release_assets/ArchiveTune-v${VER}-universal.apk \;
+
+          # Arm64-v8a APK
+          find app/build/outputs/apk -name "*Arm64*release*.apk" -exec cp {} release_assets/ArchiveTune-v${VER}-arm64-v8a.apk \;
+
+          # Fallback if specific pattern was not matched
+          if [ ! -f release_assets/ArchiveTune-v${VER}-universal.apk ]; then
+            find app/build/outputs/apk -name "*universal*.apk" -exec cp {} release_assets/ArchiveTune-v${VER}-universal.apk \;
+          fi
+
+          # ProGuard / R8 Mapping
+          find app/build/outputs/mapping -name "mapping.txt" -exec cp {} release_assets/mapping-v${VER}.txt \;
+
+          # Generate SHA-256 Checksums
+          cd release_assets
+          sha256sum *.apk > sha256_checksums.txt || true
+          cd ..
+
+          echo "Prepared release assets:"
+          ls -la release_assets/
+
+      - name: Upload Artifacts to Actions
+        uses: actions/upload-artifact@v4
+        with:
+          name: ArchiveTune-Release-v${{ steps.version_step.outputs.version }}
+          path: release_assets/*
+
+      - name: Create or Update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version_step.outputs.tag }}
+          name: ${{ steps.version_step.outputs.title }}
+          draft: ${{ github.event.inputs.is_draft || false }}
+          prerelease: ${{ github.event.inputs.is_prerelease || false }}
+          generate_release_notes: true
+          files: release_assets/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

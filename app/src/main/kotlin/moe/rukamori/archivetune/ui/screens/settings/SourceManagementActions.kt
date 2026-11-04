@@ -1,0 +1,22 @@
+
+package moe.rukamori.archivetune.ui.screens.settings
+
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.widget.Toast
+import moe.rukamori.archivetune.R
+
+fun copyToClipboard(
+    context: Context,
+    label: String,
+    entries: List<String>,
+) {
+    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager ?: return
+    clipboard.setPrimaryClip(ClipData.newPlainText(label, entries.joinToString("\n")))
+    Toast.makeText(
+        context,
+        context.getString(R.string.source_copied, entries.size),
+        Toast.LENGTH_SHORT,
+    ).show()
+}

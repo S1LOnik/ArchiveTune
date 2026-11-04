@@ -1,0 +1,18 @@
+ArchiveTune Spotify playback via Librespot:
+We are resolving Spotify track audio via Librespot (Storage-Resolve HTTP endpoint):
+Endpoint: https://spclient.wg.spotify.com/storage-resolve/files/audio/interactive/{fileId}
+Headers:
+  client-token: {clientToken from https://clienttoken.spotify.com/v1/clienttoken}
+  Accept: application/x-protobuf
+  User-Agent: Spotify/8.8.84 Android/34
+  Authorization: Bearer {token}
+
+When using ZeroConf login, the session authenticates over AP TCP (Shannon) with username and auth_data, but no OAuth token is saved in SpotifyCredentialsStore.
+Previously, storage-resolve returned 401:
+  www-authenticate: Bearer realm="spotify", error="missing_token", error_description="No token provided"
+
+We added fallback in TokenProvider to request token via:
+1) Mercury Keymaster: hm://keymaster/token/authenticated?scope={scopes}&client_id=65b708073fc0480ea92a077233ca87bd&device_id={deviceId}
+2) Or Web API OAuth token from SpotifySessionManager (using browser OAuth PKCE)
+
+What are known edge cases or best practices with Mercury Keymaster tokens in Spotify's current AP protocol? Does hm://keymaster/token/authenticated still work reliably for Spotify AP connections in 2024-2026, or is client-token + Web API OAuth Bearer token required for storage-resolve? Give concise analysis and options.

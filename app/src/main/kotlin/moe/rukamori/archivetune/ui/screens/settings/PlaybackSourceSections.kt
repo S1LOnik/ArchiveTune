@@ -1,0 +1,1304 @@
+/*
+ * ArchiveTune (2026)
+ * © Rukamori — github.com/rukamori
+ * GPL-3.0 License | Contributors: see git history
+ * Do not remove or alter this notice. - Per GPL-3.0 Section 4 & Section 5
+ *
+ * Streaming-source sections rendered inline inside Player & Audio settings:
+ *  - a single lyrics-style drag-to-reorder "preferred sources" picker (top = preferred),
+ *  - a common section (YouTube history sync),
+ *  - and per-source sections (YouTube note, Tidal, Qobuz).
+ *
+ * Account login / instance / API management lives in the Integration section, not here.
+ * The compact per-source quality-only sections that used to duplicate these rows on
+ * the Player & Audio page were removed (2026-09-01); the full pickers below remain
+ * the single in-settings home for them.
+ */
+
+package moe.rukamori.archivetune.ui.screens.settings
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavController
+import moe.rukamori.archivetune.R
+import moe.rukamori.archivetune.audiosource.AudioSourceConfig
+import moe.rukamori.archivetune.constants.AudioSourceOrderKey
+import moe.rukamori.archivetune.constants.AudioSourceType
+import moe.rukamori.archivetune.constants.DeezerAudioQuality
+import moe.rukamori.archivetune.constants.DeezerAudioQualityKey
+import moe.rukamori.archivetune.constants.DeezerEnabledKey
+import moe.rukamori.archivetune.constants.AppleMusicQuality
+import moe.rukamori.archivetune.constants.AppleMusicQualityKey
+import moe.rukamori.archivetune.constants.AppleMusicSourceEnabledKey
+import moe.rukamori.archivetune.innertube.utils.hasYouTubeLoginCookie
+import moe.rukamori.archivetune.constants.JioSaavnEnabledKey
+import moe.rukamori.archivetune.constants.SaavnAudioQuality
+import moe.rukamori.archivetune.constants.SaavnAudioQualityKey
+import moe.rukamori.archivetune.constants.SoundCloudAudioQuality
+import moe.rukamori.archivetune.constants.SoundCloudAudioQualityKey
+import moe.rukamori.archivetune.constants.SoundCloudAuthTokenKey
+import moe.rukamori.archivetune.constants.SoundCloudEnabledKey
+import moe.rukamori.archivetune.constants.SpotifyDirectEnabledKey
+import moe.rukamori.archivetune.constants.SpotifyDirectQuality
+import moe.rukamori.archivetune.constants.SpotifyDirectQualityKey
+import moe.rukamori.archivetune.constants.SpotifyResolveMethod
+import moe.rukamori.archivetune.constants.SpotifyResolveMethodKey
+import moe.rukamori.archivetune.constants.SpotifySpDcKey
+import moe.rukamori.archivetune.constants.QobuzAudioQuality
+import moe.rukamori.archivetune.constants.QobuzAudioQualityKey
+import moe.rukamori.archivetune.constants.QobuzEnabledKey
+import moe.rukamori.archivetune.constants.QobuzBackupEnabledKey
+import moe.rukamori.archivetune.constants.QobuzBackupEndpointsKey
+import moe.rukamori.archivetune.constants.TidalAccountFirstKey
+import moe.rukamori.archivetune.constants.TidalAudioQuality
+import moe.rukamori.archivetune.constants.TidalAudioQualityKey
+import moe.rukamori.archivetune.constants.TidalEnabledKey
+import moe.rukamori.archivetune.constants.TelegramLosslessOnlyKey
+import moe.rukamori.archivetune.constants.AudioQuality
+import moe.rukamori.archivetune.constants.AutoChoosePlaybackClientKey
+import moe.rukamori.archivetune.constants.InnerTubeCookieKey
+import moe.rukamori.archivetune.constants.PoTokenGvsKey
+import moe.rukamori.archivetune.constants.PoTokenPlayerKey
+import moe.rukamori.archivetune.constants.AudioQualityKey
+import moe.rukamori.archivetune.constants.DefaultMetadataSourceKey
+import moe.rukamori.archivetune.constants.DefaultSearchSourceKey
+import moe.rukamori.archivetune.constants.MetadataSource
+import moe.rukamori.archivetune.constants.SearchProvider
+import moe.rukamori.archivetune.constants.PlayerStreamClient
+import moe.rukamori.archivetune.constants.PlayerStreamClientKey
+import moe.rukamori.archivetune.ui.component.DefaultDialog
+import moe.rukamori.archivetune.ui.component.EnumListPreference
+import moe.rukamori.archivetune.ui.component.ListPreference
+import moe.rukamori.archivetune.ui.component.PreferenceEntry
+import moe.rukamori.archivetune.ui.component.PreferenceGroup
+import moe.rukamori.archivetune.ui.component.SwitchPreference
+import moe.rukamori.archivetune.ui.component.TextFieldDialog
+import moe.rukamori.archivetune.soundcloud.SoundCloudAudioProvider
+import moe.rukamori.archivetune.spotify.SpotifyAccountViewModel
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import moe.rukamori.archivetune.utils.soundcloud.isSoundCloudAuthConfigured
+import moe.rukamori.archivetune.utils.soundcloud.normalizeSoundCloudAuthInput
+import moe.rukamori.archivetune.utils.rememberEnumPreference
+import moe.rukamori.archivetune.utils.rememberPreference
+import moe.rukamori.archivetune.utils.PoolAccountManager
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyListState
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+
+private fun AudioSourceType.displayName(context: android.content.Context): String =
+    when (this) {
+        AudioSourceType.TIDAL -> context.getString(R.string.source_tidal)
+        AudioSourceType.QOBUZ -> context.getString(R.string.source_qobuz)
+        AudioSourceType.QOBUZ_BACKUP -> context.getString(R.string.source_qobuz_backup)
+        AudioSourceType.DEEZER -> context.getString(R.string.source_deezer)
+        AudioSourceType.APPLE -> context.getString(R.string.source_apple_music)
+        AudioSourceType.JIOSAAVN -> context.getString(R.string.source_jiosaavn)
+        AudioSourceType.SOUNDCLOUD -> context.getString(R.string.source_soundcloud)
+        AudioSourceType.SPOTIFY -> context.getString(R.string.source_spotify)
+        AudioSourceType.YOUTUBE -> context.getString(R.string.source_youtube)
+    }
+
+private fun AudioSourceType.iconRes(): Int =
+    when (this) {
+        AudioSourceType.TIDAL -> R.drawable.provider_tidal
+        AudioSourceType.QOBUZ -> R.drawable.provider_qobuz
+        AudioSourceType.QOBUZ_BACKUP -> R.drawable.provider_qobuz
+        AudioSourceType.DEEZER -> R.drawable.provider_deezer
+        AudioSourceType.APPLE -> R.drawable.ic_music
+
+        AudioSourceType.JIOSAAVN -> R.drawable.provider_jiosaavn
+        AudioSourceType.SOUNDCLOUD -> R.drawable.solar_music_note_2_linear
+        AudioSourceType.SPOTIFY -> R.drawable.spotify_icon
+        AudioSourceType.YOUTUBE -> R.drawable.play
+    }
+
+@Composable
+internal fun PlaybackSourceSections(
+    navController: NavController,
+    positions: PreferencePositions,
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    val (sourceOrderRaw, onSourceOrderChange) = rememberPreference(AudioSourceOrderKey, "")
+    val (tidalEnabled, onTidalEnabledChange) = rememberPreference(TidalEnabledKey, true)
+    val (qobuzEnabled, onQobuzEnabledChangeRaw) = rememberPreference(QobuzEnabledKey, false)
+    val (deezerEnabled, onDeezerEnabledChangeRaw) = rememberPreference(DeezerEnabledKey, false)
+    val (appleMusicEnabled, onAppleMusicEnabledChangeRaw) = rememberPreference(AppleMusicSourceEnabledKey, false)
+    val (deezerQuality, onDeezerQualityChange) =
+        rememberEnumPreference(DeezerAudioQualityKey, DeezerAudioQuality.FLAC)
+    val (jioSaavnEnabled, onJioSaavnEnabledChange) = rememberPreference(JioSaavnEnabledKey, false)
+    val (saavnQuality, onSaavnQualityChange) =
+        rememberEnumPreference(SaavnAudioQualityKey, SaavnAudioQuality.QUALITY_320)
+    val (soundCloudEnabled, onSoundCloudEnabledChange) = rememberPreference(SoundCloudEnabledKey, false)
+    val (soundCloudQuality, onSoundCloudQualityChange) =
+        rememberEnumPreference(SoundCloudAudioQualityKey, SoundCloudAudioQuality.AAC_160)
+    val (soundCloudAuthToken, onSoundCloudAuthTokenChange) = rememberPreference(SoundCloudAuthTokenKey, "")
+    val (spotifyDirectEnabled, onSpotifyDirectEnabledChange) = rememberPreference(SpotifyDirectEnabledKey, false)
+    val (spotifyDirectQuality, onSpotifyDirectQualityChange) =
+        rememberEnumPreference(SpotifyDirectQualityKey, SpotifyDirectQuality.AAC_128)
+    val (spotifyResolveMethod, onSpotifyResolveMethodChange) =
+        rememberEnumPreference(SpotifyResolveMethodKey, SpotifyResolveMethod.STOPIFY)
+    val (spotifySpDc) = rememberPreference(SpotifySpDcKey, defaultValue = "")
+    val spotifyDirectLoggedIn = spotifySpDc.isNotBlank()
+    val (defaultMetadataSource, onDefaultMetadataSourceChange) =
+        rememberEnumPreference(DefaultMetadataSourceKey, MetadataSource.YOUTUBE)
+    val (defaultSearchSource, onDefaultSearchSourceChange) =
+        rememberEnumPreference(DefaultSearchSourceKey, SearchProvider.YOUTUBE)
+
+    val onQobuzEnabledChange: (Boolean) -> Unit = { enabled ->
+        onQobuzEnabledChangeRaw(enabled)
+        if (enabled && PoolAccountManager.isEnabled) {
+            scope.launch(Dispatchers.IO) {
+                runCatching { PoolAccountManager.refresh(context, force = true) }
+            }
+        }
+    }
+    val onDeezerEnabledChange: (Boolean) -> Unit = { enabled ->
+        onDeezerEnabledChangeRaw(enabled)
+        if (enabled && PoolAccountManager.isEnabled) {
+            scope.launch(Dispatchers.IO) {
+                runCatching { PoolAccountManager.refresh(context, force = true) }
+            }
+        }
+    }
+    val onAppleMusicEnabledChange: (Boolean) -> Unit = { enabled ->
+        onAppleMusicEnabledChangeRaw(enabled)
+        if (enabled && PoolAccountManager.isEnabled) {
+            scope.launch(Dispatchers.IO) {
+                runCatching { PoolAccountManager.refresh(context, force = false) }
+            }
+        }
+    }
+
+    val (tidalAccountFirst, onTidalAccountFirstChange) = rememberPreference(TidalAccountFirstKey, true)
+    val (audioQuality, onAudioQualityChange) =
+        rememberEnumPreference(TidalAudioQualityKey, TidalAudioQuality.FLAC)
+
+    val (ytAudioQuality, onYtAudioQualityChange) =
+        rememberEnumPreference(AudioQualityKey, defaultValue = AudioQuality.AUTO)
+    val (playerStreamClient, onPlayerStreamClientChange) =
+        rememberEnumPreference(PlayerStreamClientKey, defaultValue = PlayerStreamClient.WEB_REMIX)
+    val (autoChoosePlaybackClient, onAutoChoosePlaybackClientChange) =
+        rememberPreference(AutoChoosePlaybackClientKey, true)
+    val (innerTubeCookie, _) = rememberPreference(InnerTubeCookieKey, defaultValue = "")
+    val (poTokenGvs, _) = rememberPreference(PoTokenGvsKey, defaultValue = "")
+    val (poTokenPlayer, _) = rememberPreference(PoTokenPlayerKey, defaultValue = "")
+
+    val isArchiveTuneExtractorEnabled =
+        remember(innerTubeCookie, poTokenGvs, poTokenPlayer) {
+            hasYouTubeLoginCookie(innerTubeCookie) &&
+                poTokenGvs.isNotBlank() &&
+                poTokenPlayer.isNotBlank()
+        }
+    val playerStreamClients =
+        remember { PlayerStreamClient.entries }
+    val selectedPlayerStreamClient =
+        if (playerStreamClient in playerStreamClients) playerStreamClient
+        else PlayerStreamClient.WEB_REMIX
+
+    LaunchedEffect(playerStreamClient, isArchiveTuneExtractorEnabled) {
+        if (playerStreamClient == PlayerStreamClient.ARCHIVETUNE_EXTRACTOR && !isArchiveTuneExtractorEnabled) {
+            onPlayerStreamClientChange(PlayerStreamClient.WEB_REMIX)
+        }
+    }
+
+    val (qobuzQuality, onQobuzQualityChange) =
+        rememberEnumPreference(QobuzAudioQualityKey, QobuzAudioQuality.FLAC)
+    val (qobuzBackupEnabled, onQobuzBackupEnabledChange) = rememberPreference(QobuzBackupEnabledKey, false)
+    val (appleMusicQuality, onAppleMusicQualityChange) =
+        rememberEnumPreference(AppleMusicQualityKey, AppleMusicQuality.LOSSLESS)
+    val (qobuzBackupEndpoints, onQobuzBackupEndpointsChange) =
+        rememberPreference(QobuzBackupEndpointsKey, "")
+    var showQobuzBackupEndpointsDialog by rememberSaveable { mutableStateOf(false) }
+    var qobuzBackupEndpointsDraft by rememberSaveable { mutableStateOf("") }
+
+    val sourceOrder =
+        remember(sourceOrderRaw) {
+            AudioSourceConfig.parseOrder(sourceOrderRaw.ifBlank { null })
+        }
+
+    fun isEnabled(source: AudioSourceType): Boolean =
+        when (source) {
+            AudioSourceType.TIDAL -> tidalEnabled
+            AudioSourceType.QOBUZ -> qobuzEnabled
+            AudioSourceType.QOBUZ_BACKUP -> qobuzBackupEnabled
+
+            AudioSourceType.DEEZER -> deezerEnabled
+            AudioSourceType.APPLE -> appleMusicEnabled
+            AudioSourceType.JIOSAAVN -> jioSaavnEnabled
+            AudioSourceType.SOUNDCLOUD -> soundCloudEnabled
+            AudioSourceType.SPOTIFY -> spotifyDirectEnabled
+            AudioSourceType.YOUTUBE -> true
+        }
+
+    var showOrderDialog by rememberSaveable { mutableStateOf(false) }
+
+    fun onOrderConfirm(newOrder: List<AudioSourceType>) {
+        newOrder.firstOrNull { it != AudioSourceType.YOUTUBE }?.let { top ->
+            when (top) {
+                AudioSourceType.TIDAL -> if (!tidalEnabled) onTidalEnabledChange(true)
+                AudioSourceType.QOBUZ -> if (!qobuzEnabled) onQobuzEnabledChange(true)
+                AudioSourceType.QOBUZ_BACKUP -> if (!qobuzBackupEnabled) onQobuzBackupEnabledChange(true)
+                AudioSourceType.DEEZER -> if (!deezerEnabled) onDeezerEnabledChange(true)
+                AudioSourceType.APPLE -> if (!appleMusicEnabled) onAppleMusicEnabledChange(true)
+                AudioSourceType.JIOSAAVN -> if (!jioSaavnEnabled) onJioSaavnEnabledChange(true)
+                AudioSourceType.SOUNDCLOUD -> if (!soundCloudEnabled) onSoundCloudEnabledChange(true)
+                AudioSourceType.SPOTIFY -> if (!spotifyDirectEnabled) onSpotifyDirectEnabledChange(true)
+                AudioSourceType.YOUTUBE -> Unit
+            }
+        }
+        onSourceOrderChange(newOrder.joinToString(",") { it.name })
+        showOrderDialog = false
+    }
+
+    if (showOrderDialog) {
+        SourceOrderDialog(
+            initialOrder = sourceOrder,
+            isEnabled = ::isEnabled,
+            onDismiss = { showOrderDialog = false },
+            onConfirm = ::onOrderConfirm,
+        )
+    }
+
+    val preferred = sourceOrder.firstOrNull { isEnabled(it) } ?: AudioSourceType.YOUTUBE
+
+    PreferenceGroup(title = stringResource(R.string.playback_sources)) {
+        item {
+            PreferenceEntry(
+                modifier = positions.modifierFor("preferred_sources"),
+                title = { Text(stringResource(R.string.preferred_sources)) },
+                description = preferred.displayName(context),
+                icon = { Icon(painterResource(preferred.iconRes()), null) },
+                onClick = { showOrderDialog = true },
+            )
+        }
+    }
+    PreferenceGroup(title = stringResource(R.string.catalog_sources)) {
+        item {
+            EnumListPreference(
+                modifier = positions.modifierFor("default_metadata_source"),
+                title = { Text(stringResource(R.string.default_metadata_source)) },
+                description = stringResource(R.string.default_metadata_source_desc),
+                icon = { Icon(painterResource(R.drawable.album), null) },
+                selectedValue = defaultMetadataSource,
+                valueText = {
+                    when (it) {
+                        MetadataSource.YOUTUBE -> stringResource(R.string.metadata_source_youtube)
+                        MetadataSource.SPOTIFY -> stringResource(R.string.metadata_source_spotify)
+                    }
+                },
+                onValueSelected = onDefaultMetadataSourceChange,
+            )
+        }
+
+        item {
+            EnumListPreference(
+                modifier = positions.modifierFor("default_search_source"),
+                title = { Text(stringResource(R.string.default_search_source)) },
+                description = stringResource(R.string.default_search_source_desc),
+                icon = { Icon(painterResource(R.drawable.language), null) },
+                selectedValue = defaultSearchSource,
+                valueText = {
+                    when (it) {
+                        SearchProvider.YOUTUBE -> stringResource(R.string.search_source_youtube)
+                        SearchProvider.SPOTIFY -> stringResource(R.string.search_source_spotify)
+                        SearchProvider.APPLE_MUSIC -> stringResource(R.string.search_source_apple_music)
+                        SearchProvider.SOUNDCLOUD -> stringResource(R.string.search_source_soundcloud)
+                        SearchProvider.TIDAL -> stringResource(R.string.source_tidal)
+                    }
+                },
+                onValueSelected = onDefaultSearchSourceChange,
+            )
+        }
+
+        item {
+            PreferenceEntry(
+                modifier = positions.modifierFor("spotify_catalog_source"),
+                title = { Text(stringResource(R.string.spotify_catalog_source)) },
+                description = stringResource(R.string.spotify_catalog_source_desc),
+                icon = { Icon(painterResource(R.drawable.spotify_icon), null) },
+                onClick = { navController.navigate("settings/integration") },
+            )
+        }
+    }
+
+    PreferenceGroup(title = stringResource(R.string.source_youtube)) {
+        item {
+            EnumListPreference(
+                title = { Text(stringResource(R.string.audio_quality)) },
+                description = stringResource(R.string.audio_quality_description),
+                icon = { Icon(painterResource(R.drawable.graphic_eq), null) },
+                selectedValue = ytAudioQuality,
+                onValueSelected = onYtAudioQualityChange,
+                valueText = {
+                    when (it) {
+                        AudioQuality.HIGHEST -> stringResource(R.string.audio_quality_max)
+                        AudioQuality.HIGH -> stringResource(R.string.audio_quality_high)
+                        AudioQuality.AUTO -> stringResource(R.string.audio_quality_auto)
+                        AudioQuality.LOW -> stringResource(R.string.audio_quality_low)
+                    }
+                },
+            )
+        }
+        item {
+            SwitchPreference(
+                modifier = positions.modifierFor("auto_choose_playback_client"),
+                title = { Text(stringResource(R.string.auto_choose_playback_client)) },
+                description =
+                    stringResource(
+                        if (autoChoosePlaybackClient) {
+                            R.string.auto_choose_playback_client_enabled_note
+                        } else {
+                            R.string.auto_choose_playback_client_disabled_note
+                        },
+                    ),
+                icon = { Icon(painterResource(R.drawable.tune), null) },
+                checked = autoChoosePlaybackClient,
+                onCheckedChange = onAutoChoosePlaybackClientChange,
+            )
+        }
+
+        item {
+            ListPreference(
+                modifier = positions.modifierFor("player_stream_client"),
+                title = { Text(stringResource(R.string.player_stream_client)) },
+                description = stringResource(R.string.player_stream_client_desc),
+                icon = { Icon(painterResource(R.drawable.integration), null) },
+                selectedValue = selectedPlayerStreamClient,
+                values = playerStreamClients,
+                onValueSelected = onPlayerStreamClientChange,
+                isEnabled = !autoChoosePlaybackClient,
+
+                isValueEnabled = { client ->
+                    client != PlayerStreamClient.ARCHIVETUNE_EXTRACTOR || isArchiveTuneExtractorEnabled
+                },
+
+                valueText = {
+                    when (it) {
+                        PlayerStreamClient.ANDROID_VR ->
+                            stringResource(R.string.player_stream_client_android_vr)
+                        PlayerStreamClient.WEB_REMIX ->
+                            stringResource(R.string.player_stream_client_web_remix)
+                        PlayerStreamClient.ARCHIVETUNE_EXTRACTOR ->
+                            stringResource(R.string.player_stream_client_archivetune_extractor)
+                        PlayerStreamClient.HI_RES_LOSSLESS ->
+                            stringResource(R.string.player_stream_client_hi_res_lossless)
+                        PlayerStreamClient.IOS ->
+                            stringResource(R.string.player_stream_client_ios)
+                        PlayerStreamClient.TVHTML5 ->
+                            stringResource(R.string.player_stream_client_tvhtml5)
+                        PlayerStreamClient.ANDROID_MUSIC ->
+                            stringResource(R.string.player_stream_client_android_music)
+                    }
+                },
+                valueDescription = {
+                    when (it) {
+                        PlayerStreamClient.ANDROID_VR ->
+                            stringResource(R.string.player_stream_client_android_vr_desc)
+                        PlayerStreamClient.WEB_REMIX ->
+                            stringResource(R.string.player_stream_client_web_remix_desc)
+                        PlayerStreamClient.ARCHIVETUNE_EXTRACTOR ->
+                            if (isArchiveTuneExtractorEnabled) {
+                                stringResource(R.string.player_stream_client_archivetune_extractor_desc)
+                            } else {
+                                stringResource(R.string.player_stream_client_archivetune_extractor_login_required)
+                            }
+                        PlayerStreamClient.HI_RES_LOSSLESS ->
+                            stringResource(R.string.player_stream_client_hi_res_lossless_desc)
+                        PlayerStreamClient.IOS ->
+                            stringResource(R.string.player_stream_client_ios_desc)
+                        PlayerStreamClient.TVHTML5 ->
+                            stringResource(R.string.player_stream_client_tvhtml5_desc)
+                        PlayerStreamClient.ANDROID_MUSIC ->
+                            stringResource(R.string.player_stream_client_android_music_desc)
+                    }
+                },
+            )
+        }
+    }
+
+    PreferenceGroup(title = stringResource(R.string.tidal_specific)) {
+        item {
+            SwitchPreference(
+                modifier = positions.modifierFor("tidal_enable"),
+                title = { Text(stringResource(R.string.tidal_enable)) },
+                description = stringResource(R.string.tidal_enable_description),
+                icon = { Icon(painterResource(R.drawable.provider_tidal), null) },
+                checked = tidalEnabled,
+                onCheckedChange = onTidalEnabledChange,
+            )
+        }
+
+        item {
+            SwitchPreference(
+                modifier = positions.modifierFor("tidal_account_first"),
+                title = { Text(stringResource(R.string.tidal_account_first)) },
+                description = stringResource(R.string.tidal_account_first_description),
+                icon = { Icon(painterResource(R.drawable.token), null) },
+                checked = tidalAccountFirst,
+                onCheckedChange = onTidalAccountFirstChange,
+                isEnabled = tidalEnabled,
+            )
+        }
+
+        item {
+            EnumListPreference(
+                modifier = positions.modifierFor("tidal_audio_quality"),
+                title = { Text(stringResource(R.string.tidal_audio_quality)) },
+                icon = { Icon(painterResource(R.drawable.play), null) },
+                selectedValue = audioQuality,
+                onValueSelected = onAudioQualityChange,
+                isEnabled = tidalEnabled,
+                valueText = { quality ->
+                    when (quality) {
+                        TidalAudioQuality.AAC_320 -> stringResource(R.string.tidal_quality_aac_320)
+                        TidalAudioQuality.FLAC -> stringResource(R.string.tidal_quality_flac)
+                        TidalAudioQuality.HI_RES_LOSSLESS -> stringResource(R.string.tidal_quality_hires)
+                    }
+                },
+            )
+        }
+
+        item {
+            PreferenceEntry(
+                modifier = positions.modifierFor("tidal_manage_instances"),
+                title = { Text(stringResource(R.string.tidal_manage_instances)) },
+                description = stringResource(R.string.tidal_integration_description),
+                icon = { Icon(painterResource(R.drawable.provider_tidal), null) },
+                onClick = { navController.navigate("settings/tidal") },
+            )
+        }
+
+        item {
+            SourceCheckRow(source = AudioSourceType.TIDAL, positions = positions)
+        }
+    }
+
+    PreferenceGroup(title = stringResource(R.string.qobuz_specific)) {
+        item {
+            SwitchPreference(
+                modifier = positions.modifierFor("qobuz_enable"),
+                title = { Text(stringResource(R.string.qobuz_enable)) },
+                description = stringResource(R.string.qobuz_enable_description),
+                icon = { Icon(painterResource(R.drawable.provider_qobuz), null) },
+                checked = qobuzEnabled,
+                onCheckedChange = onQobuzEnabledChange,
+            )
+        }
+
+        item {
+            EnumListPreference(
+                modifier = positions.modifierFor("qobuz_audio_quality"),
+                title = { Text(stringResource(R.string.qobuz_audio_quality)) },
+                icon = { Icon(painterResource(R.drawable.play), null) },
+                selectedValue = qobuzQuality,
+                onValueSelected = onQobuzQualityChange,
+                isEnabled = qobuzEnabled,
+                valueText = { quality ->
+                    when (quality) {
+                        QobuzAudioQuality.FLAC -> stringResource(R.string.qobuz_quality_flac)
+                        QobuzAudioQuality.HI_RES -> stringResource(R.string.qobuz_quality_hires)
+                        QobuzAudioQuality.MAX -> stringResource(R.string.qobuz_quality_max)
+                    }
+                },
+            )
+        }
+
+        item {
+            PreferenceEntry(
+                modifier = positions.modifierFor("qobuz_manage_instances"),
+                title = { Text(stringResource(R.string.qobuz_manage_instances)) },
+                description = stringResource(R.string.qobuz_integration_description),
+                icon = { Icon(painterResource(R.drawable.provider_qobuz), null) },
+                onClick = { navController.navigate("settings/qobuz") },
+            )
+        }
+
+        item {
+            SourceCheckRow(source = AudioSourceType.QOBUZ, positions = positions)
+        }
+    }
+
+    PreferenceGroup(title = stringResource(R.string.qobuz_backup_specific)) {
+        item {
+            SwitchPreference(
+                modifier = positions.modifierFor("qobuz_backup_enable"),
+                title = { Text(stringResource(R.string.qobuz_backup_enable)) },
+                description = stringResource(R.string.qobuz_backup_enable_description),
+                icon = { Icon(painterResource(R.drawable.provider_qobuz), null) },
+                checked = qobuzBackupEnabled,
+                onCheckedChange = onQobuzBackupEnabledChange,
+            )
+        }
+
+        item {
+            PreferenceEntry(
+                modifier = positions.modifierFor("qobuz_backup_endpoints"),
+                title = { Text(stringResource(R.string.qobuz_backup_endpoints)) },
+                description = stringResource(R.string.qobuz_backup_endpoints_desc),
+                icon = { Icon(painterResource(R.drawable.link), null) },
+                onClick = {
+                    qobuzBackupEndpointsDraft = qobuzBackupEndpoints
+                    showQobuzBackupEndpointsDialog = true
+                },
+            )
+        }
+
+        item {
+            SourceCheckRow(source = AudioSourceType.QOBUZ_BACKUP, positions = positions)
+        }
+    }
+
+    if (showQobuzBackupEndpointsDialog) {
+        DefaultDialog(
+            onDismiss = { showQobuzBackupEndpointsDialog = false },
+            icon = { Icon(painterResource(R.drawable.link), null) },
+            title = { Text(stringResource(R.string.qobuz_backup_endpoints)) },
+            contentScrollable = true,
+            buttons = {
+                TextButton(
+                    onClick = {
+                        onQobuzBackupEndpointsChange(
+                            qobuzBackupEndpointsDraft
+                                .split('\n')
+                                .map { it.trim().trimEnd('/') }
+                                .filter { it.startsWith("http") }
+                                .distinct()
+                                .joinToString("\n"),
+                        )
+                        showQobuzBackupEndpointsDialog = false
+                    },
+                    shapes = ButtonDefaults.shapes(),
+                ) {
+                    Text(stringResource(android.R.string.ok))
+                }
+                TextButton(
+                    onClick = { showQobuzBackupEndpointsDialog = false },
+                    shapes = ButtonDefaults.shapes(),
+                ) {
+                    Text(stringResource(R.string.close_dialog))
+                }
+            },
+        ) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                OutlinedTextField(
+                    value = qobuzBackupEndpointsDraft,
+                    onValueChange = { qobuzBackupEndpointsDraft = it },
+                    label = { Text(stringResource(R.string.qobuz_backup_endpoints_hint)) },
+                    minLines = 3,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = stringResource(R.string.qobuz_backup_endpoints_help),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+
+    PreferenceGroup(title = stringResource(R.string.applemusic_settings)) {
+        item {
+            SwitchPreference(
+                modifier = positions.modifierFor("applemusic_enable"),
+                title = { Text(stringResource(R.string.applemusic_enable)) },
+                description = stringResource(R.string.applemusic_enable_description),
+                icon = { Icon(painterResource(R.drawable.ic_music), null) },
+                checked = appleMusicEnabled,
+                onCheckedChange = onAppleMusicEnabledChange,
+            )
+        }
+        item {
+            EnumListPreference(
+                title = { Text(stringResource(R.string.applemusic_quality)) },
+                description = stringResource(R.string.applemusic_quality_desc),
+                icon = { Icon(painterResource(R.drawable.ic_music), null) },
+                selectedValue = appleMusicQuality,
+                onValueSelected = onAppleMusicQualityChange,
+                valueText = {
+                    when (it) {
+                        AppleMusicQuality.AAC -> stringResource(R.string.applemusic_quality_aac)
+                        AppleMusicQuality.LOSSLESS -> stringResource(R.string.applemusic_quality_lossless)
+                        AppleMusicQuality.HI_RES_LOSSLESS -> stringResource(R.string.applemusic_quality_hires)
+                    }
+                },
+            )
+        }
+        item {
+            PreferenceEntry(
+                title = { Text(stringResource(R.string.applemusic_settings)) },
+                description = stringResource(R.string.applemusic_helper_short),
+                icon = { Icon(painterResource(R.drawable.ic_music), null) },
+                onClick = { navController.navigate("settings/applemusic") },
+            )
+        }
+
+        item {
+            SourceCheckRow(source = AudioSourceType.APPLE, positions = positions)
+        }
+    }
+
+    PreferenceGroup(title = stringResource(R.string.deezer_specific)) {
+        item {
+            SwitchPreference(
+                modifier = positions.modifierFor("deezer_enable"),
+                title = { Text(stringResource(R.string.deezer_enable)) },
+                description = stringResource(R.string.deezer_enable_description),
+                icon = { Icon(painterResource(R.drawable.provider_deezer), null) },
+                checked = deezerEnabled,
+                onCheckedChange = onDeezerEnabledChange,
+            )
+        }
+
+        item {
+            EnumListPreference(
+                modifier = positions.modifierFor("deezer_audio_quality"),
+                title = { Text(stringResource(R.string.deezer_audio_quality)) },
+                icon = { Icon(painterResource(R.drawable.play), null) },
+                selectedValue = deezerQuality,
+                onValueSelected = onDeezerQualityChange,
+                isEnabled = deezerEnabled,
+                valueText = { quality ->
+                    when (quality) {
+                        DeezerAudioQuality.FLAC -> stringResource(R.string.deezer_quality_flac)
+                        DeezerAudioQuality.MP3_320 -> stringResource(R.string.deezer_quality_mp3_320)
+                        DeezerAudioQuality.MP3_128 -> stringResource(R.string.deezer_quality_mp3_128)
+                    }
+                },
+            )
+        }
+
+        item {
+            PreferenceEntry(
+                title = { Text(stringResource(R.string.deezer_login)) },
+                description = stringResource(R.string.deezer_integration_description),
+                icon = { Icon(painterResource(R.drawable.provider_deezer), null) },
+                onClick = { navController.navigate("settings/deezer") },
+            )
+        }
+
+        item {
+            SourceCheckRow(source = AudioSourceType.DEEZER, positions = positions)
+        }
+    }
+
+    PreferenceGroup(title = stringResource(R.string.jiosaavn_specific)) {
+        item {
+            SwitchPreference(
+                modifier = positions.modifierFor("jiosaavn_enable"),
+                title = { Text(stringResource(R.string.jiosaavn_enable)) },
+                description = stringResource(R.string.jiosaavn_enable_description),
+                icon = { Icon(painterResource(R.drawable.provider_jiosaavn), null) },
+                checked = jioSaavnEnabled,
+                onCheckedChange = onJioSaavnEnabledChange,
+            )
+        }
+
+        item {
+            EnumListPreference(
+                modifier = positions.modifierFor("jiosaavn_audio_quality"),
+                title = { Text(stringResource(R.string.jiosaavn_audio_quality)) },
+                icon = { Icon(painterResource(R.drawable.play), null) },
+                selectedValue = saavnQuality,
+                onValueSelected = onSaavnQualityChange,
+                isEnabled = jioSaavnEnabled,
+                valueText = { quality -> quality.toLabel() },
+            )
+        }
+
+        item {
+            PreferenceEntry(
+                title = { Text(stringResource(R.string.jiosaavn_open_settings)) },
+                description = stringResource(R.string.jiosaavn_open_settings_description),
+                icon = { Icon(painterResource(R.drawable.provider_jiosaavn), null) },
+                onClick = { navController.navigate("settings/jiosaavn") },
+            )
+        }
+
+        item {
+            PreferenceEntry(
+                title = { Text(stringResource(R.string.jiosaavn_credit)) },
+                description = stringResource(R.string.jiosaavn_credit_description),
+                icon = { Icon(painterResource(R.drawable.info), null) },
+                onClick = {
+                    runCatching {
+                        context.startActivity(
+                            android.content.Intent(
+                                android.content.Intent.ACTION_VIEW,
+                                android.net.Uri.parse("https://www.jiosaavn.com"),
+                            ),
+                        )
+                    }
+                },
+            )
+        }
+
+        item {
+            SourceCheckRow(source = AudioSourceType.JIOSAAVN, positions = positions)
+        }
+    }
+
+    var showSoundCloudTokenDialog by rememberSaveable { mutableStateOf(false) }
+    var showSoundCloudWebLogin by rememberSaveable { mutableStateOf(false) }
+    var showSpotifyLogin by rememberSaveable { mutableStateOf(false) }
+    val spotifyAccountViewModel: SpotifyAccountViewModel = hiltViewModel()
+    val spotifyState by spotifyAccountViewModel.uiState.collectAsStateWithLifecycle()
+
+    LaunchedEffect(spotifyState.isAuthenticated) {
+        if (spotifyState.isAuthenticated) {
+            showSpotifyLogin = false
+        }
+    }
+
+    PreferenceGroup(title = stringResource(R.string.soundcloud_specific)) {
+        item {
+            SwitchPreference(
+                modifier = positions.modifierFor("soundcloud_enable"),
+                title = { Text(stringResource(R.string.soundcloud_enable)) },
+                description = stringResource(R.string.soundcloud_enable_description),
+                icon = { Icon(painterResource(R.drawable.solar_music_note_2_linear), null) },
+                checked = soundCloudEnabled,
+                onCheckedChange = onSoundCloudEnabledChange,
+            )
+        }
+
+        item {
+            EnumListPreference(
+                modifier = positions.modifierFor("soundcloud_audio_quality"),
+                title = { Text(stringResource(R.string.soundcloud_audio_quality)) },
+                icon = { Icon(painterResource(R.drawable.play), null) },
+                selectedValue = soundCloudQuality,
+                onValueSelected = onSoundCloudQualityChange,
+                isEnabled = soundCloudEnabled,
+                valueText = { quality ->
+                    when (quality) {
+                        SoundCloudAudioQuality.MP3_128 -> stringResource(R.string.soundcloud_quality_mp3_128)
+                        SoundCloudAudioQuality.AAC_96 -> stringResource(R.string.soundcloud_quality_aac_96)
+                        SoundCloudAudioQuality.AAC_160 -> stringResource(R.string.soundcloud_quality_aac_160)
+                        // [FIX-ZCODE] Opus 64k tier lost during settings-dir revert — restored
+                        SoundCloudAudioQuality.OPUS_64 -> stringResource(R.string.soundcloud_quality_opus_64)
+                    }
+                },
+            )
+        }
+
+        item {
+            PreferenceEntry(
+                modifier = positions.modifierFor("soundcloud_web_login"),
+                title = { Text(stringResource(R.string.soundcloud_web_login)) },
+                description = stringResource(R.string.soundcloud_web_login_description),
+                icon = { Icon(painterResource(R.drawable.language), null) },
+                onClick = { showSoundCloudWebLogin = true },
+            )
+        }
+
+        item {
+            PreferenceEntry(
+                modifier = positions.modifierFor("soundcloud_auth_token"),
+                title = { Text(stringResource(R.string.soundcloud_auth_token_title)) },
+                description =
+                    if (isSoundCloudAuthConfigured(soundCloudAuthToken)) {
+                        stringResource(R.string.soundcloud_auth_configured)
+                    } else {
+                        stringResource(R.string.soundcloud_auth_not_configured)
+                    },
+                icon = { Icon(painterResource(R.drawable.key), null) },
+                onClick = { showSoundCloudTokenDialog = true },
+            )
+        }
+
+        item(visible = isSoundCloudAuthConfigured(soundCloudAuthToken)) {
+            PreferenceEntry(
+                modifier = positions.modifierFor("soundcloud_clear_auth"),
+                title = { Text(stringResource(R.string.soundcloud_clear_auth)) },
+                icon = { Icon(painterResource(R.drawable.logout), null) },
+                onClick = {
+                    onSoundCloudAuthTokenChange("")
+                    SoundCloudAudioProvider.invalidateClientId()
+                },
+            )
+        }
+
+        item {
+            SourceCheckRow(source = AudioSourceType.SOUNDCLOUD, positions = positions)
+        }
+    }
+
+    if (showSoundCloudTokenDialog) {
+        var tokenText by remember { mutableStateOf("") }
+        TextFieldDialog(
+            icon = { Icon(painterResource(R.drawable.key), null) },
+            title = { Text(stringResource(R.string.soundcloud_auth_token_title)) },
+            textFieldValue = tokenText,
+            onTextFieldValueChange = { tokenText = it },
+            placeholder = { Text(stringResource(R.string.soundcloud_auth_token_placeholder)) },
+            visualTransformation = PasswordVisualTransformation(),
+            isInputValid = { normalizeSoundCloudAuthInput(it) != null },
+            onDone = { raw ->
+                normalizeSoundCloudAuthInput(raw)?.let { token ->
+                    onSoundCloudAuthTokenChange(token)
+                    SoundCloudAudioProvider.invalidateClientId()
+                }
+                showSoundCloudTokenDialog = false
+            },
+            onDismiss = { showSoundCloudTokenDialog = false },
+        )
+    }
+
+    if (showSoundCloudWebLogin) {
+        SoundCloudLoginSheet(
+            onDismiss = { showSoundCloudWebLogin = false },
+            onTokenCaptured = { token ->
+                onSoundCloudAuthTokenChange(token)
+                SoundCloudAudioProvider.invalidateClientId()
+            },
+        )
+    }
+
+    if (showSpotifyLogin) {
+        SpotifyLoginSheet(
+            onDismiss = { showSpotifyLogin = false },
+            onCookiesCaptured = { spDc, spKey ->
+                showSpotifyLogin = false
+                spotifyAccountViewModel.connectWithCookies(spDc = spDc, spKey = spKey)
+            },
+        )
+    }
+
+    spotifyState.errorMessage?.let { error ->
+        SpotifyErrorDialog(
+            message = error,
+            onDismiss = spotifyAccountViewModel::dismissError,
+        )
+    }
+
+    PreferenceGroup(title = stringResource(R.string.spotify_direct_specific)) {
+        item {
+            SwitchPreference(
+                modifier = positions.modifierFor("spotify_direct_enable"),
+                title = { Text(stringResource(R.string.spotify_direct_enable)) },
+                description = stringResource(R.string.spotify_direct_enable_description),
+                icon = { Icon(painterResource(R.drawable.spotify_icon), null) },
+                checked = spotifyDirectEnabled,
+                onCheckedChange = onSpotifyDirectEnabledChange,
+            )
+        }
+
+        item {
+            PreferenceEntry(
+                title = { Text(stringResource(R.string.spotify_direct_experimental)) },
+                icon = {
+                    Icon(
+                        painterResource(R.drawable.solar_danger_circle_linear),
+                        null,
+                        tint = MaterialTheme.colorScheme.error,
+                    )
+                },
+                content = {
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        text = stringResource(R.string.spotify_direct_warning),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                },
+            )
+        }
+
+        item {
+            if (!spotifyState.isAuthenticated) {
+                PreferenceEntry(
+                    modifier = positions.modifierFor("spotify_direct_login"),
+                    title = { Text(stringResource(R.string.spotify_connect)) },
+                    description = stringResource(R.string.spotify_not_connected),
+                    icon = { Icon(painterResource(R.drawable.spotify_icon), null) },
+                    trailingContent = {
+                        AnimatedVisibility(visible = spotifyState.isLoading) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                strokeWidth = 2.dp,
+                            )
+                        }
+                    },
+                    onClick = { showSpotifyLogin = true },
+                    isEnabled = !spotifyState.isLoading,
+                )
+            } else {
+                PreferenceEntry(
+                    modifier = positions.modifierFor("spotify_direct_login"),
+                    title = {
+                        Text(
+                            text =
+                                if (spotifyState.accountName.isNotBlank()) {
+                                    stringResource(R.string.spotify_connected_as, spotifyState.accountName)
+                                } else {
+                                    stringResource(R.string.spotify_account)
+                                },
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    },
+                    description = stringResource(R.string.spotify_direct_signed_in_desc),
+                    icon = { SpotifyAccountIcon(avatarUrl = spotifyState.accountAvatarUrl) },
+                    isEnabled = false,
+                )
+            }
+        }
+
+        item(visible = spotifyState.isAuthenticated) {
+            PreferenceEntry(
+                modifier = positions.modifierFor("spotify_direct_logout"),
+                title = { Text(stringResource(R.string.action_logout)) },
+                icon = { Icon(painterResource(R.drawable.logout), null) },
+                onClick = { spotifyAccountViewModel.logout() },
+                isEnabled = !spotifyState.isLoading,
+            )
+        }
+
+        item {
+            EnumListPreference(
+                modifier = positions.modifierFor("spotify_direct_quality"),
+                title = { Text(stringResource(R.string.spotify_direct_audio_quality)) },
+                icon = { Icon(painterResource(R.drawable.play), null) },
+                selectedValue = spotifyDirectQuality,
+                onValueSelected = onSpotifyDirectQualityChange,
+                isEnabled = spotifyDirectEnabled && spotifyDirectLoggedIn,
+                valueText = { quality ->
+                    when (quality) {
+                        SpotifyDirectQuality.AAC_128 -> stringResource(R.string.spotify_direct_quality_aac_128)
+                    }
+                },
+            )
+        }
+
+        item {
+            EnumListPreference(
+                modifier = positions.modifierFor("spotify_resolve_method"),
+                title = { Text(stringResource(R.string.spotify_resolve_method)) },
+                description = stringResource(R.string.spotify_resolve_method_desc),
+                icon = { Icon(painterResource(R.drawable.music_note), null) },
+                selectedValue = spotifyResolveMethod,
+                onValueSelected = onSpotifyResolveMethodChange,
+                isEnabled = spotifyDirectEnabled && spotifyDirectLoggedIn,
+                valueText = { method ->
+                    when (method) {
+                        SpotifyResolveMethod.STOPIFY -> stringResource(R.string.spotify_resolve_method_stopify)
+                        SpotifyResolveMethod.ECHO -> stringResource(R.string.spotify_resolve_method_echo)
+                    }
+                },
+            )
+        }
+
+        item {
+            SourceCheckRow(source = AudioSourceType.SPOTIFY, positions = positions)
+        }
+    }
+
+    val (telegramLosslessOnly, onTelegramLosslessOnlyChange) =
+        rememberPreference(TelegramLosslessOnlyKey, false)
+
+    PreferenceGroup(title = stringResource(R.string.telegram_integration)) {
+        item {
+            PreferenceEntry(
+                title = { Text(stringResource(R.string.telegram_integration)) },
+                description = stringResource(R.string.telegram_integration_description),
+                icon = { Icon(painterResource(R.drawable.provider_telegram), null) },
+                onClick = { navController.navigate("settings/telegram") },
+            )
+        }
+        item {
+            SwitchPreference(
+                modifier = positions.modifierFor("telegram_lossless_only"),
+                title = { Text(stringResource(R.string.telegram_lossless_only)) },
+                description = stringResource(R.string.telegram_lossless_only_description),
+                icon = { Icon(painterResource(R.drawable.graphic_eq), null) },
+                checked = telegramLosslessOnly,
+                onCheckedChange = onTelegramLosslessOnlyChange,
+            )
+        }
+    }
+}
+
+@Composable
+private fun SourceCheckRow(
+    source: AudioSourceType,
+    positions: PreferencePositions,
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var checking by remember { mutableStateOf(false) }
+    var result by remember { mutableStateOf<SourceCheckResult?>(null) }
+
+    val cachedResults by SourceCheckService.results.collectAsStateWithLifecycle()
+    val cached = cachedResults[source]
+
+    PreferenceEntry(
+        modifier = positions.modifierFor("check_source"),
+        title = { Text(stringResource(R.string.check_source)) },
+        description =
+            if (cached == null) {
+                stringResource(R.string.check_source_description)
+            } else {
+                buildString {
+                    append(sourceStatusLabel(cached.status))
+                    append(" · ")
+                    append(lastCheckedLabel(cached.checkedAtMs))
+                }
+            },
+        icon = {
+            Icon(
+                painterResource(R.drawable.graphic_eq),
+                null,
+                tint = sourceStatusColor(cached?.status),
+            )
+        },
+        trailingContent = if (checking) {
+            { CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp) }
+        } else if (cached != null) {
+            {
+                Text(
+                    text = sourceStatusLabel(cached.status),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = sourceStatusColor(cached.status),
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+        } else {
+            null
+        },
+        isEnabled = !checking,
+        onClick = {
+            if (checking) return@PreferenceEntry
+            checking = true
+            scope.launch {
+                val res = withContext(Dispatchers.IO) {
+                    SourceCheckService.check(source, context)
+                }
+                result = res
+                checking = false
+            }
+        },
+    )
+
+    result?.let { res ->
+        DefaultDialog(
+            onDismiss = { result = null },
+            buttons = {
+                TextButton(onClick = { result = null }, shapes = ButtonDefaults.shapes()) {
+                    Text(stringResource(android.R.string.ok))
+                }
+            },
+        ) {
+            Column(modifier = Modifier.padding(top = 4.dp)) {
+                Text(
+                    text = stringResource(R.string.check_source_result_title, source.displayName(context)),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(bottom = 8.dp),
+                )
+                Text(
+                    text = res.summary,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (res.healthy) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.error
+                    },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun sourceStatusLabel(status: SourceCheckStatus): String =
+    when (status) {
+        SourceCheckStatus.READY -> stringResource(R.string.check_source_status_ready)
+        SourceCheckStatus.DEGRADED -> stringResource(R.string.check_source_status_degraded)
+        SourceCheckStatus.NOT_CONFIGURED -> stringResource(R.string.check_source_status_not_configured)
+        SourceCheckStatus.UNSUPPORTED -> stringResource(R.string.check_source_status_unsupported)
+        SourceCheckStatus.UNREACHABLE -> stringResource(R.string.check_source_status_unreachable)
+    }
+
+@Composable
+private fun sourceStatusColor(status: SourceCheckStatus?): Color =
+    when (status) {
+        null -> MaterialTheme.colorScheme.onSurfaceVariant
+        SourceCheckStatus.READY -> MaterialTheme.colorScheme.primary
+        SourceCheckStatus.DEGRADED -> MaterialTheme.colorScheme.tertiary
+        SourceCheckStatus.NOT_CONFIGURED -> MaterialTheme.colorScheme.onSurfaceVariant
+        SourceCheckStatus.UNSUPPORTED -> MaterialTheme.colorScheme.onSurfaceVariant
+        SourceCheckStatus.UNREACHABLE -> MaterialTheme.colorScheme.error
+    }
+
+private fun lastCheckedLabel(checkedAtMs: Long): String {
+    val minutes = (System.currentTimeMillis() - checkedAtMs) / 60_000L
+    return when {
+        minutes < 1 -> "just now"
+        minutes < 60 -> "${minutes}m ago"
+        else -> "${minutes / 60}h ago"
+    }
+}
+
+@Composable
+private fun SourceOrderDialog(
+    initialOrder: List<AudioSourceType>,
+    isEnabled: (AudioSourceType) -> Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: (List<AudioSourceType>) -> Unit,
+) {
+    val context = LocalContext.current
+    val sources = remember { mutableStateListOf(*initialOrder.toTypedArray()) }
+    val lazyListState = rememberLazyListState()
+    val reorderableState =
+        rememberReorderableLazyListState(lazyListState) { from, to ->
+            val item = sources.removeAt(from.index)
+            sources.add(to.index, item)
+        }
+
+    DefaultDialog(
+        onDismiss = onDismiss,
+        buttons = {
+            TextButton(
+                onClick = onDismiss,
+                shapes = ButtonDefaults.shapes(),
+            ) {
+                Text(stringResource(android.R.string.cancel))
+            }
+            Spacer(Modifier.weight(1f))
+            TextButton(
+                onClick = { onConfirm(sources.toList()) },
+                shapes = ButtonDefaults.shapes(),
+            ) {
+                Text(stringResource(android.R.string.ok))
+            }
+        },
+    ) {
+        androidx.compose.foundation.layout.Column(modifier = Modifier.padding(top = 4.dp)) {
+            Text(
+                text = stringResource(R.string.set_source_priority),
+                style = MaterialTheme.typography.headlineSmall,
+                modifier = Modifier.padding(bottom = 12.dp),
+            )
+            LazyColumn(
+                state = lazyListState,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 440.dp),
+            ) {
+                itemsIndexed(sources, key = { _, item -> item.name }) { index, source ->
+                    ReorderableItem(reorderableState, key = source.name) {
+                        val isFirst = index == 0
+                        val enabled = isEnabled(source)
+                        val containerColor =
+                            if (isFirst) {
+                                MaterialTheme.colorScheme.primaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.surfaceContainerHigh
+                            }
+                        val contentColor =
+                            if (isFirst) {
+                                MaterialTheme.colorScheme.onPrimaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.onSurface
+                            }
+
+                        Row(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = if (index < sources.size - 1) 4.dp else 0.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(containerColor)
+                                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            Text(
+                                text = "${index + 1}",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = contentColor.copy(alpha = 0.7f),
+                                modifier = Modifier.size(20.dp),
+                            )
+                            Icon(
+                                painter = painterResource(source.iconRes()),
+                                contentDescription = null,
+                                tint = contentColor,
+                                modifier = Modifier.size(20.dp),
+                            )
+                            androidx.compose.foundation.layout.Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = source.displayName(context),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = contentColor,
+                                )
+                                if (!enabled) {
+                                    Text(
+                                        text = stringResource(R.string.audio_source_disabled),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = contentColor.copy(alpha = 0.7f),
+                                    )
+                                }
+                            }
+                            Icon(
+                                painter = painterResource(R.drawable.drag_handle),
+                                contentDescription = null,
+                                tint = contentColor.copy(alpha = 0.6f),
+                                modifier =
+                                    Modifier
+                                        .size(20.dp)
+                                        .draggableHandle(),
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
