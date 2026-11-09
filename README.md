@@ -2,19 +2,19 @@
 
   <img src="https://raw.githubusercontent.com/S1LOnik/ArchiveTune/main/fastlane/metadata/android/en-US/images/icon.png" width="160" height="160" alt="ArchiveTune Logo" style="border-radius: 22%">
 
-  <h1>ArchiveTune</h1>
-  <p><em>Enhanced Edition • Maintained by <a href="https://github.com/S1LOnik">S1LOnik</a></em></p>
+  <h1>ArchiveTune (Extended Edition)</h1>
+  <p><em>An extended feature-rich edition based on <a href="https://github.com/rukamori/ArchiveTune">ArchiveTune by rukamori</a> &amp; <a href="https://github.com/ddinjustices/OuterTune">OuterTune</a></em></p>
 
   <p align="center">
-    <strong>Redefining the YouTube Music &amp; Spotify Experience on Android.</strong>
+    <strong>Universal Android Music Player with Multi-Source Streaming, Advanced DSP &amp; Dynamic UI</strong>
     <br />
-    <em>High-performance, privacy-focused, zero-stutter playback, and authoritative multi-source library sync.</em>
+    <em>Supporting YouTube Music, Spotify, SoundCloud, Tidal, Local Audio, Bit-Perfect DSP, and 10+ Player Styles.</em>
   </p>
 
   <p align="center">
-    <a href="#-key-improvements--differences-from-upstream"><b>Why This Fork?</b></a> •
+    <a href="#-extended-features--overview"><b>Extended Features</b></a> •
+    <a href="#-feature-comparison-original-vs-extended-edition"><b>Comparison</b></a> •
     <a href="#-download-releases"><b>Download</b></a> •
-    <a href="#-features"><b>Features</b></a> •
     <a href="#-screenshots"><b>Screenshots</b></a> •
     <a href="https://github.com/S1LOnik/ArchiveTune/releases"><b>GitHub Releases</b></a>
   </p>
@@ -41,47 +41,87 @@
 
 <hr />
 
-> [!IMPORTANT]
-> **📦 Official Releases & Updates:**  
-> All releases, updates, and signed APKs for this fork are published directly on **[GitHub Releases](https://github.com/S1LOnik/ArchiveTune/releases)** via automated GitHub Actions CI/CD.  
-> We do **not** distribute APK builds through private Telegram channels, third-party file hosters, or unverified mirrors. Every release includes SHA-256 checksums and automated mapping files.
+### 🌸 About the Project & Upstream Roots
+
+**ArchiveTune** was originally created by **[rukamori](https://github.com/rukamori/ArchiveTune)** as a charming, lightweight music player focusing on local audio and YouTube Music for Android, succeeding the foundations laid by OuterTune and ViMusic.
+
+This repository (**Extended Edition**) is an actively developed continuation that preserves the spirit of the original while significantly expanding its technical capabilities: adding full native Spotify and multi-source streaming, a real-time DSP audio engine with beat-matched Automix, 10 distinct player interfaces, animated video canvas backgrounds, an expanded 10-provider lyrics suite, and fine-grained UI scaling.
+
+> [!NOTE]
+> **📦 Official Builds & Continuous Deployment:**  
+> All APK releases for this extended edition are built automatically via GitHub Actions CI/CD and published on **[GitHub Releases](https://github.com/S1LOnik/ArchiveTune/releases)** with SHA-256 integrity checksums.
 
 ---
 
-## ⚡ Key Improvements & Differences from Upstream
+## 📊 Feature Comparison: Original vs. Extended Edition
 
-This repository is an actively maintained and optimized fork of ArchiveTune/OuterTune, focused on rock-solid playback stability, full Spotify library integration, and eliminating real-world playback bottlenecks:
-
-| Feature / Area | Original Upstream | **S1LOnik Fork** |
+| Capability / Module | Original ArchiveTune | Extended Edition (This Fork) |
 | :--- | :--- | :--- |
-| **Spotify Liked Songs** | ❌ Fails with `No content in fetchPlaylist response` / blank screen | ✅ **Fully fixed.** Intercepts GQL collection queries, maps to `fetchLibraryTracks`, supports in-playlist search, multi-selection & shuffle |
-| **Track Loading Speed** | ⚠️ 2–5s blocking network delay on every YouTube track if SoundCloud enabled | ⚡ **Instant loading.** SoundCloud stream resolution is strictly isolated to SoundCloud tracks, removing blocking overhead |
-| **High Quality Playback Transition** | ❌ Interrupts and re-prepares audio stream mid-song when switching from background to foreground | ✅ **Zero-stutter.** Playing tracks are never interrupted; candidate resolution happens ahead-of-time in `nextStreamPreload` |
-| **Audio Focus on ColorOS / Modern Android** | ⚠️ Stutters or pauses when opening app, switching windows, or using Dynamic Island | ✅ **Smart audio ducking.** Volume ducks to 50% during transient system animations; 1200ms debounce prevents false pauses |
-| **Library Synchronization** | ⚠️ Unliking songs remotely leaves stale tracks in local database | ✅ **Authoritative two-way sync** for YouTube Music & Spotify with pull-to-refresh on library tabs |
-| **Missing Settings Destinations** | ❌ Crashes when navigating to several provider settings | ✅ **100% stable navigation graph** with all sub-settings routes fully implemented |
-| **Automated Release Pipeline** | ⚠️ Manual builds or external links | 🚀 **Automated GitHub Actions CI/CD** generating signed Universal & Arm64-v8a APKs with SHA-256 hashes |
+| **Streaming Sources** | Local Audio Files, YouTube Music (via InnerTube / NewPipe) | **Multi-Source Ecosystem:** Local Files, YouTube Music, native **Spotify** (`librespot-java` + Login5), **SoundCloud**, **Tidal** (lossless), **Deezer**, and **Apple Music** catalog search |
+| **Source Redundancy** | Single source playback | **Universal Fallback Matrix:** Seamless automatic failover between Spotify, YouTube Music, and SoundCloud when tracks are geo-blocked or rate-limited |
+| **Audio Processing & DSP** | ExoPlayer standard output, Android system equalizer | **Smart DJ Automix** (BPM beat-matching, silence trimming, tempo warping, harmonic ducking), **Bit-Perfect output**, **Decent USB Audio DAC** support, and dedicated DSP engines (`Lastwave`, `Monochrome`) |
+| **Player Designs & Themes** | Signature cute anime player theme | **10+ distinct player layouts:** Flamingo (Apple Music style with album shrink), BitChord (gesture-driven UI), TikTok, SimpMusic, SpatialFlow, Looper, V8 Immersive Extended, V7, V9, V10, and Default |
+| **UI Customization & Scaling** | System font scaling | **Global UI Scale slider** (`UiScaleFactorKey` modifying Compose `Density`), morphing play/pause icons with spring animations, adaptive compact floating navigation bar with frosted glass effect |
+| **Lyrics & Music Recognition** | LRCLIB & Kugou basic lyrics | **10+ Lyrics Providers:** Musixmatch, LRCLIB, Paxsenix, BetterLyrics (word-by-word synchronized scrolling), Kugou, Unison, YouLyPlus, Genius, Deezer; AI translation, romanization & Japanese language pack; **ShazamKit** song recognition |
+| **Artwork & Dynamic Canvas** | Static cover artwork | **Modular `:canvas` engine:** Spotify Canvaz, Apple Music motion video backdrops, Tidal canvas, and procedural algorithmic canvas |
+| **Library Synchronization** | Local Room database + YouTube Music sync | **Two-way authoritative sync:** YouTube Music & Spotify (Liked Songs, saved albums, playlists) with pull-to-refresh and offline caching |
+| **Release Pipeline** | Manual releases | **Automated GitHub Actions CI/CD:** Universal and ARM64-v8a signed release APKs with automated version tagging and checksums |
+
+---
+
+## 🚀 Extended Features & Deep-Dive
+
+### 🎵 1. Multi-Source Streaming & Universal Fallback
+* **Native Spotify Streaming (`:spotifycore`):** Integrated `librespot-java` (1.6.5) with Login5 authentication, OAuth loopback server, and Mercury/Dealer protocol support.
+* **Full Spotify Library Integration:** Browse, search, and manage your Spotify Liked Songs, saved albums, and custom playlists with authoritative two-way synchronization.
+* **Universal Fallback Matrix:** Never encounter a broken track. If a stream fails (e.g. YouTube HTTP 403 or regional unavailability), the player dynamically falls back to an alternative high-quality source (Spotify ↔ YTM ↔ SoundCloud) without skipping the song.
+* **High-Resolution Sources:** Built-in routing for SoundCloud, Tidal (lossless FLAC), Deezer, and local device audio.
+
+### 🎛️ 2. Smart DJ Automix & High-Fidelity DSP Engine
+* **Beat-Matched Automix (`SmartDjAutomixManager`):** Real-time BPM detection, intelligent silence trimming, tempo warping, and harmonic crossfading with bass ducking.
+* **Bit-Perfect Playback:** Direct-to-DAC audio routing supporting high-sample-rate audio without Android resampler interference.
+* **USB Audio DAC Support:** Integrated Decent USB Audio driver subsystem for external USB DACs.
+* **Integrated DSP Modules:** Dedicated equalizer engines (`com.lastwave` and `tf.monochrome`) with parametric EQ and custom sound profiles.
+
+### 🎨 3. 10+ Player Styles & UI Personalization
+* **Flamingo Theme:** Elegant Apple Music-inspired player layout with dynamic cover-art shrinking during pause/scrubbing and blurred background canvas.
+* **BitChord Theme:** High-interactivity layout with spring-loaded physical gesture controls and dedicated BitChord navigation bar.
+* **Immersive Extended (V8) & SpatialFlow:** Full-screen edge-to-edge album visualizer designed for AMOLED displays.
+* **Diverse Additional Styles:** TikTok, SimpMusic, Looper, V7, V9, V10, and Classic Default.
+* **True UI Scale Factor:** Fine-tune the entire app interface scale independently from system display size via an in-app density multiplier.
+* **Adaptive Navigation Bar:** Frosted glass floating navigation toolbar that dynamically morphs and minimizes upon scrolling.
+
+### 📜 4. Comprehensive Lyrics Suite & Song Recognition
+* **Word-by-Word Synchronized Lyrics:** Rich, animated scrolling lyrics powered by BetterLyrics, Musixmatch, LRCLIB, Paxsenix, Kugou, Unison, and YouLyPlus.
+* **Multilingual AI Translation & Romanization:** Built-in Romanization and AI-powered translation for international tracks, plus a specialized Japanese language pack.
+* **Lyrics Share Card Creator:** Export shareable, aesthetic lyric snippet cards (`LyricsImageCard`) with custom backgrounds and styling.
+* **Integrated ShazamKit Recognition:** Identify playing songs from the outside world directly within the app.
+
+### 🎬 5. Dynamic Motion Canvas & Video Artwork
+* **Spotify Canvaz Protocol:** Stream authentic short looping video artwork directly from Spotify.
+* **Motion Video Backdrops:** Support for Apple Music motion covers, Tidal canvas, and procedural geometric visuals.
 
 ---
 
 ## 📥 Download Releases
 
-Always download the latest build directly from GitHub:
+Always download verified APKs directly from GitHub Releases:
 
 <div align="center" id="download-releases">
 
 ### 🌟 [Download Latest ArchiveTune Release](https://github.com/S1LOnik/ArchiveTune/releases/latest)
 
-| Architecture | Package | Description |
+| Architecture | Package | Compatibility |
 | :---: | :---: | :---: |
-| **Universal (All Devices)** | [`ArchiveTune-v16.1.1-universal.apk`](https://github.com/S1LOnik/ArchiveTune/releases/latest) | Works on all 64-bit and 32-bit Android devices (Android 8.0+) |
-| **ARM64 (Modern Phones)** | [`ArchiveTune-v16.1.1-arm64-v8a.apk`](https://github.com/S1LOnik/ArchiveTune/releases/latest) | Optimized for modern 64-bit processors (smaller footprint) |
+| **Universal (Recommended)** | [`ArchiveTune-v16.1.1-universal.apk`](https://github.com/S1LOnik/ArchiveTune/releases/latest) | Works on all 64-bit and 32-bit Android devices (Android 8.0+) |
+| **ARM64-v8a (Optimized)** | [`ArchiveTune-v16.1.1-arm64-v8a.apk`](https://github.com/S1LOnik/ArchiveTune/releases/latest) | Smaller package size for modern 64-bit devices |
 
 </div>
 
 > [!TIP]
-> **Troubleshooting Installation (`App not installed` error):**  
-> If Android reports *"An app with the same signature has already been installed"* after uninstalling, check if ArchiveTune was cloned in **App Cloner / Dual Apps** or installed in **System Clone (User 11 / Second Space)**. Use `adb uninstall --user 11 moe.rukamori.archivetune` or delete the clone profile before installing.
+> **Installation Troubleshooting ("App not installed" error):**  
+> If your device says *"App not installed. An app with the same signature has already been installed"*, please check if ArchiveTune is installed under another profile or clone (e.g. **System Clone / Second Space / Dual Apps / User 11** on ColorOS, OxygenOS, or MIUI).  
+> Because different developers and CI builds use different signing certificates, all previous instances from other sources must be uninstalled across all user profiles before installing this build.
 
 ---
 
@@ -97,59 +137,9 @@ Always download the latest build directly from GitHub:
 
 ---
 
-## ✨ Features
-
-<table>
-  <tr>
-    <td width="50%" valign="top">
-      <h3>🎵 Playback &amp; Sources</h3>
-      <ul>
-        <li>Ad-free background playback with caching &amp; offline downloads</li>
-        <li>Dual source routing: YouTube Music &amp; Spotify Web API integration</li>
-        <li>Universal fallback matrix: automatically picks the highest bitrate source</li>
-        <li>Lossless FLAC playback via custom providers</li>
-        <li>Full local audio file and folder playback support</li>
-      </ul>
-    </td>
-    <td width="50%" valign="top">
-      <h3>🔊 Audio Processing</h3>
-      <ul>
-        <li>EBU R128 loudness normalization and replay gain</li>
-        <li>Seamless crossfade between queue items</li>
-        <li>Tempo, pitch, and variable speed playback adjustments</li>
-        <li>System equalizer &amp; spatial audio integration</li>
-        <li>Smart audio ducking during notifications &amp; transient system prompts</li>
-      </ul>
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" valign="top">
-      <h3>🎤 Lyrics &amp; Recognition</h3>
-      <ul>
-        <li>Synchronized word-by-word scrolling lyrics</li>
-        <li>Multi-provider lyrics: Musixmatch, LRCLIB, Paxsenix, BetterLyrics</li>
-        <li>Built-in music recognition (ShazamKit engine)</li>
-        <li>AI lyrics translation and romanization</li>
-      </ul>
-    </td>
-    <td width="50%" valign="top">
-      <h3>🎨 Customization &amp; Interface</h3>
-      <ul>
-        <li>Modern Material 3 design with dynamic Monet color palette</li>
-        <li>Over 9 distinct player themes and animated canvas backgrounds</li>
-        <li>Persistent queue state across app launches and device reboots</li>
-        <li>Last.fm and ListenBrainz scrobbling support</li>
-        <li>Discord Rich Presence with album art and playback state</li>
-      </ul>
-    </td>
-  </tr>
-</table>
-
----
-
 ## 🛠️ Building from Source
 
-To compile ArchiveTune locally using Gradle:
+To build ArchiveTune Extended locally:
 
 ```bash
 # Clone the repository
@@ -159,20 +149,22 @@ cd ArchiveTune
 # Build Universal Release APK
 ./gradlew :app:assembleGmsMobileUniversalRelease
 
-# Build Arm64 Release APK
+# Build ARM64 Release APK
 ./gradlew :app:assembleGmsMobileArm64Release
 ```
 
-The compiled APKs will be located in `app/build/outputs/apk/gmsMobile/release/`.
+Compiled APKs will be output to `app/build/outputs/apk/gmsMobile/release/`.
 
 ---
 
-## ⚖️ License & Attribution
+## ⚖️ Credits & Attribution
 
-* ArchiveTune is licensed under the **[GNU General Public License v3.0 (GPLv3)](LICENSE)**.
-* Based on the original ArchiveTune by [rukamori](https://github.com/rukamori/ArchiveTune) and [OuterTune](https://github.com/dd injustices/OuterTune).
-* This project is independent and not affiliated with Google LLC, YouTube, or Spotify.
+* **[rukamori/ArchiveTune](https://github.com/rukamori/ArchiveTune)** — The wonderful upstream project that gave ArchiveTune its distinctive design and spirit.
+* **[OuterTune](https://github.com/ddinjustices/OuterTune)** & **[ViMusic](https://github.com/vfsfitvnm/ViMusic)** — Foundations of open-source YouTube Music streaming on Android.
+* **[librespot-java](https://github.com/librespot-org/librespot-java)** — Open-source Spotify client library enabling native playback.
+* **[NewPipe Extractor](https://github.com/TeamNewPipe/NewPipeExtractor)** — Reliable YouTube stream extraction.
+* Licensed under the **[GNU General Public License v3.0 (GPLv3)](LICENSE)**.
 
 <div align="center">
-  <p><b>If you enjoy this fork, please give it a ⭐ on GitHub!</b></p>
+  <p><em>Built with ❤️ by the open-source music community.</em></p>
 </div>
