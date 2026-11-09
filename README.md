@@ -74,8 +74,8 @@ Always download the latest build directly from GitHub:
 
 | Architecture | Package | Description |
 | :---: | :---: | :---: |
-| **Universal (All Devices)** | [`ArchiveTune-v16.1-universal.apk`](https://github.com/S1LOnik/ArchiveTune/releases/latest) | Works on all 64-bit and 32-bit Android devices (Android 8.0+) |
-| **ARM64 (Modern Phones)** | [`ArchiveTune-v16.1-arm64-v8a.apk`](https://github.com/S1LOnik/ArchiveTune/releases/latest) | Optimized for modern 64-bit processors (smaller footprint) |
+| **Universal (All Devices)** | [`ArchiveTune-v16.1.1-universal.apk`](https://github.com/S1LOnik/ArchiveTune/releases/latest) | Works on all 64-bit and 32-bit Android devices (Android 8.0+) |
+| **ARM64 (Modern Phones)** | [`ArchiveTune-v16.1.1-arm64-v8a.apk`](https://github.com/S1LOnik/ArchiveTune/releases/latest) | Optimized for modern 64-bit processors (smaller footprint) |
 
 </div>
 
