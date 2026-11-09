@@ -105,21 +105,21 @@ fun UpdateScreen(
                     verticalArrangement = Arrangement.spacedBy(20.dp),
                 ) {
                     Icon(
-                        painter = painterResource(R.drawable.telegram),
+                        painter = painterResource(R.drawable.github),
                         contentDescription = null,
                         modifier = Modifier.size(64.dp),
                         tint = MaterialTheme.colorScheme.primary,
                     )
 
                     Text(
-                        text = "Обновления ArchiveTune",
+                        text = "Релизы и обновления",
                         style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center,
                     )
 
                     Text(
-                        text = "Все свежие обновления, исправления и новые версии публикуются в официальном Telegram-канале разработчика:",
+                        text = "Все официальные релизы ArchiveTune, APK-файлы с автосборкой и подробные списки изменений публикуются на GitHub:",
                         style = MaterialTheme.typography.bodyLarge,
                         textAlign = TextAlign.Center,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -132,8 +132,8 @@ fun UpdateScreen(
                         ),
                     ) {
                         Text(
-                            text = "t.me/S1LOnik",
-                            style = MaterialTheme.typography.titleLarge,
+                            text = "github.com/S1LOnik/ArchiveTune",
+                            style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold,
                             modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
                             color = MaterialTheme.colorScheme.onSecondaryContainer,
@@ -141,20 +141,20 @@ fun UpdateScreen(
                     }
 
                     Button(
-                        onClick = { uriHandler.openUri("https://t.me/S1LOnik") },
+                        onClick = { uriHandler.openUri("https://github.com/S1LOnik/ArchiveTune/releases") },
                         modifier = Modifier.fillMaxWidth(),
                         shape = ButtonDefaults.shape,
                     ) {
                         Icon(
-                            painter = painterResource(R.drawable.telegram),
+                            painter = painterResource(R.drawable.github),
                             contentDescription = null,
                             modifier = Modifier.size(20.dp),
                         )
                         Spacer(modifier = Modifier.size(8.dp))
-                        Text(text = "Перейти в Telegram")
+                        Text(text = "Релизы на GitHub")
                     }
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
 
                     Text(
                         text = "Установленная версия: ${BuildConfig.VERSION_NAME}",
