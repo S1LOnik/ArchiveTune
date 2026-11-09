@@ -95,7 +95,7 @@ class SpotifyPlaylistViewModel
                                         ),
                                 )
                             synthPlaylist to album.tracks?.items.orEmpty()
-                        } else if (playlistId == SPOTIFY_LIKED_SONGS_ID || playlistId == "liked" || playlistId == "__spotify_liked_songs__") {
+                        } else if (isLikedSongsPlaylistId(playlistId)) {
                             val liked = repository.likedSongs()
                             val synthPlaylist =
                                 SpotifyPlaylist(

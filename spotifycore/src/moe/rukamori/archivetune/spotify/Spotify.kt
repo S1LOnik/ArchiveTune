@@ -867,8 +867,32 @@ object Spotify {
 
     // ── Playlist detail (GQL: fetchPlaylist) ────────────────────────────
 
+    fun isLikedSongsUriOrId(id: String): Boolean =
+        id == "collection" ||
+            id == "tracks" ||
+            id == "liked" ||
+            id == "__spotify_liked_songs__" ||
+            id == "spotify_liked_songs" ||
+            id.endsWith(":collection") ||
+            id.contains("collection") ||
+            id.contains("liked")
+
     suspend fun playlist(playlistId: String): Result<SpotifyPlaylist> =
         runCatching {
+            if (isLikedSongsUriOrId(playlistId)) {
+                val total = likedSongs(limit = 1, offset = 0).getOrNull()?.total ?: 0
+                return@runCatching SpotifyPlaylist(
+                    id = playlistId,
+                    name = "Liked Songs",
+                    description = "Spotify Liked Songs",
+                    images = emptyList(),
+                    owner = null,
+                    tracks = SpotifyPlaylistTracksRef(total = total),
+                    collaborative = false,
+                    uri = "spotify:user:liked",
+                )
+            }
+
             val vars =
                 buildJsonObject {
                     put("uri", "spotify:playlist:$playlistId")
@@ -917,6 +941,22 @@ object Spotify {
         offset: Int = 0,
     ): Result<SpotifyPaging<SpotifyPlaylistTrack>> =
         runCatching {
+            if (isLikedSongsUriOrId(playlistId)) {
+                val likedPage = likedSongs(limit = limit, offset = offset).getOrThrow()
+                return@runCatching SpotifyPaging(
+                    items =
+                        likedPage.items.map { saved ->
+                            SpotifyPlaylistTrack(
+                                track = saved.track,
+                                uid = saved.track.id,
+                            )
+                        },
+                    total = likedPage.total,
+                    limit = likedPage.limit,
+                    offset = likedPage.offset,
+                )
+            }
+
             val vars =
                 buildJsonObject {
                     put("uri", "spotify:playlist:$playlistId")
@@ -931,9 +971,30 @@ object Spotify {
                     variables = vars,
                 )
 
-            val content =
-                response.obj("data")?.obj("playlistV2")?.obj("content")
-                    ?: throw SpotifyException(500, "No content in fetchPlaylist response")
+            val playlistV2 = response.obj("data")?.obj("playlistV2")
+            val content = playlistV2?.obj("content")
+            if (content == null) {
+                if (playlistId.contains("collection", ignoreCase = true) || playlistId.contains("liked", ignoreCase = true)) {
+                    val fallback = likedSongs(limit = limit, offset = offset).getOrNull()
+                    if (fallback != null) {
+                        return@runCatching SpotifyPaging(
+                            items =
+                                fallback.items.map { saved ->
+                                    SpotifyPlaylistTrack(track = saved.track, uid = saved.track.id)
+                                },
+                            total = fallback.total,
+                            limit = fallback.limit,
+                            offset = fallback.offset,
+                        )
+                    }
+                }
+                return@runCatching SpotifyPaging(
+                    items = emptyList(),
+                    total = 0,
+                    limit = limit,
+                    offset = offset,
+                )
+            }
 
             val tracks =
                 content.arr("items")?.mapNotNull { elem ->

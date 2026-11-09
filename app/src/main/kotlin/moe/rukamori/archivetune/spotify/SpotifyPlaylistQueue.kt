@@ -107,13 +107,30 @@ class SpotifyPlaylistQueue(
 
     private suspend fun fetchNextApiPage() {
         if (!apiHasMore) return
+        val currentId = checkNotNull(playlistId)
         val result =
-            Spotify
-                .playlistTracks(
-                    playlistId = checkNotNull(playlistId),
-                    limit = SPOTIFY_PAGE_SIZE,
-                    offset = apiFetchOffset,
-                ).getOrThrow()
+            if (isLikedSongsPlaylistId(currentId)) {
+                val likedPage = Spotify.likedSongs(limit = SPOTIFY_PAGE_SIZE, offset = apiFetchOffset).getOrThrow()
+                moe.rukamori.archivetune.spotify.models.SpotifyPaging(
+                    items =
+                        likedPage.items.map { saved ->
+                            moe.rukamori.archivetune.spotify.models.SpotifyPlaylistTrack(
+                                track = saved.track,
+                                uid = saved.track.id,
+                            )
+                        },
+                    total = likedPage.total,
+                    limit = likedPage.limit,
+                    offset = likedPage.offset,
+                )
+            } else {
+                Spotify
+                    .playlistTracks(
+                        playlistId = currentId,
+                        limit = SPOTIFY_PAGE_SIZE,
+                        offset = apiFetchOffset,
+                    ).getOrThrow()
+            }
         apiTotal = result.total
         val fetched = result.items.mapNotNull { it.track?.takeUnless(SpotifyTrack::isLocal) }
         allTracks += fetched

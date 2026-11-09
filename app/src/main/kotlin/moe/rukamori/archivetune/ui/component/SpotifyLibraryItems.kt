@@ -235,7 +235,7 @@ fun SpotifyLikedSongsListItem(
                 }.clickable(
                     interactionSource = interactionSource,
                     indication = null,
-                    onClick = { navController.navigate("spotify_liked_songs") },
+                    onClick = { navController.navigate("spotify_playlist/$SPOTIFY_LIKED_SONGS_ID") },
                 ).focusable(),
     )
 }

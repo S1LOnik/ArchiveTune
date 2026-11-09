@@ -3609,11 +3609,13 @@ class MusicService :
             }
 
             AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
-                // Debounce transient loss for short system actions (Dynamic Island, Screen Recorder startup, transient prompts)
+                // Debounce transient loss for short system actions (ColorOS window animations, Dynamic Island, app opening)
                 lastAudioFocusState = focusChange
                 transientFocusLossJob?.cancel()
+                // Duck volume during transient transitions instead of cutting audio abruptly
+                audioFocusVolumeFactor.value = 0.5f
                 transientFocusLossJob = scope.launch {
-                    delay(550)
+                    delay(1200)
                     if (lastAudioFocusState == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT) {
                         hasAudioFocus = false
                         ignoringAudioFocusLoss = false
@@ -7281,7 +7283,13 @@ class MusicService :
                         val maxMediaItem = maxQuality.preservedMetadata.toMediaItem()
                         withContext(Dispatchers.Main) {
                             val currentIndex = player.currentMediaItemIndex
-                            if (currentIndex in 0 until player.mediaItemCount && player.getMediaItemAt(currentIndex).mediaId == mediaItem.mediaId) {
+                            // Only replace mid-playback if the track has not started playing significantly (< 1s) and is not actively playing,
+                            // to avoid tearing down the playback pipeline, pausing audio, or re-buffering while user is already listening.
+                            if (currentIndex in 0 until player.mediaItemCount &&
+                                player.getMediaItemAt(currentIndex).mediaId == mediaItem.mediaId &&
+                                player.currentPosition < 1000L &&
+                                !player.isPlaying
+                            ) {
                                 val currentPos = player.currentPosition
                                 val wasPlaying = player.playWhenReady
                                 player.replaceMediaItem(currentIndex, maxMediaItem)
@@ -8327,8 +8335,8 @@ class MusicService :
             return dataSpec
         }
 
-        // [FIX-ZCODE] T4: soundCloudEnabledCache replaces blocking dataStore.get() here
-        if (mediaId.startsWith("soundcloud:") || soundCloudEnabledCache) {
+        // Only resolve SoundCloud streams for SoundCloud tracks (never hijack regular YouTube tracks)
+        if (mediaId.startsWith("soundcloud:")) {
             val soundCloudStream = runCatching {
                 val song = database.getSongByIdBlocking(mediaId)
                 val currentMeta = currentMediaMetadata.value?.takeIf { it.id == mediaId }

@@ -381,6 +381,19 @@ class SpotifyLibraryRepository
         suspend fun playlist(playlistId: String): SpotifyPlaylist =
             withContext(Dispatchers.IO) {
                 ensureAuthenticated()
+                if (isLikedSongsPlaylistId(playlistId)) {
+                    val count = runCatching { Spotify.likedSongs(limit = 1, offset = 0).getOrThrow().total }.getOrDefault(0)
+                    return@withContext SpotifyPlaylist(
+                        id = playlistId,
+                        name = context.getString(R.string.liked_songs),
+                        description = context.getString(R.string.liked_songs),
+                        images = emptyList(),
+                        uri = "spotify:user:liked",
+                        owner = null,
+                        tracks = SpotifyPlaylistTracksRef(total = count),
+                        collaborative = false,
+                    )
+                }
                 spotifyCallWithTokenRetry {
                     Spotify.playlist(playlistId).getOrThrow()
                 }
@@ -389,6 +402,9 @@ class SpotifyLibraryRepository
         suspend fun playlistTracks(playlistId: String): List<SpotifyTrack> =
             withContext(Dispatchers.IO) {
                 ensureAuthenticated()
+                if (isLikedSongsPlaylistId(playlistId)) {
+                    return@withContext likedSongs()
+                }
                 val tracks = ArrayList<SpotifyTrack>()
                 var offset = 0
                 val limit = 50
@@ -632,7 +648,9 @@ class SpotifyLibraryRepository
                     }
                 if (page.items.isEmpty()) break
                 playlists +=
-                    page.items.map { playlist ->
+                    page.items
+                        .filterNot { isLikedSongsPlaylistId(it.id) || it.name.equals("Liked Songs", ignoreCase = true) }
+                        .map { playlist ->
                         if (playlist.tracks?.total != null) {
                             playlist
                         } else {
@@ -697,3 +715,16 @@ data class SpotifyAccountSession(
     val accountName: String = "",
     val accountAvatarUrl: String? = null,
 )
+
+fun isLikedSongsPlaylistId(id: String?): Boolean {
+    if (id == null) return false
+    return id == SPOTIFY_LIKED_SONGS_ID ||
+        id == "liked" ||
+        id == "__spotify_liked_songs__" ||
+        id == "spotify_liked_songs" ||
+        id == "collection" ||
+        id == "tracks" ||
+        id.endsWith(":collection") ||
+        id.contains("collection") ||
+        id.contains("liked")
+}
