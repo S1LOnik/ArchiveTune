@@ -113,15 +113,15 @@ Always download verified APKs directly from GitHub Releases:
 
 | Architecture | Package | Compatibility |
 | :---: | :---: | :---: |
-| **Universal (Recommended)** | [`ArchiveTune-v16.1.2-universal.apk`](https://github.com/S1LOnik/ArchiveTune/releases/latest) | Works on all 64-bit and 32-bit Android devices (Android 8.0+) |
-| **ARM64-v8a (Optimized)** | [`ArchiveTune-v16.1.2-arm64-v8a.apk`](https://github.com/S1LOnik/ArchiveTune/releases/latest) | Smaller package size for modern 64-bit devices |
+| **Universal (Recommended)** | [`ArchiveTune-v16.1.3-universal.apk`](https://github.com/S1LOnik/ArchiveTune/releases/latest) | Works on all 64-bit and 32-bit Android devices (Android 8.0+) |
+| **ARM64-v8a (Optimized)** | [`ArchiveTune-v16.1.3-arm64-v8a.apk`](https://github.com/S1LOnik/ArchiveTune/releases/latest) | Smaller package size for modern 64-bit devices |
 
 </div>
 
 > [!TIP]
 > **Installation Troubleshooting ("App not installed" error):**  
 > If your device says *"App not installed. An app with the same signature has already been installed"*, please check if ArchiveTune is installed under another profile or clone (e.g. **System Clone / Second Space / Dual Apps / User 11** on ColorOS, OxygenOS, or MIUI).  
-> Because different developers and CI builds use different signing certificates, all previous instances from other sources must be uninstalled across all user profiles before installing this build.
+> Starting from **v16.1.3**, all GitHub releases are signed with one persistent key, so future updates install over each other. Builds from earlier sources/releases used different keys: uninstall them once (in all user profiles, back up data first) before installing v16.1.3+.
 
 ---
 
