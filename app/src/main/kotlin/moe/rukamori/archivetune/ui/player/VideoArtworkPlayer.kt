@@ -490,11 +490,9 @@ fun rememberVideoArtworkState(
         if (awaitingVideoReady) return
         awaitingVideoReady = true
         resumeAudioAfterVideoReady = shouldPlay || resumeOverride
-
-        if (shouldPlay) updatedOnRequestPauseMain()
         Timber
             .tag(VideoPlaybackLogTag)
-            .d("Video for $videoId loading — audio paused until first frame (or artwork fallback)")
+            .d("Video for $videoId loading — waiting for first frame without interrupting audio")
     }
 
     fun releaseAudioHold(resumeMainAudio: Boolean = false) {
@@ -622,7 +620,6 @@ fun rememberVideoArtworkState(
         state.isVideoReady = false
         state.isResolvingUrl = true
         exoPlayer.pause()
-        updatedOnRequestPauseMain()
         state.streamUrl = null
         val resolved =
             withContext(Dispatchers.IO) {
@@ -647,9 +644,6 @@ fun rememberVideoArtworkState(
                 state.hasPlaybackFailed = true
                 updatedOnPlaybackFailed()
             }
-            if (state.wasPlayingBeforeQualityChange) {
-                updatedOnRequestResumeMain()
-            }
         }
     }
 
@@ -663,7 +657,6 @@ fun rememberVideoArtworkState(
             state.wasPlayingBeforeQualityChange = shouldPlay
             state.isChangingQuality = true
             exoPlayer.pause()
-            if (shouldPlay) updatedOnRequestPauseMain()
         }
         lastLoadedStreamUrl = url
         lastLoadedCaptionTrack = state.selectedCaptionTrack
@@ -736,11 +729,9 @@ fun rememberVideoArtworkState(
         } else if (awaitingVideoReady) {
             if (isPlaying) {
                 resumeAudioAfterVideoReady = true
-                updatedOnRequestPauseMain()
             }
             exoPlayer.pause()
         } else if (state.isChangingQuality) {
-            if (isPlaying) updatedOnRequestPauseMain()
             exoPlayer.pause()
         } else if (state.isResyncing) {
             exoPlayer.pause()
@@ -866,7 +857,7 @@ fun rememberVideoArtworkState(
         Timber
             .tag(VideoPlaybackLogTag)
             .d(
-                "Resync to ${position}ms (wasPlaying=$wasPlaying, auto=$isAutomatic) — pause-load-resume",
+                "Resync video to ${position}ms (wasPlaying=$wasPlaying, auto=$isAutomatic) without pausing main audio",
             )
         state.wasPlayingBeforeResync = wasPlaying
         state.isResyncing = true
@@ -874,7 +865,6 @@ fun rememberVideoArtworkState(
 
         state.currentSpeedCorrectionFactor = 1.0f
         state.lastSeekAtMs = SystemClock.elapsedRealtime()
-        if (wasPlaying) updatedOnRequestPauseMain()
         exoPlayer.pause()
         exoPlayer.seekTo(position)
         state.bufferingStartedAtMs = SystemClock.elapsedRealtime()

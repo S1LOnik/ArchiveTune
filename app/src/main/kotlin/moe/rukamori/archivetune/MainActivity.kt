@@ -399,9 +399,13 @@ class MainActivity : ComponentActivity() {
             ) {
                 isMusicServiceBound = true
                 if (service is MusicBinder) {
-                    playerConnection =
-                        PlayerConnection(this@MainActivity, service, database, lifecycleScope)
-                    moe.rukamori.archivetune.debug.DebugBridge.updatePlayerConnection(playerConnection)
+                    val existing = playerConnection
+                    if (existing == null || existing.service !== service.service) {
+                        existing?.dispose()
+                        playerConnection =
+                            PlayerConnection(this@MainActivity, service, database, lifecycleScope)
+                        moe.rukamori.archivetune.debug.DebugBridge.updatePlayerConnection(playerConnection)
+                    }
                     playPendingDeepLinkQueueIfReady()
                     playPendingVoiceSearchIfReady()
                     openPendingAodModeIfReady()
@@ -522,12 +526,14 @@ class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         registerAodScreenOffReceiver()
-        isMusicServiceBound =
-            bindService(
-                Intent(this, MusicService::class.java),
-                serviceConnection,
-                Context.BIND_AUTO_CREATE,
-            )
+        if (!isMusicServiceBound) {
+            isMusicServiceBound =
+                bindService(
+                    Intent(this, MusicService::class.java),
+                    serviceConnection,
+                    Context.BIND_AUTO_CREATE,
+                )
+        }
         playPendingDeepLinkQueueIfReady()
         openPendingAodModeIfReady()
     }
@@ -546,11 +552,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onStop() {
         unregisterAodScreenOffReceiver()
-        if (!isMusicServiceBound || playerConnection?.aodModeEnabled?.value == true) {
-            super.onStop()
-            return
-        }
-        safeUnbindMusicService()
         super.onStop()
     }
 
@@ -558,7 +559,6 @@ class MainActivity : ComponentActivity() {
         moe.rukamori.archivetune.debug.DebugBridge.stop()
         aodPreferenceReadJob?.cancel()
         aodPreferenceReadJob = null
-        super.onDestroy()
 
         val shouldStopOnTaskClear =
             if (!isFinishing) {
@@ -569,10 +569,14 @@ class MainActivity : ComponentActivity() {
 
         if (shouldStopOnTaskClear) {
             playerConnection?.service?.stopAndClearPlayback(clearPersistentState = true)
-            safeUnbindMusicService()
-            stopService(Intent(this, MusicService::class.java))
-            playerConnection = null
         }
+        safeUnbindMusicService()
+        playerConnection?.dispose()
+        playerConnection = null
+        if (shouldStopOnTaskClear) {
+            stopService(Intent(this, MusicService::class.java))
+        }
+        super.onDestroy()
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {

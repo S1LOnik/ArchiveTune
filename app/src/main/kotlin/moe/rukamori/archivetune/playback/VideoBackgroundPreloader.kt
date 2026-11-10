@@ -123,10 +123,7 @@ object VideoBackgroundPreloader {
     ) {
         heldMediaId = mediaId
         wasPlayingBeforeHold = player.playWhenReady
-        if (player.playWhenReady) {
-            player.pause()
-        }
-        Timber.tag(TAG).d("Holding main audio for background video load of $mediaId (wasPlaying=$wasPlayingBeforeHold)")
+        Timber.tag(TAG).d("Preloading background video for $mediaId without pausing main audio (wasPlaying=$wasPlayingBeforeHold)")
 
         preloadJob =
             scope.launch {

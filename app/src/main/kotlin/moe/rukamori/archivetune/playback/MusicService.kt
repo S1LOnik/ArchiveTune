@@ -7274,41 +7274,6 @@ class MusicService :
             scrobbleManager?.onSongStart(player.currentMetadata, duration = player.duration)
         }
 
-        if (audioQuality == moe.rukamori.archivetune.constants.AudioQuality.HIGHEST && mediaItem != null) {
-            val currentMeta = mediaItem.metadata ?: player.currentMetadata
-            if (currentMeta != null && !currentMeta.id.startsWith("spotify:") && !currentMeta.id.startsWith("spotify//") && !isCurrentPlaybackItemLocal(currentMeta)) {
-                scope.launch {
-                    val maxQuality = universalFallbackMatrix.resolveMaxQuality(currentMeta)
-                    if (maxQuality != null) {
-                        val maxMediaItem = maxQuality.preservedMetadata.toMediaItem()
-                        withContext(Dispatchers.Main) {
-                            val currentIndex = player.currentMediaItemIndex
-                            // Only replace mid-playback if the track has not started playing significantly (< 1s) and is not actively playing,
-                            // to avoid tearing down the playback pipeline, pausing audio, or re-buffering while user is already listening.
-                            if (currentIndex in 0 until player.mediaItemCount &&
-                                player.getMediaItemAt(currentIndex).mediaId == mediaItem.mediaId &&
-                                player.currentPosition < 1000L &&
-                                !player.isPlaying
-                            ) {
-                                val currentPos = player.currentPosition
-                                val wasPlaying = player.playWhenReady
-                                player.replaceMediaItem(currentIndex, maxMediaItem)
-                                player.seekTo(currentIndex, currentPos)
-                                currentMediaMetadata.value = maxQuality.preservedMetadata
-                                player.prepare()
-                                player.playWhenReady = wasPlaying
-                                Toast.makeText(
-                                    this@MusicService,
-                                    maxQuality.statusMessage,
-                                    Toast.LENGTH_SHORT,
-                                ).show()
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
         scope.launch {
             val shouldSave = withContext(Dispatchers.IO) { dataStore.get(PersistentQueueKey, true) }
             if (shouldSave) {
@@ -7433,6 +7398,7 @@ class MusicService :
     }
 
     private var preloadMaxQualityJob: Job? = null
+    private var lastPreloadedMaxQualityMediaId: String? = null
 
     private fun updateNextStreamPreload() {
         val configuration = playbackPreloadConfiguration
@@ -7478,10 +7444,12 @@ class MusicService :
         }
 
         if (audioQuality == moe.rukamori.archivetune.constants.AudioQuality.HIGHEST &&
-            !nextMediaId.startsWith("spotify:") && !nextMediaId.startsWith("spotify//")
+            !nextMediaId.startsWith("spotify:") && !nextMediaId.startsWith("spotify//") &&
+            lastPreloadedMaxQualityMediaId != nextMediaId
         ) {
             val nextMeta = nextMediaItem.metadata
             if (nextMeta != null && !isCurrentPlaybackItemLocal(nextMeta)) {
+                lastPreloadedMaxQualityMediaId = nextMediaId
                 preloadMaxQualityJob?.cancel()
                 preloadMaxQualityJob = scope.launch {
                     val maxQuality = universalFallbackMatrix.resolveMaxQuality(nextMeta)
@@ -7493,6 +7461,7 @@ class MusicService :
                                 targetIndex in 0 until player.mediaItemCount &&
                                 player.getMediaItemAt(targetIndex).mediaId == nextMediaItem.mediaId
                             ) {
+                                lastPreloadedMaxQualityMediaId = maxMediaItem.mediaId
                                 player.replaceMediaItem(targetIndex, maxMediaItem)
                                 nextStreamPreloader.cancel()
                             }

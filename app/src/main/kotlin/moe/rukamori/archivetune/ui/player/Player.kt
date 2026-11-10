@@ -1205,18 +1205,14 @@ fun BottomSheetPlayer(
             isPlaying = isPlaying,
             positionProvider = { playerConnection.player.currentPosition },
             preferredHeight = videoPreferredHeight,
-            holdAudioUntilVideoReady = true,
+            holdAudioUntilVideoReady = false,
             onStreamResolved = { info ->
                 videoAvailableHeights = info?.availableHeights.orEmpty()
                 videoSelectedHeight = info?.selectedHeight
             },
             onPlaybackFailed = { videoPlaybackFailed = true },
             onLoadingStateChange = {  },
-            onRequestPauseMain = {
-                if (videoMediaId != null && playerConnection.player.currentMediaItem?.mediaId == videoMediaId) {
-                    playerConnection.player.pause()
-                }
-            },
+            onRequestPauseMain = {},
             onRequestResumeMain = {
                 if (videoMediaId != null && playerConnection.player.currentMediaItem?.mediaId == videoMediaId) {
                     playerConnection.player.play()

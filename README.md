@@ -113,8 +113,8 @@ Always download verified APKs directly from GitHub Releases:
 
 | Architecture | Package | Compatibility |
 | :---: | :---: | :---: |
-| **Universal (Recommended)** | [`ArchiveTune-v16.1.1-universal.apk`](https://github.com/S1LOnik/ArchiveTune/releases/latest) | Works on all 64-bit and 32-bit Android devices (Android 8.0+) |
-| **ARM64-v8a (Optimized)** | [`ArchiveTune-v16.1.1-arm64-v8a.apk`](https://github.com/S1LOnik/ArchiveTune/releases/latest) | Smaller package size for modern 64-bit devices |
+| **Universal (Recommended)** | [`ArchiveTune-v16.1.2-universal.apk`](https://github.com/S1LOnik/ArchiveTune/releases/latest) | Works on all 64-bit and 32-bit Android devices (Android 8.0+) |
+| **ARM64-v8a (Optimized)** | [`ArchiveTune-v16.1.2-arm64-v8a.apk`](https://github.com/S1LOnik/ArchiveTune/releases/latest) | Smaller package size for modern 64-bit devices |
 
 </div>
 
