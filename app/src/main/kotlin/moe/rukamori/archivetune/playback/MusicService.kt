@@ -625,13 +625,13 @@ class MusicService :
             }
         }
 
-    private var smartDjAutomixEnabled = true
+    private var smartDjAutomixEnabled = false
 
     private data class CrossfadeConfig(
         val enabled: Boolean,
         val durationSeconds: Float,
         val gapless: Boolean,
-        val smartDjAutomix: Boolean = true,
+        val smartDjAutomix: Boolean = false,
     )
 
     private data class DiscordSyncRequest(
@@ -1462,7 +1462,7 @@ class MusicService :
         }
 
         dataStore.data
-            .map { (it[SkipSilenceKey] ?: false) || (it[SmartDjAutomixEnabledKey] ?: true) }
+            .map { (it[SkipSilenceKey] ?: false) || (it[SmartDjAutomixEnabledKey] ?: false) }
             .distinctUntilChanged()
             .collectLatest(scope) {
                 localPlayer.skipSilenceEnabled = it
@@ -1533,7 +1533,7 @@ class MusicService :
             val enabled = prefs[CrossfadeEnabledKey] ?: false
             val durationSeconds = prefs[CrossfadeDurationKey] ?: 5f
             val gapless = prefs[CrossfadeGaplessKey] ?: true
-            val automix = prefs[SmartDjAutomixEnabledKey] ?: true
+            val automix = prefs[SmartDjAutomixEnabledKey] ?: false
             CrossfadeConfig(
                 enabled = (enabled || automix) && togetherState is moe.rukamori.archivetune.together.TogetherSessionState.Idle,
                 durationSeconds = durationSeconds,

@@ -1317,7 +1317,7 @@ class MainActivity : ComponentActivity() {
                     )
                     val playerDesignStyle by rememberEnumPreference(
                         key = PlayerDesignStyleKey,
-                        defaultValue = PlayerDesignStyle.V4,
+                        defaultValue = PlayerDesignStyle.APPLE_MUSIC,
                     )
 
                     val aodModeEnabled by remember(playerConnection) {
@@ -3094,6 +3094,11 @@ class MainActivity : ComponentActivity() {
             return
         }
 
+        if (moe.rukamori.archivetune.utils.ExternalMusicLinkResolver.isExternalMusicHost(uri.host)) {
+            handleExternalMusicLink(uri, navController)
+            return
+        }
+
         when (val path = uri.pathSegments.firstOrNull()) {
             "playlist" -> {
                 uri.getQueryParameter("list")?.let { playlistId ->
@@ -3194,6 +3199,46 @@ class MainActivity : ComponentActivity() {
                                 reportException(it)
                             }
                     }
+                }
+            }
+        }
+    }
+
+    private fun handleExternalMusicLink(
+        uri: Uri,
+        navController: NavHostController,
+    ) {
+        lifecycleScope.launch {
+            when (val resolved = moe.rukamori.archivetune.utils.ExternalMusicLinkResolver.resolve(uri)) {
+                is moe.rukamori.archivetune.utils.ExternalMusicLinkResolver.Result.SpotifyPlaylist -> {
+                    navController.navigate("spotify_playlist/${resolved.playlistId}")
+                }
+
+                is moe.rukamori.archivetune.utils.ExternalMusicLinkResolver.Result.TrackQuery -> {
+                    val song =
+                        withContext(Dispatchers.IO) {
+                            YouTube
+                                .search(resolved.query, filter = YouTube.SearchFilter.FILTER_SONG)
+                                .getOrNull()
+                                ?.items
+                                ?.filterIsInstance<SongItem>()
+                                ?.firstOrNull()
+                        }
+                    if (song == null) {
+                        android.widget.Toast
+                            .makeText(this@MainActivity, R.string.external_link_track_not_found, android.widget.Toast.LENGTH_LONG)
+                            .show()
+                    } else {
+                        pendingDeepLinkQueue = ListQueue(items = listOf(song.toMediaItem()))
+                        startMusicServiceSafely()
+                        playPendingDeepLinkQueueIfReady()
+                    }
+                }
+
+                moe.rukamori.archivetune.utils.ExternalMusicLinkResolver.Result.Unsupported -> {
+                    android.widget.Toast
+                        .makeText(this@MainActivity, R.string.external_link_not_supported, android.widget.Toast.LENGTH_LONG)
+                        .show()
                 }
             }
         }

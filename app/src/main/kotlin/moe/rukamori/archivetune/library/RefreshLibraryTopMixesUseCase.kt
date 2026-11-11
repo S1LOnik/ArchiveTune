@@ -10,9 +10,13 @@ package moe.rukamori.archivetune.library
 import android.content.Context
 import com.google.common.collect.ImmutableList
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import moe.rukamori.archivetune.ai.AiServiceConfig
 import moe.rukamori.archivetune.ai.AiTextService
 import moe.rukamori.archivetune.constants.AiApiKeyKey
@@ -22,6 +26,11 @@ import moe.rukamori.archivetune.constants.AiCustomEndpointKey
 import moe.rukamori.archivetune.constants.AiCustomModelKey
 import moe.rukamori.archivetune.constants.AiProvider
 import moe.rukamori.archivetune.constants.AiProviderKey
+import moe.rukamori.archivetune.constants.AiRecommendationsApiKeyKey
+import moe.rukamori.archivetune.constants.AiRecommendationsCustomEndpointKey
+import moe.rukamori.archivetune.constants.AiRecommendationsModelKey
+import moe.rukamori.archivetune.constants.AiRecommendationsProviderKey
+import moe.rukamori.archivetune.constants.AiRecommendationsSeparateApiKey
 import moe.rukamori.archivetune.constants.AiSelectedModelKey
 import moe.rukamori.archivetune.db.entities.Song
 import moe.rukamori.archivetune.extensions.toEnum
@@ -37,9 +46,8 @@ import java.util.Locale
 import javax.inject.Inject
 
 private const val TopMixCountLimit = 5
-private const val TopMixCandidateLimit = 100
-private const val TopMixSongsPerMix = 50
-private const val TopMixPromptCandidateLimit = 80
+private const val TopMixSongsPerMix = 40
+private const val TopMixPromptCandidateLimit = 90
 
 class RefreshLibraryTopMixesUseCase
     @Inject
@@ -53,11 +61,31 @@ class RefreshLibraryTopMixesUseCase
                 return RefreshLibraryTopMixesResult.Failure(TopMixGenerationFailure.AI_NOT_CONFIGURED)
             }
 
+            val likedSongs = repository.likedSongsForTopMixes(40)
+            val mostPlayedSongs = repository.mostPlayedSongsForTopMixes(40)
+            val recentSongs = repository.recentSongsForTopMixes(50)
+
+            val likedIds = likedSongs.mapTo(HashSet()) { it.id }
+            val recentRankById = recentSongs.mapIndexed { idx, s -> s.id to (idx + 1) }.toMap()
+
             val candidates =
-                repository
-                    .recentSongsForTopMixes(TopMixCandidateLimit)
-                    .validateWithYtm()
+                (likedSongs + mostPlayedSongs + recentSongs)
+                    .distinctBy { it.id }
+                    .filter { it.song.title.isNotBlank() }
                     .take(TopMixPromptCandidateLimit)
+                    .map { song ->
+                        ValidatedTopMixSong(
+                            id = song.id,
+                            title = song.song.title,
+                            artists = song.artists.map { it.name }.filter { it.isNotBlank() },
+                            albumName = song.album?.title ?: song.song.albumName,
+                            mediaMetadata = song.toMediaMetadata(),
+                            isLiked = song.id in likedIds || song.song.liked,
+                            playMinutes = (song.song.totalPlayTime / 60_000L).toInt().coerceAtLeast(0),
+                            recentRank = recentRankById[song.id],
+                        )
+                    }
+
             if (candidates.isEmpty()) {
                 return RefreshLibraryTopMixesResult.Failure(TopMixGenerationFailure.NO_RECENT_HISTORY)
             }
@@ -80,24 +108,46 @@ class RefreshLibraryTopMixesUseCase
 
         private suspend fun readAiConfig(): AiServiceConfig {
             val prefs = context.dataStore.data.first()
-            val provider = prefs[AiProviderKey].toEnum(AiProvider.NONE)
+            val useSeparate = prefs[AiRecommendationsSeparateApiKey] == true
+            val provider =
+                if (useSeparate) {
+                    prefs[AiRecommendationsProviderKey].toEnum(AiProvider.NONE)
+                } else {
+                    prefs[AiProviderKey].toEnum(AiProvider.NONE)
+                }
+            val apiKey =
+                if (useSeparate) {
+                    prefs[AiRecommendationsApiKeyKey].orEmpty()
+                } else {
+                    prefs[AiApiKeyKey].orEmpty()
+                }
+            val endpoint =
+                if (useSeparate) {
+                    prefs[AiRecommendationsCustomEndpointKey].orEmpty()
+                } else {
+                    prefs[AiCustomEndpointKey].orEmpty()
+                }
+            val mainModel =
+                if (provider == AiProvider.CUSTOM) {
+                    prefs[AiCustomModelKey].orEmpty()
+                } else {
+                    prefs[AiSelectedModelKey].orEmpty()
+                }
+            val recModel = prefs[AiRecommendationsModelKey].orEmpty().trim()
             return AiServiceConfig(
                 provider = provider,
-                apiKey = prefs[AiApiKeyKey].orEmpty(),
-                customEndpoint = prefs[AiCustomEndpointKey].orEmpty(),
-                model =
-                    if (provider == AiProvider.CUSTOM) {
-                        prefs[AiCustomModelKey].orEmpty()
-                    } else {
-                        prefs[AiSelectedModelKey].orEmpty()
-                    },
+                apiKey = apiKey,
+                customEndpoint = endpoint,
+                model = recModel.ifBlank { mainModel },
             )
         }
 
-        private suspend fun isAiValidationFailed(): Boolean =
-            context.dataStore.data
-                .first()[AiApiValidationStatusKey]
+        private suspend fun isAiValidationFailed(): Boolean {
+            val prefs = context.dataStore.data.first()
+            if (prefs[AiRecommendationsSeparateApiKey] == true) return false
+            return prefs[AiApiValidationStatusKey]
                 .toEnum(AiApiValidationStatus.UNKNOWN) == AiApiValidationStatus.FAILED
+        }
 
         private suspend fun requestAiMixes(
             config: AiServiceConfig,
@@ -106,14 +156,20 @@ class RefreshLibraryTopMixesUseCase
             val candidateById = candidates.associateBy { it.id }
             val candidatePayload =
                 JSONArray().apply {
-                    candidates.forEachIndexed { index, candidate ->
+                    candidates.forEach { candidate ->
                         put(
                             JSONObject()
                                 .put("id", candidate.id)
                                 .put("title", candidate.title)
                                 .put("artists", candidate.artists.joinToString(", "))
                                 .put("album", candidate.albumName.orEmpty())
-                                .put("recentRank", index + 1),
+                                .put("liked", candidate.isLiked)
+                                .put("playMinutes", candidate.playMinutes)
+                                .apply {
+                                    if (candidate.recentRank != null) {
+                                        put("recentRank", candidate.recentRank)
+                                    }
+                                },
                         )
                     }
                 }
@@ -122,27 +178,35 @@ class RefreshLibraryTopMixesUseCase
                     config = config,
                     systemPrompt =
                         """
-                        You are a music curator for ArchiveTune.
-                        Analyze the provided candidate list of songs (representing the user's recent listening history), focusing on artists, titles, and album names to infer genres, styles, eras, and moods.
-                        Build up to $TopMixCountLimit personal mixes based on this history.
-                        Each mix should have a distinct musical identity, style, mood, or theme.
-                        While some overlap of songs between different mixes is fine and expected for your favorite tracks, the mixes should be substantially different from one another.
-                        Select at most $TopMixSongsPerMix songs per mix, avoid duplicate songs inside a single mix, and prioritize transition flow and genre coherence.
-                        Do not force every candidate song to be used if it doesn't fit any theme. Prioritize quality over quantity.
-                        
-                        For each mix, in addition to selecting relevant songs from the candidates, you MUST recommend 3 to 5 top tracks from similar artists of the same genre for each selected candidate song in this mix (e.g. if a mix contains 3 candidate songs, recommend 9 to 15 similar songs; if it contains only 1 candidate, recommend 3 to 5 similar songs). The total songs (candidates + recommended) in each mix must not exceed $TopMixSongsPerMix. Make sure the recommendations are from similar artists of the same genre that are not in the candidates list.
-                        
-                        Return JSON only matching this schema: {"mixes":[{"title":"Descriptive Mix Title","description":"Vibrant and appealing description of the vibe and genre","songIds":["id"],"recommendations":[{"title":"Song Title","artist":"Artist Name"}]}]}.
-                        Every title must contain the word "Mix" (e.g. "90s Grunge Mix", "Late Night Vibes Mix", "Synthwave Drive Mix").
+                        You are an elite personal music curator and A&R specialist for ArchiveTune.
+                        You receive the user's multi-signal taste profile:
+                        - `liked`: tracks the user explicitly marked as favorites
+                        - `playMinutes`: total listening time showing long-term obsession
+                        - `recentRank`: what they have been playing most recently (1 = most recent)
+
+                        Build $TopMixCountLimit distinct, deeply cohesive personal mixes:
+                        1. Core Favorites & Deep Cuts Mix (anchored by their most-loved/most-played tracks + hidden gems from the same scene/subgenre)
+                        2. Current Obsession Mix (built around their recent listening vibe + fresh tracks that match the exact tempo, production style, and language/scene)
+                        3. High-Energy / Flow Mix (tracks with driving rhythm, bass, or momentum from their taste profile + matching recommendations)
+                        4. Late-Night / Atmospheric Mix (melodic, immersive, emotional, or chill tracks from their profile + matching recommendations)
+                        5. Pure Discovery Radar Mix (mostly NEW recommended tracks — 75%+ recommendations — from kindred artists, underground/indie peers, and adjacent subgenres the user hasn't heard yet but will love based on their liked & most-played tracks).
+
+                        Rules:
+                        - Never pad mixes with generic top-40 pop unless the user's history is top-40 pop. Respect niche genres (phonk, hyperpop, post-punk, synthwave, anime/vocaloid, hip-hop, metal, electronic, CIS/Russian indie, etc.).
+                        - In mixes 1-4, blend the user's matching candidate `songIds` with 8 to 15 new `recommendations` (`{"title":"...","artist":"..."}`) not already in `candidates`.
+                        - Order tracks for smooth DJ-like energy and mood transitions.
+                        - Return valid JSON only matching this exact schema:
+                          {"mixes":[{"title":"Descriptive Mix Title","description":"Vivid 1-sentence description","songIds":["id"],"recommendations":[{"title":"Song Title","artist":"Artist Name"}]}]}
+                        - Every title must end with "Mix".
                         """.trimIndent(),
                     userPrompt =
                         JSONObject()
-                            .put("basis", "recent listening history")
+                            .put("basis", "liked songs, most played songs, and recent listening history")
                             .put("maxMixes", TopMixCountLimit)
                             .put("maxSongsPerMix", TopMixSongsPerMix)
                             .put("candidates", candidatePayload)
                             .toString(),
-                    temperature = 0.35,
+                    temperature = 0.45,
                     maxTokens = 4096,
                 )
             return parseGeneratedMixes(
@@ -172,32 +236,35 @@ class RefreshLibraryTopMixesUseCase
                             }
                         }
                     }
-                }.distinct()
+                }.distinct().take(48)
 
+            val searchSemaphore = Semaphore(6)
             val resolvedRecommendations =
-                kotlinx.coroutines.coroutineScope {
+                coroutineScope {
                     recQueries
                         .map { (title, artist) ->
-                            async(kotlinx.coroutines.Dispatchers.IO) {
-                                val query = "$artist $title"
-                                val songs =
-                                    YouTube
-                                        .search(query, YouTube.SearchFilter.FILTER_SONG)
-                                        .getOrNull()
-                                        ?.items
-                                        .orEmpty()
-                                        .filterIsInstance<SongItem>()
+                            async(Dispatchers.IO) {
+                                searchSemaphore.withPermit {
+                                    val query = "$artist $title"
+                                    val songs =
+                                        YouTube
+                                            .search(query, YouTube.SearchFilter.FILTER_SONG)
+                                            .getOrNull()
+                                            ?.items
+                                            .orEmpty()
+                                            .filterIsInstance<SongItem>()
 
-                                val match =
-                                    songs.firstOrNull { song ->
-                                        song.title.contains(title, ignoreCase = true) &&
-                                            song.artists.any { it.name.contains(artist, ignoreCase = true) }
-                                    } ?: songs.firstOrNull()
+                                    val match =
+                                        songs.firstOrNull { song ->
+                                            song.title.contains(title, ignoreCase = true) &&
+                                                song.artists.any { it.name.contains(artist, ignoreCase = true) }
+                                        } ?: songs.firstOrNull()
 
-                                if (match != null) {
-                                    (title to artist) to ValidatedTopMixSong(match)
-                                } else {
-                                    null
+                                    if (match != null) {
+                                        (title to artist) to ValidatedTopMixSong.fromYtm(match)
+                                    } else {
+                                        null
+                                    }
                                 }
                             }
                         }.awaitAll()
@@ -267,83 +334,24 @@ enum class TopMixGenerationFailure {
 }
 
 private data class ValidatedTopMixSong(
-    val ytmSong: SongItem,
+    val id: String,
+    val title: String,
+    val artists: List<String>,
+    val albumName: String?,
+    val mediaMetadata: MediaMetadata,
+    val isLiked: Boolean = false,
+    val playMinutes: Int = 0,
+    val recentRank: Int? = null,
 ) {
-    val id: String
-        get() = ytmSong.id
-    val title: String
-        get() = ytmSong.title
-    val artists: List<String>
-        get() = ytmSong.artists.map { it.name }
-    val albumName: String?
-        get() = ytmSong.album?.name
-    val mediaMetadata: MediaMetadata
-        get() = ytmSong.toMediaMetadata()
-}
-
-private suspend fun List<Song>.validateWithYtm(): List<ValidatedTopMixSong> {
-    val localSongs = distinctBy { it.id }
-    return buildList {
-        localSongs.forEach { song ->
-            val validatedSong = song.validateWithYtm()
-            if (validatedSong != null) {
-                add(validatedSong)
-            }
-        }
-    }
-}
-
-private suspend fun Song.validateWithYtm(): ValidatedTopMixSong? {
-    val query = ytmValidationQuery()
-    if (query.isBlank()) return null
-    val songs =
-        YouTube
-            .search(query, YouTube.SearchFilter.FILTER_SONG)
-            .getOrNull()
-            ?.items
-            .orEmpty()
-            .filterIsInstance<SongItem>()
-    val match =
-        songs.firstOrNull { it.id == id }
-            ?: songs.firstOrNull { it.matchesLocalIdentity(this) }
-    return match?.let { songItem ->
-        ValidatedTopMixSong(
-            ytmSong = songItem,
-        )
-    }
-}
-
-private fun Song.ytmValidationQuery(): String =
-    buildString {
-        append(song.title)
-        val artistNames = artists.joinToString(" ") { it.name }
-        if (artistNames.isNotBlank()) {
-            append(' ')
-            append(artistNames)
-        }
-    }.trim()
-
-private fun SongItem.matchesLocalIdentity(song: Song): Boolean =
-    title.matchesComparableTitle(song.song.title) && artists.matchesAnyLocalArtist(song)
-
-private fun String.matchesComparableTitle(other: String): Boolean {
-    val self = normalizedForMixMatch()
-    val target = other.normalizedForMixMatch()
-    return self.isNotBlank() &&
-        target.isNotBlank() &&
-        (self == target || (self.length > 3 && target.contains(self)) || (target.length > 3 && self.contains(target)))
-}
-
-private fun List<moe.rukamori.archivetune.innertube.models.Artist>.matchesAnyLocalArtist(song: Song): Boolean {
-    val remoteArtists = map { it.name.normalizedForMixMatch() }.filter { it.isNotBlank() }
-    val localArtists = song.artists.map { it.name.normalizedForMixMatch() }.filter { it.isNotBlank() }
-    if (remoteArtists.isEmpty() || localArtists.isEmpty()) return false
-    return localArtists.any { localArtist ->
-        remoteArtists.any { remoteArtist ->
-            localArtist == remoteArtist ||
-                (localArtist.length > 3 && remoteArtist.contains(localArtist)) ||
-                (remoteArtist.length > 3 && localArtist.contains(remoteArtist))
-        }
+    companion object {
+        fun fromYtm(ytmSong: SongItem): ValidatedTopMixSong =
+            ValidatedTopMixSong(
+                id = ytmSong.id,
+                title = ytmSong.title,
+                artists = ytmSong.artists.map { it.name },
+                albumName = ytmSong.album?.name,
+                mediaMetadata = ytmSong.toMediaMetadata(),
+            )
     }
 }
 
@@ -371,10 +379,4 @@ private fun String.sanitizeMixDescription(): String =
         .orEmpty()
         .trim()
         .take(120)
-        .ifBlank { "A genre-focused mix based on your recent listening history." }
-
-private fun String.normalizedForMixMatch(): String =
-    lowercase(Locale.getDefault())
-        .replace(Regex("[^\\p{L}\\p{N}]+"), " ")
-        .trim()
-        .replace(Regex("\\s+"), " ")
+        .ifBlank { "A genre-focused mix based on your listening profile." }

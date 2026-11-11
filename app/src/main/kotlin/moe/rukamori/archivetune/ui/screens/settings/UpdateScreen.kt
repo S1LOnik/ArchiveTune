@@ -11,6 +11,7 @@ package moe.rukamori.archivetune.ui.screens.settings
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -18,6 +19,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -27,12 +30,19 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -40,8 +50,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import kotlinx.coroutines.launch
 import moe.rukamori.archivetune.BuildConfig
 import moe.rukamori.archivetune.R
+import moe.rukamori.archivetune.constants.GithubAutoUpdateKey
+import moe.rukamori.archivetune.updates.GithubAutoUpdateWorker
+import moe.rukamori.archivetune.updates.GithubUpdateChecker
+import moe.rukamori.archivetune.utils.AppUpdateInstaller
+import moe.rukamori.archivetune.utils.rememberPreference
 import moe.rukamori.archivetune.ui.component.IconButton
 import moe.rukamori.archivetune.ui.utils.backToMain
 
@@ -52,6 +68,13 @@ fun UpdateScreen(
     onUpToDate: () -> Unit = {},
 ) {
     val uriHandler = LocalUriHandler.current
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val (autoUpdateEnabled, onAutoUpdateEnabledChange) =
+        rememberPreference(GithubAutoUpdateKey, defaultValue = false)
+    var latestRelease by remember { mutableStateOf<GithubUpdateChecker.LatestRelease?>(null) }
+    var statusText by remember { mutableStateOf<String?>(null) }
+    var isBusy by remember { mutableStateOf(false) }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -86,6 +109,7 @@ fun UpdateScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -162,6 +186,96 @@ fun UpdateScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
                     )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Автообновление через GitHub",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                            Text(
+                                text = "Скачивать новые релизы по Wi-Fi и присылать уведомление для установки",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Switch(
+                            checked = autoUpdateEnabled,
+                            onCheckedChange = {
+                                onAutoUpdateEnabledChange(it)
+                                GithubAutoUpdateWorker.apply(context, it)
+                            },
+                        )
+                    }
+
+                    Button(
+                        onClick = {
+                            scope.launch {
+                                isBusy = true
+                                statusText = "Проверяем обновления…"
+                                val latest = GithubUpdateChecker.fetchLatest()
+                                latestRelease = null
+                                statusText =
+                                    when {
+                                        latest == null -> "Не удалось проверить обновления"
+
+                                        GithubUpdateChecker.isNewer(latest.version, BuildConfig.VERSION_NAME) -> {
+                                            latestRelease = latest
+                                            "Доступна версия ${latest.version}"
+                                        }
+
+                                        else -> "Установлена последняя версия"
+                                    }
+                                isBusy = false
+                            }
+                        },
+                        enabled = !isBusy,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = ButtonDefaults.shape,
+                    ) {
+                        Text(text = "Проверить обновления")
+                    }
+
+                    latestRelease?.let { release ->
+                        Button(
+                            onClick = {
+                                scope.launch {
+                                    isBusy = true
+                                    val result =
+                                        AppUpdateInstaller.downloadAndInstall(context, release.apkUrl) { progress ->
+                                            val percent = progress.fraction?.let { (it * 100).toInt() }
+                                            statusText = "Загрузка${percent?.let { " $it%" }.orEmpty()}…"
+                                        }
+                                    statusText =
+                                        if (result.isSuccess) {
+                                            "Откроется установщик Android"
+                                        } else {
+                                            "Не удалось скачать обновление"
+                                        }
+                                    isBusy = false
+                                }
+                            },
+                            enabled = !isBusy,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = ButtonDefaults.shape,
+                        ) {
+                            Text(text = "Скачать и установить ${release.version}")
+                        }
+                    }
+
+                    statusText?.let {
+                        Text(
+                            text = it,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
                 }
             }
         }

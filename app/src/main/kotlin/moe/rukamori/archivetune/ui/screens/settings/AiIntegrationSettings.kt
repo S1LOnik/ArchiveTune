@@ -66,7 +66,9 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -92,12 +94,26 @@ import moe.rukamori.archivetune.R
 import moe.rukamori.archivetune.ai.AiModelOption
 import moe.rukamori.archivetune.constants.AiApiValidationStatus
 import moe.rukamori.archivetune.constants.AiProvider
+import moe.rukamori.archivetune.constants.AiRecommendationsApiKeyKey
+import moe.rukamori.archivetune.constants.AiRecommendationsCustomEndpointKey
+import moe.rukamori.archivetune.constants.AiRecommendationsModelKey
+import moe.rukamori.archivetune.constants.AiRecommendationsProviderKey
+import moe.rukamori.archivetune.constants.AiRecommendationsSeparateApiKey
+import moe.rukamori.archivetune.constants.MascotAiApiKeyKey
+import moe.rukamori.archivetune.constants.MascotAiCustomEndpointKey
+import moe.rukamori.archivetune.constants.MascotAiEnabledKey
+import moe.rukamori.archivetune.constants.MascotAiModelKey
+import moe.rukamori.archivetune.constants.MascotAiProviderKey
+import moe.rukamori.archivetune.constants.MascotAiSeparateApiKey
 import moe.rukamori.archivetune.ui.component.DefaultDialog
 import moe.rukamori.archivetune.ui.component.IconButton
 import moe.rukamori.archivetune.ui.component.ListPreference
 import moe.rukamori.archivetune.ui.component.PreferenceEntry
 import moe.rukamori.archivetune.ui.component.PreferenceGroup
+import moe.rukamori.archivetune.ui.component.SwitchPreference
 import moe.rukamori.archivetune.ui.utils.backToMain
+import moe.rukamori.archivetune.utils.rememberEnumPreference
+import moe.rukamori.archivetune.utils.rememberPreference
 import moe.rukamori.archivetune.viewmodels.AiIntegrationSettingsScreenState
 import moe.rukamori.archivetune.viewmodels.AiIntegrationSettingsUiModel
 import moe.rukamori.archivetune.viewmodels.AiIntegrationSettingsViewModel
@@ -362,6 +378,250 @@ private fun AiIntegrationSettingsContent(
                         },
                     icon = { Icon(painterResource(R.drawable.edit), null) },
                     onClick = { onOpenEditor(AiSettingsEditorField.CUSTOM_PROMPT) },
+                )
+            }
+        }
+
+        AiRecommendationsAndMascotSection(availableModels = model.availableModels)
+    }
+}
+
+@Composable
+private fun AiRecommendationsAndMascotSection(
+    availableModels: ImmutableList<AiModelOption>,
+) {
+    val (recModel, onRecModelChange) = rememberPreference(AiRecommendationsModelKey, defaultValue = "")
+    val (recSeparateApi, onRecSeparateApiChange) = rememberPreference(AiRecommendationsSeparateApiKey, defaultValue = false)
+    val (recProvider, onRecProviderChange) = rememberEnumPreference(AiRecommendationsProviderKey, defaultValue = AiProvider.NONE)
+    val (recApiKey, onRecApiKeyChange) = rememberPreference(AiRecommendationsApiKeyKey, defaultValue = "")
+    val (recEndpoint, onRecEndpointChange) = rememberPreference(AiRecommendationsCustomEndpointKey, defaultValue = "")
+
+    val (mascotAiEnabled, onMascotAiEnabledChange) = rememberPreference(MascotAiEnabledKey, defaultValue = false)
+    val (mascotAiModel, onMascotAiModelChange) = rememberPreference(MascotAiModelKey, defaultValue = "")
+    val (mascotSeparateApi, onMascotSeparateApiChange) = rememberPreference(MascotAiSeparateApiKey, defaultValue = false)
+    val (mascotProvider, onMascotProviderChange) = rememberEnumPreference(MascotAiProviderKey, defaultValue = AiProvider.NONE)
+    val (mascotApiKey, onMascotApiKeyChange) = rememberPreference(MascotAiApiKeyKey, defaultValue = "")
+    val (mascotEndpoint, onMascotEndpointChange) = rememberPreference(MascotAiCustomEndpointKey, defaultValue = "")
+
+    var dialogKey by remember { mutableStateOf<String?>(null) }
+    var dialogValue by remember { mutableStateOf("") }
+
+    if (dialogKey != null) {
+        val isPassword = dialogKey?.endsWith("_key") == true
+        val title =
+            when (dialogKey) {
+                "rec_model" -> "Модель ИИ для рекомендаций (умнее)"
+                "rec_key" -> "API-ключ для рекомендаций"
+                "rec_endpoint" -> "Custom Endpoint для рекомендаций"
+                "mascot_model" -> "Модель ИИ для Клодика (быстрее/меньше)"
+                "mascot_key" -> "API-ключ для Клодика"
+                else -> "Custom Endpoint для Клодика"
+            }
+        DefaultDialog(
+            onDismiss = { dialogKey = null },
+            icon = { Icon(painterResource(R.drawable.auto_awesome), contentDescription = null) },
+            title = { Text(title) },
+            buttons = {
+                TextButton(onClick = { dialogKey = null }, shapes = ButtonDefaults.shapes()) {
+                    Text(stringResource(android.R.string.cancel))
+                }
+                TextButton(
+                    onClick = {
+                        val trimmed = dialogValue.trim()
+                        when (dialogKey) {
+                            "rec_model" -> onRecModelChange(trimmed)
+                            "rec_key" -> onRecApiKeyChange(trimmed)
+                            "rec_endpoint" -> onRecEndpointChange(trimmed)
+                            "mascot_model" -> onMascotAiModelChange(trimmed)
+                            "mascot_key" -> onMascotApiKeyChange(trimmed)
+                            "mascot_endpoint" -> onMascotEndpointChange(trimmed)
+                        }
+                        dialogKey = null
+                    },
+                    shapes = ButtonDefaults.shapes(),
+                ) {
+                    Text(stringResource(R.string.save))
+                }
+            },
+        ) {
+            OutlinedTextField(
+                value = dialogValue,
+                onValueChange = { dialogValue = it },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                visualTransformation = if (isPassword) PasswordVisualTransformation() else VisualTransformation.None,
+                label = { Text(title) },
+            )
+        }
+    }
+
+    PreferenceGroup(title = "ИИ-рекомендации и персональные миксы") {
+        item {
+            PreferenceEntry(
+                title = { Text("Модель для рекомендаций (умная)") },
+                description = recModel.ifBlank { "Использовать основную модель (или укажите более мощную, например gpt-4o / gemini-2.5-pro)" },
+                icon = { Icon(painterResource(R.drawable.auto_awesome), null) },
+                onClick = {
+                    dialogValue = recModel
+                    dialogKey = "rec_model"
+                },
+            )
+        }
+
+        if (availableModels.isNotEmpty()) {
+            item {
+                ListPreference(
+                    title = { Text("Выбрать модель рекомендаций из списка API") },
+                    description = recModel.ifBlank { "По умолчанию (основная)" },
+                    icon = { Icon(painterResource(R.drawable.tune), null) },
+                    selectedValue = recModel.ifBlank { availableModels.first().id },
+                    values = availableModels.map { it.id },
+                    valueText = { id -> availableModels.firstOrNull { it.id == id }?.displayName ?: id },
+                    onValueSelected = onRecModelChange,
+                )
+            }
+        }
+
+        item {
+            SwitchPreference(
+                title = { Text("Отдельный API-ключ / провайдер для рекомендаций") },
+                description = "Позволяет подключить другой сервис специально для генерации миксов и рекомендаций",
+                icon = { Icon(painterResource(R.drawable.token), null) },
+                checked = recSeparateApi,
+                onCheckedChange = onRecSeparateApiChange,
+            )
+        }
+
+        if (recSeparateApi) {
+            item {
+                ListPreference(
+                    title = { Text("Провайдер рекомендаций") },
+                    description = recProvider.label(),
+                    icon = { Icon(painterResource(R.drawable.auto_awesome), null) },
+                    selectedValue = recProvider,
+                    values = AiProviderOptions,
+                    valueText = { it.label() },
+                    onValueSelected = onRecProviderChange,
+                )
+            }
+
+            if (recProvider == AiProvider.CUSTOM) {
+                item {
+                    PreferenceEntry(
+                        title = { Text("Custom Endpoint рекомендаций") },
+                        description = recEndpoint.ifBlank { "Не задан" },
+                        icon = { Icon(painterResource(R.drawable.website), null) },
+                        onClick = {
+                            dialogValue = recEndpoint
+                            dialogKey = "rec_endpoint"
+                        },
+                    )
+                }
+            }
+
+            item {
+                PreferenceEntry(
+                    title = { Text("API-ключ рекомендаций") },
+                    description = if (recApiKey.isBlank()) stringResource(R.string.ai_api_key_missing) else stringResource(R.string.ai_api_key_configured),
+                    icon = { Icon(painterResource(R.drawable.token), null) },
+                    onClick = {
+                        dialogValue = recApiKey
+                        dialogKey = "rec_key"
+                    },
+                )
+            }
+        }
+    }
+
+    PreferenceGroup(title = "Клодик — живые ИИ-комментарии (приоритет у музыки)") {
+        item {
+            SwitchPreference(
+                title = { Text("Подключить ИИ к Клодику") },
+                description = "Клодик живо комментирует треки и действия, но ждёт буферизации аудио, чтобы не мешать загрузке музыки",
+                icon = { Icon(painterResource(R.drawable.ic_mascot), null) },
+                checked = mascotAiEnabled,
+                onCheckedChange = onMascotAiEnabledChange,
+            )
+        }
+
+        item {
+            PreferenceEntry(
+                title = { Text("Модель для Клодика (быстрая и лёгкая)") },
+                description = mascotAiModel.ifBlank { "Авто (gpt-4o-mini / gemini-2.0-flash-lite / mistral-small)" },
+                icon = { Icon(painterResource(R.drawable.auto_awesome), null) },
+                isEnabled = mascotAiEnabled,
+                onClick = {
+                    dialogValue = mascotAiModel
+                    dialogKey = "mascot_model"
+                },
+            )
+        }
+
+        if (availableModels.isNotEmpty()) {
+            item {
+                ListPreference(
+                    title = { Text("Выбрать модель Клодика из списка API") },
+                    description = mascotAiModel.ifBlank { "Авто (быстрая)" },
+                    icon = { Icon(painterResource(R.drawable.tune), null) },
+                    selectedValue = mascotAiModel.ifBlank { availableModels.first().id },
+                    values = availableModels.map { it.id },
+                    valueText = { id -> availableModels.firstOrNull { it.id == id }?.displayName ?: id },
+                    onValueSelected = onMascotAiModelChange,
+                    isEnabled = mascotAiEnabled,
+                )
+            }
+        }
+
+        item {
+            SwitchPreference(
+                title = { Text("Отдельный API-ключ / провайдер для Клодика") },
+                description = "Если выключено, используется основной API-ключ выше, но с отдельной лёгкой моделью",
+                icon = { Icon(painterResource(R.drawable.token), null) },
+                checked = mascotSeparateApi,
+                onCheckedChange = onMascotSeparateApiChange,
+                isEnabled = mascotAiEnabled,
+            )
+        }
+
+        if (mascotSeparateApi) {
+            item {
+                ListPreference(
+                    title = { Text("Провайдер Клодика") },
+                    description = mascotProvider.label(),
+                    icon = { Icon(painterResource(R.drawable.auto_awesome), null) },
+                    selectedValue = mascotProvider,
+                    values = AiProviderOptions,
+                    valueText = { it.label() },
+                    onValueSelected = onMascotProviderChange,
+                    isEnabled = mascotAiEnabled,
+                )
+            }
+
+            if (mascotProvider == AiProvider.CUSTOM) {
+                item {
+                    PreferenceEntry(
+                        title = { Text("Custom Endpoint Клодика") },
+                        description = mascotEndpoint.ifBlank { "Не задан" },
+                        icon = { Icon(painterResource(R.drawable.website), null) },
+                        isEnabled = mascotAiEnabled,
+                        onClick = {
+                            dialogValue = mascotEndpoint
+                            dialogKey = "mascot_endpoint"
+                        },
+                    )
+                }
+            }
+
+            item {
+                PreferenceEntry(
+                    title = { Text("API-ключ Клодика") },
+                    description = if (mascotApiKey.isBlank()) stringResource(R.string.ai_api_key_missing) else stringResource(R.string.ai_api_key_configured),
+                    icon = { Icon(painterResource(R.drawable.token), null) },
+                    isEnabled = mascotAiEnabled,
+                    onClick = {
+                        dialogValue = mascotApiKey
+                        dialogKey = "mascot_key"
+                    },
                 )
             }
         }

@@ -46,6 +46,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
@@ -62,6 +63,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import moe.rukamori.archivetune.LocalPlayerConnection
+import moe.rukamori.archivetune.constants.MascotAiEnabledKey
 import moe.rukamori.archivetune.constants.MascotCharacterKey
 import moe.rukamori.archivetune.constants.MascotChatterFrequencyKey
 import moe.rukamori.archivetune.constants.MascotEnabledKey
@@ -92,21 +94,25 @@ fun MascotOverlay(
     val (mascotChatterFrequency) = rememberPreference(MascotChatterFrequencyKey, defaultValue = 1)
     val (mascotUiReactions) = rememberPreference(MascotUiReactionsKey, defaultValue = true)
     val (mascotPlatformPhysics) = rememberPreference(MascotPlatformPhysicsKey, defaultValue = true)
+    val (mascotAiEnabled) = rememberPreference(MascotAiEnabledKey, defaultValue = false)
 
     val character = remember(mascotCharacterId) {
         MascotRegistry.getCharacter(mascotCharacterId)
     }
 
+    val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val density = LocalDensity.current
     val haptic = LocalHapticFeedback.current
     val playerConnection = LocalPlayerConnection.current
     val isPlaying = playerConnection?.isPlaying?.collectAsState()?.value ?: false
+    val currentMediaMetadata = playerConnection?.mediaMetadata?.collectAsState()?.value
 
     var currentState by remember { mutableStateOf(MascotState.IDLE) }
     var speechText by remember { mutableStateOf<String?>(null) }
     var speechVisible by remember { mutableStateOf(false) }
     var speechJob by remember { mutableStateOf<Job?>(null) }
+    var aiSpeechJob by remember { mutableStateOf<Job?>(null) }
     var bubbleSize by remember { mutableStateOf(IntSize.Zero) }
 
     fun speak(text: String, durationMs: Long = 3800L, priority: Int = 1) {
@@ -118,6 +124,29 @@ fun MascotOverlay(
         speechJob = coroutineScope.launch {
             delay(durationMs)
             speechVisible = false
+        }
+    }
+
+    fun speakWithOptionalAi(event: MascotEvent, durationMs: Long = 4200L, priority: Int = 1) {
+        speak(character.getRandomLine(event), durationMs, priority)
+        if (!mascotAiEnabled || !mascotSpeechEnabled) return
+        aiSpeechJob?.cancel()
+        aiSpeechJob = coroutineScope.launch {
+            val title = (event as? MascotEvent.TrackStarted)?.title ?: currentMediaMetadata?.title
+            val artist =
+                (event as? MascotEvent.TrackStarted)?.artist
+                    ?: currentMediaMetadata?.artists?.joinToString { it.name }
+            val liveLine =
+                MascotAiCommentator.generateLiveLineOrNull(
+                    context = context,
+                    playerConnection = playerConnection,
+                    event = event,
+                    currentTrackTitle = title,
+                    currentTrackArtist = artist,
+                )
+            if (!liveLine.isNullOrBlank()) {
+                speak(liveLine, durationMs = 5200L, priority = priority)
+            }
         }
     }
 
@@ -141,6 +170,7 @@ fun MascotOverlay(
             character = character,
             onStateChange = { currentState = it },
             speak = { text, durationMs -> speak(text, durationMs) },
+            onTrackStarted = { event -> speakWithOptionalAi(event, 4800L) },
         )
     }
 
@@ -187,7 +217,7 @@ fun MascotOverlay(
                 }
                 is MascotEvent.TrackLiked -> {
                     currentState = MascotState.LOVE
-                    speak(character.getRandomLine(event), 3000L)
+                    speakWithOptionalAi(event, 3800L)
                 }
                 is MascotEvent.TrackUnliked -> {
                     currentState = MascotState.IDLE
@@ -380,7 +410,7 @@ fun MascotOverlay(
 
                             if (tapCount >= 3) {
                                 currentState = MascotState.ANNOYED
-                                speak(character.getRandomLine(MascotEvent.RapidTapMascot), 3500L, priority = 2)
+                                speakWithOptionalAi(MascotEvent.RapidTapMascot, 3800L, priority = 2)
                                 tapCount = 0
                             } else {
                                 val tapStates = listOf(
@@ -392,7 +422,7 @@ fun MascotOverlay(
                                     MascotState.LIKE,
                                 )
                                 currentState = tapStates.random()
-                                speak(character.getRandomLine(MascotEvent.TapMascot), 3000L)
+                                speakWithOptionalAi(MascotEvent.TapMascot, 3600L)
                             }
                         },
                         onDoubleTap = {
@@ -416,7 +446,7 @@ fun MascotOverlay(
                                 }
                             }
                             currentState = MascotState.PARTY
-                            speak(character.getRandomLine(MascotEvent.DoubleTapMascot), 3000L)
+                            speakWithOptionalAi(MascotEvent.DoubleTapMascot, 3600L)
                         },
                         onLongPress = {
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -426,7 +456,7 @@ fun MascotOverlay(
                                 rotationZ.animateTo(0f, spring(stiffness = Spring.StiffnessMedium))
                             }
                             currentState = MascotState.LOVE
-                            speak(character.getRandomLine(MascotEvent.LongPressMascot), 3500L, priority = 2)
+                            speakWithOptionalAi(MascotEvent.LongPressMascot, 3800L, priority = 2)
                         }
                     )
                 }
@@ -605,6 +635,7 @@ private fun MascotPlaybackEffects(
     character: MascotCharacter,
     onStateChange: (MascotState) -> Unit,
     speak: (String, Long) -> Unit,
+    onTrackStarted: (MascotEvent.TrackStarted) -> Unit,
 ) {
     val isPlaying by playerConnection.isPlaying.collectAsState()
     val mediaMetadata by playerConnection.mediaMetadata.collectAsState()
@@ -645,7 +676,7 @@ private fun MascotPlaybackEffects(
                 MascotState.DANCE,
             )
             onStateChange(musicalStates.random())
-            speak(character.getRandomLine(MascotEvent.TrackStarted(title, artist)), 4500L)
+            onTrackStarted(MascotEvent.TrackStarted(title, artist))
         }
     }
 }

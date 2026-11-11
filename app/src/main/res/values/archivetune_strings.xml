@@ -1226,4 +1226,6 @@
     <string name="mascot_chatter_quiet">Quiet</string>
     <string name="mascot_chatter_normal">Normal</string>
     <string name="mascot_chatter_talkative">Talkative</string>
+    <string name="external_link_track_not_found">Couldn\'t find this track on YouTube Music</string>
+    <string name="external_link_not_supported">This link type isn\'t supported yet (tracks and Spotify playlists only)</string>
 </resources>

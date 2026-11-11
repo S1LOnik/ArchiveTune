@@ -1041,6 +1041,15 @@ enum class PlayerDesignStyle {
     LOOPER,
 }
 
+val RemovedPlayerDesignStyles: Set<PlayerDesignStyle> =
+    setOf(
+        PlayerDesignStyle.V1,
+        PlayerDesignStyle.V2,
+        PlayerDesignStyle.V3,
+        PlayerDesignStyle.V5,
+        PlayerDesignStyle.V6,
+    )
+
 // [FIX-ZCODE] T5: FlamingoShowVolumeBarKey removed — the Apple Music (Flamingo)
 // volume bar was removed permanently from the design (owner request).
 
@@ -1729,3 +1738,19 @@ val CanvasSourceKey = stringPreferencesKey("canvasSource")
 val CanvasWifiOnlyKey = booleanPreferencesKey("canvasWifiOnly")
 
 val AodShowLyricTickerKey = booleanPreferencesKey("aodShowLyricTicker")
+
+val GithubAutoUpdateKey = booleanPreferencesKey("githubAutoUpdate")
+val GithubAutoUpdateLastVersionKey = stringPreferencesKey("githubAutoUpdateLastVersion")
+
+val AiRecommendationsSeparateApiKey = booleanPreferencesKey("ai_recommendations_separate_api")
+val AiRecommendationsProviderKey = stringPreferencesKey("ai_recommendations_provider")
+val AiRecommendationsApiKeyKey = stringPreferencesKey("ai_recommendations_api_key")
+val AiRecommendationsCustomEndpointKey = stringPreferencesKey("ai_recommendations_custom_endpoint")
+val AiRecommendationsModelKey = stringPreferencesKey("ai_recommendations_model")
+
+val MascotAiEnabledKey = booleanPreferencesKey("mascot_ai_enabled")
+val MascotAiSeparateApiKey = booleanPreferencesKey("mascot_ai_separate_api")
+val MascotAiProviderKey = stringPreferencesKey("mascot_ai_provider")
+val MascotAiApiKeyKey = stringPreferencesKey("mascot_ai_api_key")
+val MascotAiCustomEndpointKey = stringPreferencesKey("mascot_ai_custom_endpoint")
+val MascotAiModelKey = stringPreferencesKey("mascot_ai_model")
