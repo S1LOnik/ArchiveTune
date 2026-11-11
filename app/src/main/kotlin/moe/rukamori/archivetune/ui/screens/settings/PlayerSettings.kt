@@ -245,7 +245,7 @@ fun PlayerSettings(navController: NavController) {
     val (smartDjAutomixEnabled, onSmartDjAutomixEnabledChange) =
         rememberPreference(
             SmartDjAutomixEnabledKey,
-            defaultValue = true,
+            defaultValue = false,
         )
 
     val (artistSeparators, onArtistSeparatorsChange) =

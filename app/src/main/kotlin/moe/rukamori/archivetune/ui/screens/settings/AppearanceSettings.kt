@@ -103,6 +103,7 @@ import moe.rukamori.archivetune.constants.PlayerButtonsStyle
 import moe.rukamori.archivetune.constants.PlayerButtonsStyleKey
 import moe.rukamori.archivetune.constants.PlayerDesignStyle
 import moe.rukamori.archivetune.constants.PlayerDesignStyleKey
+import moe.rukamori.archivetune.constants.RemovedPlayerDesignStyles
 import moe.rukamori.archivetune.constants.PlaylistTagOrderKey
 import moe.rukamori.archivetune.constants.PureBlackKey
 import moe.rukamori.archivetune.constants.QuickPicksDisplayMode
@@ -176,7 +177,7 @@ fun AppearanceSettings(navController: NavController) {
     val (playerDesignStyle, onPlayerDesignStyleChange) =
         rememberEnumPreference(
             PlayerDesignStyleKey,
-            defaultValue = PlayerDesignStyle.V4,
+            defaultValue = PlayerDesignStyle.APPLE_MUSIC,
         )
     val (showPlayerVolumeBar, onShowPlayerVolumeBarChange) =
         rememberPreference(
@@ -798,6 +799,7 @@ fun AppearanceSettings(navController: NavController) {
                         icon = { Icon(painterResource(R.drawable.palette), null) },
                         selectedValue = playerDesignStyle,
                         onValueSelected = onPlayerDesignStyleChange,
+                        availableValues = SelectablePlayerDesignStyles,
                         valueText = {
                             when (it) {
                                 PlayerDesignStyle.V1 -> stringResource(R.string.player_design_v1)
@@ -1351,3 +1353,9 @@ enum class LyricsPosition {
     CENTER,
     RIGHT,
 }
+
+
+// Legacy styles (Classic, Modern, Minimal, Little, Expressive) are hidden from the picker
+// and migrated to the default style on startup (see App.migrateRemovedPlayerStyles).
+private val SelectablePlayerDesignStyles: List<PlayerDesignStyle> =
+    PlayerDesignStyle.entries.filterNot { it in RemovedPlayerDesignStyles }

@@ -32,20 +32,24 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -54,6 +58,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
@@ -63,9 +69,19 @@ import com.airbnb.lottie.compose.LottieConstants
 import com.airbnb.lottie.compose.animateLottieCompositionAsState
 import com.airbnb.lottie.compose.rememberLottieComposition
 import dev.chrisbanes.haze.hazeSource
+import kotlinx.coroutines.launch
 import moe.rukamori.archivetune.LocalPlayerAwareWindowInsets
+import moe.rukamori.archivetune.LocalPlayerConnection
 import moe.rukamori.archivetune.LocalStableSystemBarsTopPadding
 import moe.rukamori.archivetune.R
+import moe.rukamori.archivetune.ai.AiModelOption
+import moe.rukamori.archivetune.constants.AiProvider
+import moe.rukamori.archivetune.constants.MascotAiApiKeyKey
+import moe.rukamori.archivetune.constants.MascotAiCustomEndpointKey
+import moe.rukamori.archivetune.constants.MascotAiEnabledKey
+import moe.rukamori.archivetune.constants.MascotAiModelKey
+import moe.rukamori.archivetune.constants.MascotAiProviderKey
+import moe.rukamori.archivetune.constants.MascotAiSeparateApiKey
 import moe.rukamori.archivetune.constants.MascotCharacterKey
 import moe.rukamori.archivetune.constants.MascotChatterFrequencyKey
 import moe.rukamori.archivetune.constants.MascotEnabledKey
@@ -74,17 +90,21 @@ import moe.rukamori.archivetune.constants.MascotScaleKey
 import moe.rukamori.archivetune.constants.MascotSpeechEnabledKey
 import moe.rukamori.archivetune.constants.MascotUiReactionsKey
 import moe.rukamori.archivetune.constants.MascotWanderEnabledKey
+import moe.rukamori.archivetune.ui.component.DefaultDialog
+import moe.rukamori.archivetune.ui.component.ListPreference
 import moe.rukamori.archivetune.ui.component.PreferenceEntry
 import moe.rukamori.archivetune.ui.component.PreferenceGroup
 import moe.rukamori.archivetune.ui.component.SettingsPageTopBar
 import moe.rukamori.archivetune.ui.component.SwitchPreference
 import moe.rukamori.archivetune.ui.mascot.ClaudieMascot
+import moe.rukamori.archivetune.ui.mascot.MascotAiCommentator
 import moe.rukamori.archivetune.ui.mascot.MascotEvent
 import moe.rukamori.archivetune.ui.mascot.MascotRegistry
 import moe.rukamori.archivetune.ui.mascot.MascotState
 import moe.rukamori.archivetune.ui.screens.ScreenHeaderHaze
 import moe.rukamori.archivetune.ui.screens.rememberScreenHeaderHaze
 import moe.rukamori.archivetune.ui.utils.backToMain
+import moe.rukamori.archivetune.utils.rememberEnumPreference
 import moe.rukamori.archivetune.utils.rememberPreference
 
 @Composable
@@ -105,6 +125,23 @@ fun MascotSettings(navController: NavController) {
         rememberPreference(MascotPlatformPhysicsKey, defaultValue = true)
     val (mascotChatterFrequency, onMascotChatterFrequencyChange) =
         rememberPreference(MascotChatterFrequencyKey, defaultValue = 1)
+    val (mascotAiEnabled, onMascotAiEnabledChange) =
+        rememberPreference(MascotAiEnabledKey, defaultValue = false)
+    val (mascotAiSeparateApi, onMascotAiSeparateApiChange) =
+        rememberPreference(MascotAiSeparateApiKey, defaultValue = false)
+    val (mascotAiProvider, onMascotAiProviderChange) =
+        rememberEnumPreference(MascotAiProviderKey, defaultValue = AiProvider.NONE)
+    val (mascotAiApiKey, onMascotAiApiKeyChange) =
+        rememberPreference(MascotAiApiKeyKey, defaultValue = "")
+    val (mascotAiCustomEndpoint, onMascotAiCustomEndpointChange) =
+        rememberPreference(MascotAiCustomEndpointKey, defaultValue = "")
+    val (mascotAiModel, onMascotAiModelChange) =
+        rememberPreference(MascotAiModelKey, defaultValue = "")
+
+    var editingField by remember { mutableStateOf<String?>(null) }
+    var editorText by remember { mutableStateOf("") }
+    var fetchedModels by remember { mutableStateOf<List<AiModelOption>>(emptyList()) }
+    var isFetchingModels by remember { mutableStateOf(false) }
 
     val character = remember(mascotCharacterId) {
         MascotRegistry.getCharacter(mascotCharacterId)
@@ -113,6 +150,55 @@ fun MascotSettings(navController: NavController) {
     val headerHaze = rememberScreenHeaderHaze()
     val systemBarsTopPadding = LocalStableSystemBarsTopPadding.current
     val context = LocalContext.current
+    val playerConnection = LocalPlayerConnection.current
+    val scope = rememberCoroutineScope()
+
+    if (editingField != null) {
+        val isPassword = editingField == "api_key"
+        val dialogTitle =
+            when (editingField) {
+                "api_key" -> "API-ключ для Клодика"
+                "endpoint" -> "Кастомный Endpoint Клодика"
+                else -> "Модель ИИ для Клодика"
+            }
+        DefaultDialog(
+            onDismiss = { editingField = null },
+            icon = { Icon(painterResource(R.drawable.auto_awesome), contentDescription = null) },
+            title = { Text(dialogTitle) },
+            buttons = {
+                TextButton(onClick = { editingField = null }) {
+                    Text(stringResource(android.R.string.cancel))
+                }
+                TextButton(
+                    onClick = {
+                        when (editingField) {
+                            "api_key" -> onMascotAiApiKeyChange(editorText.trim())
+                            "endpoint" -> onMascotAiCustomEndpointChange(editorText.trim())
+                            "model" -> onMascotAiModelChange(editorText.trim())
+                        }
+                        editingField = null
+                    },
+                ) {
+                    Text(stringResource(R.string.save))
+                }
+            },
+        ) {
+            OutlinedTextField(
+                value = editorText,
+                onValueChange = { editorText = it },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                visualTransformation = if (isPassword) PasswordVisualTransformation() else VisualTransformation.None,
+                label = { Text(dialogTitle) },
+                supportingText =
+                    if (editingField == "model") {
+                        { Text("Например: gpt-4o-mini, gemini-2.0-flash-lite, mistral-small-latest") }
+                    } else {
+                        null
+                    },
+            )
+        }
+    }
 
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -151,8 +237,24 @@ fun MascotSettings(navController: NavController) {
                     scale = mascotScale,
                     character = character,
                     onTestSpeech = {
-                        val testLine = character.getRandomLine(MascotEvent.TapMascot)
-                        Toast.makeText(context, testLine, Toast.LENGTH_SHORT).show()
+                        scope.launch {
+                            val currentMeta = playerConnection?.mediaMetadata?.value
+                            val aiLine =
+                                if (mascotAiEnabled) {
+                                    MascotAiCommentator.generateLiveLineOrNull(
+                                        context = context,
+                                        playerConnection = playerConnection,
+                                        event = MascotEvent.TapMascot,
+                                        currentTrackTitle = currentMeta?.title,
+                                        currentTrackArtist = currentMeta?.artists?.joinToString { it.name },
+                                        bypassCooldown = true,
+                                    )
+                                } else {
+                                    null
+                                }
+                            val testLine = aiLine ?: character.getRandomLine(MascotEvent.TapMascot)
+                            Toast.makeText(context, testLine, Toast.LENGTH_SHORT).show()
+                        }
                     },
                     modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
                 )
@@ -270,6 +372,143 @@ fun MascotSettings(navController: NavController) {
                                 )
                             },
                         )
+                    }
+                }
+
+                Spacer(Modifier.height(12.dp))
+
+                PreferenceGroup(title = "ИИ-мозги Клодика (приоритет у музыки)") {
+                    item {
+                        SwitchPreference(
+                            title = { Text("Живые ИИ-реплики Клодика") },
+                            description = "Клодик комментирует играющий трек и действия через ИИ, только когда аудио уже забуферизовано",
+                            icon = { Icon(painterResource(R.drawable.auto_awesome), null) },
+                            checked = mascotAiEnabled,
+                            onCheckedChange = onMascotAiEnabledChange,
+                            isEnabled = mascotEnabled && mascotSpeechEnabled,
+                        )
+                    }
+
+                    item {
+                        PreferenceEntry(
+                            title = { Text("Модель ИИ для Клодика (быстрая/легкая)") },
+                            description =
+                                mascotAiModel.ifBlank {
+                                    "Авто (быстрая модель провайдера: gpt-4o-mini / gemini-2.0-flash-lite)"
+                                },
+                            icon = { Icon(painterResource(R.drawable.auto_awesome), null) },
+                            isEnabled = mascotEnabled && mascotAiEnabled,
+                            onClick = {
+                                editorText = mascotAiModel
+                                editingField = "model"
+                            },
+                        )
+                    }
+
+                    item {
+                        PreferenceEntry(
+                            title = { Text(if (isFetchingModels) "Загрузка списка моделей…" else "Загрузить модели из API") },
+                            description =
+                                if (fetchedModels.isNotEmpty()) {
+                                    "Найдено моделей: ${fetchedModels.size} (выберите ниже)"
+                                } else {
+                                    "Подтянуть доступные модели от вашего провайдера"
+                                },
+                            icon = { Icon(painterResource(R.drawable.sync), null) },
+                            isEnabled = mascotEnabled && mascotAiEnabled && !isFetchingModels,
+                            onClick = {
+                                scope.launch {
+                                    isFetchingModels = true
+                                    fetchedModels = MascotAiCommentator.fetchAvailableModels(context)
+                                    isFetchingModels = false
+                                    if (fetchedModels.isEmpty()) {
+                                        Toast.makeText(
+                                            context,
+                                            "Не удалось получить список моделей — проверьте API-ключ",
+                                            Toast.LENGTH_SHORT,
+                                        ).show()
+                                    }
+                                }
+                            },
+                        )
+                    }
+
+                    if (fetchedModels.isNotEmpty()) {
+                        item {
+                            ListPreference(
+                                title = { Text("Выбрать модель Клодика из списка") },
+                                description = mascotAiModel.ifBlank { "Не выбрана" },
+                                icon = { Icon(painterResource(R.drawable.tune), null) },
+                                selectedValue = mascotAiModel.ifBlank { fetchedModels.first().id },
+                                values = fetchedModels.map { it.id },
+                                valueText = { id -> fetchedModels.firstOrNull { it.id == id }?.displayName ?: id },
+                                onValueSelected = onMascotAiModelChange,
+                                isEnabled = mascotEnabled && mascotAiEnabled,
+                            )
+                        }
+                    }
+
+                    item {
+                        SwitchPreference(
+                            title = { Text("Отдельный API-ключ / провайдер для Клодика") },
+                            description = "Если выключено, используется основной API-ключ из настроек ИИ (но со своей быстрой моделью)",
+                            icon = { Icon(painterResource(R.drawable.token), null) },
+                            checked = mascotAiSeparateApi,
+                            onCheckedChange = onMascotAiSeparateApiChange,
+                            isEnabled = mascotEnabled && mascotAiEnabled,
+                        )
+                    }
+
+                    if (mascotAiSeparateApi) {
+                        item {
+                            val providers =
+                                listOf(
+                                    AiProvider.CHATGPT,
+                                    AiProvider.GEMINI,
+                                    AiProvider.OPENROUTER,
+                                    AiProvider.MISTRAL,
+                                    AiProvider.CUSTOM,
+                                    AiProvider.NONE,
+                                )
+                            ListPreference(
+                                title = { Text("Провайдер ИИ Клодика") },
+                                description = mascotAiProvider.name,
+                                icon = { Icon(painterResource(R.drawable.auto_awesome), null) },
+                                selectedValue = mascotAiProvider,
+                                values = providers,
+                                valueText = { it.name },
+                                onValueSelected = onMascotAiProviderChange,
+                                isEnabled = mascotEnabled && mascotAiEnabled,
+                            )
+                        }
+
+                        if (mascotAiProvider == AiProvider.CUSTOM) {
+                            item {
+                                PreferenceEntry(
+                                    title = { Text("Custom Endpoint Клодика") },
+                                    description = mascotAiCustomEndpoint.ifBlank { "Не задан" },
+                                    icon = { Icon(painterResource(R.drawable.website), null) },
+                                    isEnabled = mascotEnabled && mascotAiEnabled,
+                                    onClick = {
+                                        editorText = mascotAiCustomEndpoint
+                                        editingField = "endpoint"
+                                    },
+                                )
+                            }
+                        }
+
+                        item {
+                            PreferenceEntry(
+                                title = { Text("API-ключ Клодика") },
+                                description = if (mascotAiApiKey.isBlank()) "Не задан" else "Настроен",
+                                icon = { Icon(painterResource(R.drawable.token), null) },
+                                isEnabled = mascotEnabled && mascotAiEnabled && mascotAiProvider != AiProvider.NONE,
+                                onClick = {
+                                    editorText = mascotAiApiKey
+                                    editingField = "api_key"
+                                },
+                            )
+                        }
                     }
                 }
             }

@@ -751,4 +751,6 @@
     <string name="mascot_chatter_quiet">Редко</string>
     <string name="mascot_chatter_normal">Обычно</string>
     <string name="mascot_chatter_talkative">Болтун</string>
+    <string name="external_link_track_not_found">Не удалось найти этот трек в YouTube Music</string>
+    <string name="external_link_not_supported">Этот тип ссылки пока не поддерживается (только треки и плейлисты Spotify)</string>
 </resources>

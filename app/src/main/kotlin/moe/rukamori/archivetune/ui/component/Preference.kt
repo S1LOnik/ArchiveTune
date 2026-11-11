@@ -337,8 +337,9 @@ inline fun <reified T : Enum<T>> EnumSegmentedPreference(
     noinline valueText: @Composable (T) -> String,
     noinline onValueSelected: (T) -> Unit,
     isEnabled: Boolean = true,
+    availableValues: List<T>? = null,
 ) {
-    val values = remember { enumValues<T>().toList() }
+    val values = availableValues ?: remember { enumValues<T>().toList() }
 
     SegmentedPreference(
         modifier = modifier,
@@ -629,8 +630,9 @@ inline fun <reified T : Enum<T>> EnumListPreference(
     noinline valueText: @Composable (T) -> String,
     noinline onValueSelected: (T) -> Unit,
     isEnabled: Boolean = true,
+    availableValues: List<T>? = null,
 ) {
-    val values = remember { enumValues<T>().toList() }
+    val values = availableValues ?: remember { enumValues<T>().toList() }
 
     ListPreference(
         modifier = modifier,

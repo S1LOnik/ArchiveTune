@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ArchiveTune Cleaner</string>
+    <string name="explanation">Старая версия ArchiveTune подписана другим ключом, поэтому новая версия с GitHub не устанавливается («конфликт подписи»). Удалите старую версию кнопкой ниже, затем установите новую.</string>
+    <string name="warning">⚠ Сначала сделайте резервную копию! Удаление приложения стирает все его данные. В ArchiveTune откройте Настройки → Резервное копирование и сохраните файл. После установки новой версии восстановите данные из него.</string>
+    <string name="detected_title">Найденные версии:</string>
+    <string name="variant_line">%1$s — версия %2$s</string>
+    <string name="status_clean">Всё чисто — можно ставить новую версию</string>
+    <string name="status_found">Найден старый ArchiveTune. Удалите его, чтобы установить новую версию.</string>
+    <string name="button_uninstall">Удалить старый ArchiveTune</string>
+    <string name="button_releases">Открыть страницу загрузки новой версии</string>
+    <string name="profiles_note">Если установка всё равно не проходит, проверьте другие профили пользователя (Системный клон / Second Space / Dual Apps) и удалите ArchiveTune также там.</string>
+    <string name="no_browser">Не удалось открыть браузер</string>
+</resources>

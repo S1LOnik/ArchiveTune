@@ -84,6 +84,34 @@ class LibraryTopMixRepository
                         }
                 }.first()
 
+        suspend fun likedSongsForTopMixes(limit: Int): List<Song> =
+            hideExplicitEnabled()
+                .flatMapLatest { hideExplicit ->
+                    database
+                        .likedSongsByCreateDateAsc()
+                        .map { songs ->
+                            songs
+                                .filterNot { it.song.isPodcast }
+                                .filterExplicit(hideExplicit)
+                                .asReversed()
+                                .take(limit)
+                        }
+                }.first()
+
+        suspend fun mostPlayedSongsForTopMixes(limit: Int): List<Song> =
+            hideExplicitEnabled()
+                .flatMapLatest { hideExplicit ->
+                    database
+                        .songs(SongSortType.PLAY_TIME, descending = true, filterVideo = true)
+                        .map { songs ->
+                            songs
+                                .filterNot { it.song.isPodcast }
+                                .filterExplicit(hideExplicit)
+                                .filter { it.song.totalPlayTime > 0L }
+                                .take(limit)
+                        }
+                }.first()
+
         suspend fun replaceTopMixes(mixes: List<GeneratedLibraryTopMix>) {
             database.withTransaction {
                 deleteLibraryTopMixes()

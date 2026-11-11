@@ -269,6 +269,16 @@ class App :
                     }
                 }
 
+                moe.rukamori.archivetune.updates.GithubAutoUpdateWorker
+                    .apply(applicationContext, prefs[GithubAutoUpdateKey] == true)
+
+                val storedStyle = prefs[PlayerDesignStyleKey]
+                if (storedStyle != null && RemovedPlayerDesignStyles.any { it.name == storedStyle }) {
+                    dataStore.edit { settings ->
+                        settings[PlayerDesignStyleKey] = PlayerDesignStyle.APPLE_MUSIC.name
+                    }
+                }
+
                 isInitialized = true
             } catch (e: Exception) {
                 Timber.e(e, "Error during deferred initialization")

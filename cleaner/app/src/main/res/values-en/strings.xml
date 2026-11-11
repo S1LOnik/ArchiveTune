@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ArchiveTune Cleaner</string>
+    <string name="explanation">The old ArchiveTune build is signed with a different key, so the new GitHub release fails to install (\"signature conflict\"). Uninstall the old version with the button below, then install the new one.</string>
+    <string name="warning">⚠ Back up first! Uninstalling deletes all app data. In ArchiveTune open Settings → Backup and save the file. Restore your data from it after installing the new version.</string>
+    <string name="detected_title">Detected versions:</string>
+    <string name="variant_line">%1$s — version %2$s</string>
+    <string name="status_clean">All clear — you can install the new version</string>
+    <string name="status_found">Old ArchiveTune found. Uninstall it to install the new version.</string>
+    <string name="button_uninstall">Uninstall old ArchiveTune</string>
+    <string name="button_releases">Open the new version download page</string>
+    <string name="profiles_note">If the install still fails, check other user profiles (System Clone / Second Space / Dual Apps) and uninstall ArchiveTune there too.</string>
+    <string name="no_browser">Could not open the browser</string>
+</resources>
