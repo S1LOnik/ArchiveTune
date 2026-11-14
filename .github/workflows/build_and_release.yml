@@ -126,10 +126,10 @@ jobs:
           VER="${{ steps.version_step.outputs.version }}"
 
           # Universal APK
-          find app/build/outputs/apk -name "*Universal*release*.apk" -exec cp {} release_assets/ArchiveTune-v${VER}-universal.apk \;
+          find app/build/outputs/apk -iname "*universal*release*.apk" -exec cp {} release_assets/ArchiveTune-v${VER}-universal.apk \;
 
           # Arm64-v8a APK
-          find app/build/outputs/apk -name "*Arm64*release*.apk" -exec cp {} release_assets/ArchiveTune-v${VER}-arm64-v8a.apk \;
+          find app/build/outputs/apk -iname "*arm64*release*.apk" -exec cp {} release_assets/ArchiveTune-v${VER}-arm64-v8a.apk \;
 
           # Fallback if specific pattern was not matched
           if [ ! -f release_assets/ArchiveTune-v${VER}-universal.apk ]; then
