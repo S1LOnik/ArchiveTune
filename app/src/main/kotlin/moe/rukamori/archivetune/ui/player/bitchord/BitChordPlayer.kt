@@ -156,6 +156,7 @@ import moe.rukamori.archivetune.constants.LyricsMode
 import moe.rukamori.archivetune.constants.LyricsModeKey
 import moe.rukamori.archivetune.constants.PlayerBackgroundStyle
 import moe.rukamori.archivetune.constants.PlayerBackgroundStyleKey
+import moe.rukamori.archivetune.constants.ShowPlayerVolumeBarKey
 import moe.rukamori.archivetune.ui.player.StyledLyricsBackground
 import moe.rukamori.archivetune.utils.rememberEnumPreference
 import moe.rukamori.archivetune.ui.component.LyricsEnhanced
@@ -373,6 +374,7 @@ fun BitChordPlayerContent(
     }
 
     val reduceAnimations = LocalAnimationsDisabled.current
+    val (showPlayerVolumeBar) = rememberPreference(ShowPlayerVolumeBarKey, defaultValue = true)
 
     val lyricsEntity by database.lyrics(mediaMetadata.id)
         .collectAsStateWithLifecycle(initialValue = null)
@@ -1325,43 +1327,47 @@ fun BitChordPlayerContent(
                 )
             }
 
-            Spacer(Modifier.height(12.dp + controlSpread / 2))
+            if (showPlayerVolumeBar) {
+                Spacer(Modifier.height(12.dp + controlSpread / 2))
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(
-                    Icons.AutoMirrored.Rounded.VolumeDown,
-                    contentDescription = null,
-                    tint = Color.White.copy(alpha = 0.5f),
-                    modifier = Modifier.size(20.dp),
-                )
-                Spacer(Modifier.width(10.dp))
-                ThinSlider(
-                    valueProvider = { volume.value },
-                    onValueChange = {
-                        volumeDragging = true
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        Icons.AutoMirrored.Rounded.VolumeDown,
+                        contentDescription = null,
+                        tint = Color.White.copy(alpha = 0.5f),
+                        modifier = Modifier.size(20.dp),
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    ThinSlider(
+                        valueProvider = { volume.value },
+                        onValueChange = {
+                            volumeDragging = true
 
-                        scope.launch { volume.snapTo(it) }
-                        audioManager?.setStreamVolume(
-                            AudioManager.STREAM_MUSIC,
-                            (it * maxVolume).roundToInt(),
-                            0,
-                        )
-                    },
-                    onValueChangeFinished = { volumeDragging = false },
-                    idleHeight = 6.dp,
-                    activeHeight = 10.dp,
-                    modifier = Modifier.weight(1f),
-                )
-                Spacer(Modifier.width(10.dp))
-                Icon(
-                    Icons.AutoMirrored.Rounded.VolumeUp,
-                    contentDescription = null,
-                    tint = Color.White.copy(alpha = 0.5f),
-                    modifier = Modifier.size(20.dp),
-                )
+                            scope.launch { volume.snapTo(it) }
+                            audioManager?.setStreamVolume(
+                                AudioManager.STREAM_MUSIC,
+                                (it * maxVolume).roundToInt(),
+                                0,
+                            )
+                        },
+                        onValueChangeFinished = { volumeDragging = false },
+                        idleHeight = 6.dp,
+                        activeHeight = 10.dp,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    Icon(
+                        Icons.AutoMirrored.Rounded.VolumeUp,
+                        contentDescription = null,
+                        tint = Color.White.copy(alpha = 0.5f),
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+            } else {
+                Spacer(Modifier.height(16.dp + controlSpread / 2))
             }
 
             Spacer(Modifier.height(6.dp))

@@ -390,7 +390,8 @@ fun AppearanceSettings(navController: NavController) {
         }
     val isVolumeBarSupported =
         playerDesignStyle == PlayerDesignStyle.V7 ||
-            playerDesignStyle == PlayerDesignStyle.V8
+            playerDesignStyle == PlayerDesignStyle.V8 ||
+            playerDesignStyle == PlayerDesignStyle.BITCHORD
     val isSystemInDarkTheme = isSystemInDarkTheme()
     val useDarkTheme =
         remember(darkMode, isSystemInDarkTheme) {

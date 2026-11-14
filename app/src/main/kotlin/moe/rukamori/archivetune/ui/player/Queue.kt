@@ -419,21 +419,10 @@ fun Queue(
         onCollapsedContentClick = {},
         collapsedContent = {
             when (playerDesignStyle) {
-                // [FIX-ZCODE] exhaustive coverage: classic/ported styles share the V3 collapsed content
                 PlayerDesignStyle.V1,
                 PlayerDesignStyle.V2,
                 PlayerDesignStyle.V3,
-                PlayerDesignStyle.V5,
                 PlayerDesignStyle.V6,
-                PlayerDesignStyle.V8,
-                PlayerDesignStyle.V9,
-                PlayerDesignStyle.V10,
-                PlayerDesignStyle.APPLE_MUSIC,
-                PlayerDesignStyle.BITCHORD,
-                PlayerDesignStyle.TIKTOK,
-                PlayerDesignStyle.SIMPMUSIC,
-                PlayerDesignStyle.SPATIALFLOW,
-                PlayerDesignStyle.LOOPER,
                 -> {
                     QueueCollapsedContentV3(
                         showCodecOnPlayer = showCodecOnPlayer,
@@ -588,22 +577,15 @@ fun Queue(
                     )
                 }
 
-                PlayerDesignStyle.APPLE_MUSIC -> {
-                }
-
-                PlayerDesignStyle.BITCHORD -> {
-                }
-
-                PlayerDesignStyle.TIKTOK -> {
-                }
-
-                PlayerDesignStyle.SIMPMUSIC -> {
-                }
-
-                PlayerDesignStyle.SPATIALFLOW -> {
-                }
-
-                PlayerDesignStyle.LOOPER -> {
+                PlayerDesignStyle.V5,
+                PlayerDesignStyle.V8,
+                PlayerDesignStyle.APPLE_MUSIC,
+                PlayerDesignStyle.BITCHORD,
+                PlayerDesignStyle.TIKTOK,
+                PlayerDesignStyle.SIMPMUSIC,
+                PlayerDesignStyle.SPATIALFLOW,
+                PlayerDesignStyle.LOOPER,
+                -> {
                 }
             }
 

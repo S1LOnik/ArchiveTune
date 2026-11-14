@@ -319,7 +319,7 @@ private fun ImmersivePortrait(
                     ),
         ) {
             FormatSeam(if (showCodecOnPlayer) model.formatDetails else "")
-            Spacer(modifier = Modifier.height(52.dp))
+            Spacer(modifier = Modifier.height(if (showCodecOnPlayer && model.formatDetails.isNotBlank()) 32.dp else 14.dp))
             MetadataRow(
                 title = model.title,
                 artists = model.artists,

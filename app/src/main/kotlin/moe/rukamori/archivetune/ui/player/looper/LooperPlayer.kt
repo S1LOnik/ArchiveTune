@@ -10,6 +10,7 @@ package moe.rukamori.archivetune.ui.player.looper
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -303,12 +304,30 @@ fun LooperPlayerContent(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
+                        val albumId = mediaMetadata.album?.id
+                        val artistId = mediaMetadata.artists.firstOrNull()?.id
                         Text(
                             text = mediaMetadata.title,
                             style = LooperTypography.titleLarge,
                             color = Color.White,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
+                            modifier =
+                                Modifier
+                                    .basicMarquee(iterations = Int.MAX_VALUE)
+                                    .then(
+                                        if (albumId != null) {
+                                            Modifier.clickable(
+                                                interactionSource = remember { MutableInteractionSource() },
+                                                indication = null,
+                                            ) {
+                                                state.collapseSoft()
+                                                navController.navigate("album/$albumId")
+                                            }
+                                        } else {
+                                            Modifier
+                                        },
+                                    ),
                         )
                         Text(
                             text = mediaMetadata.artists.joinToString { it.name },
@@ -316,6 +335,18 @@ fun LooperPlayerContent(
                             color = Color.White.copy(alpha = 0.6f),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
+                            modifier =
+                                if (artistId != null) {
+                                    Modifier.clickable(
+                                        interactionSource = remember { MutableInteractionSource() },
+                                        indication = null,
+                                    ) {
+                                        state.collapseSoft()
+                                        navController.navigate("artist/$artistId")
+                                    }
+                                } else {
+                                    Modifier
+                                },
                         )
                     }
 

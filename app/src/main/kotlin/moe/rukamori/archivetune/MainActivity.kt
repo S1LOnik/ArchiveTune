@@ -2883,6 +2883,7 @@ class MainActivity : ComponentActivity() {
                             bottomNavHeight = bottomNavigationBarHeight,
                             miniPlayerCollapsedBound = playerBottomSheetState.collapsedBound,
                             isMiniPlayerVisible = (playerConnection != null && !playerBottomSheetState.isDismissed && playerBottomSheetState.isCollapsed),
+                            isPlayerExpanded = (playerConnection != null && playerBottomSheetState.isExpandedOrExpanding),
                         )
                     }
 

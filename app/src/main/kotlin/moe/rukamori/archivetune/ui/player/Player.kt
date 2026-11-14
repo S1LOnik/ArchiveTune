@@ -1018,6 +1018,7 @@ fun BottomSheetPlayer(
     val dynamicQueuePeekHeight =
         if (
             playerDesignStyle == PlayerDesignStyle.V5 ||
+            playerDesignStyle == PlayerDesignStyle.V8 ||
             playerDesignStyle == PlayerDesignStyle.APPLE_MUSIC ||
             playerDesignStyle == PlayerDesignStyle.BITCHORD ||
             playerDesignStyle == PlayerDesignStyle.TIKTOK ||

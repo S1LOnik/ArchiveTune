@@ -508,8 +508,9 @@ internal fun LyricsUnavailableLine(
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
+            .graphicsLayer { this.alpha = alpha }
             .clip(RoundedCornerShape(8.dp))
-            .let { if (onClick != null) it.clickable(onClick = onClick) else it }
+            .let { if (onClick != null && visible) it.clickable(onClick = onClick) else it }
             .padding(vertical = 4.dp),
     ) {
         Text(
@@ -518,9 +519,7 @@ internal fun LyricsUnavailableLine(
             color = Color.White,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier
-                .weight(1f, fill = false)
-                .graphicsLayer { this.alpha = alpha },
+            modifier = Modifier.weight(1f, fill = false),
         )
         if (onClick != null) {
             Spacer(Modifier.width(6.dp))

@@ -83,6 +83,7 @@ fun MascotOverlay(
     bottomNavHeight: androidx.compose.ui.unit.Dp = 80.dp,
     miniPlayerCollapsedBound: androidx.compose.ui.unit.Dp = 0.dp,
     isMiniPlayerVisible: Boolean = false,
+    isPlayerExpanded: Boolean = false,
 ) {
     val (mascotEnabled) = rememberPreference(MascotEnabledKey, defaultValue = false)
     if (!mascotEnabled) return
@@ -281,11 +282,19 @@ fun MascotOverlay(
 
         val maxYPx = if (isMiniPlayerVisible) miniPlayerPlatformY else navBarPlatformY
 
-        val currentPlatformLevel = remember(mascotPlatformPhysics, isPlaying, isMiniPlayerVisible, miniPlayerPlatformY, navBarPlatformY) {
-            if (mascotPlatformPhysics) {
-                if (isMiniPlayerVisible) miniPlayerPlatformY else navBarPlatformY
-            } else {
-                minYPx + (navBarPlatformY - minYPx) * 0.45f
+        val currentPlatformLevel = remember(
+            mascotPlatformPhysics,
+            isPlaying,
+            isPlayerExpanded,
+            isMiniPlayerVisible,
+            topBarPlatformY,
+            miniPlayerPlatformY,
+            navBarPlatformY,
+        ) {
+            when {
+                isPlayerExpanded -> topBarPlatformY
+                mascotPlatformPhysics -> if (isMiniPlayerVisible) miniPlayerPlatformY else navBarPlatformY
+                else -> minYPx + (navBarPlatformY - minYPx) * 0.45f
             }
         }
 
@@ -299,7 +308,7 @@ fun MascotOverlay(
 
         // Keep mascot aligned to platform level on dynamic UI changes
         LaunchedEffect(currentPlatformLevel) {
-            if (!isDragging && mascotPlatformPhysics) {
+            if (!isDragging && (mascotPlatformPhysics || isPlayerExpanded)) {
                 posY.animateTo(currentPlatformLevel, spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessLow))
             }
         }
@@ -309,7 +318,15 @@ fun MascotOverlay(
         var lastTapTime by remember { mutableLongStateOf(0L) }
 
         // Wandering / Platform Walking Mode with beat pacing
-        LaunchedEffect(mascotWanderEnabled, currentState, isPlaying, isDragging, mascotPlatformPhysics, isMiniPlayerVisible) {
+        LaunchedEffect(
+            mascotWanderEnabled,
+            currentState,
+            isPlaying,
+            isDragging,
+            mascotPlatformPhysics,
+            isPlayerExpanded,
+            isMiniPlayerVisible,
+        ) {
             if (!mascotWanderEnabled || isDragging) return@LaunchedEffect
             while (isActive) {
                 val delayTime = if (isPlaying) (14_000L..26_000L).random() else (24_000L..42_000L).random()
@@ -325,10 +342,10 @@ fun MascotOverlay(
                     val steps = (distance / with(density) { 28.dp.toPx() }).toInt().coerceIn(3, 8)
 
                     // Desired walking ground Y
-                    val groundY = if (mascotPlatformPhysics) {
-                        if (isMiniPlayerVisible) miniPlayerPlatformY else navBarPlatformY
-                    } else {
-                        posY.value
+                    val groundY = when {
+                        isPlayerExpanded -> topBarPlatformY
+                        mascotPlatformPhysics -> if (isMiniPlayerVisible) miniPlayerPlatformY else navBarPlatformY
+                        else -> posY.value
                     }
 
                     // Walk / pace animation
