@@ -78,12 +78,7 @@ object ExternalMusicLinkResolver {
             "track" -> {
                 val html = httpGet("https://open.spotify.com/track/$id") ?: return Result.Unsupported
                 val title = metaContent(html, "og:title") ?: return Result.Unsupported
-                val artist =
-                    metaContent(html, "og:description")
-                        ?.split("·")
-                        ?.firstOrNull()
-                        ?.trim()
-                        ?.takeIf { it.isNotBlank() && !it.equals(title, ignoreCase = true) }
+                val artist = spotifyArtistFromDescription(metaContent(html, "og:description"), title)
                 Result.TrackQuery(listOfNotNull(title, artist).joinToString(" "))
             }
 
@@ -106,14 +101,31 @@ object ExternalMusicLinkResolver {
         val json = JSONObject(body)
         val rawTitle = json.optString("title").takeIf { it.isNotBlank() } ?: return Result.Unsupported
         val author = json.optString("author_name").takeIf { it.isNotBlank() }
-        val title =
-            if (author != null && rawTitle.endsWith(" by $author")) {
-                rawTitle.removeSuffix(" by $author")
-            } else {
-                rawTitle.substringBeforeLast(" by ")
-            }
+        val title = soundCloudTitleWithoutAuthor(rawTitle, author)
         return Result.TrackQuery(listOfNotNull(title, author).joinToString(" "))
     }
+
+    /** Spotify og:description looks like "Artist · Album · Song · 2020"; the first part is the artist. */
+    internal fun spotifyArtistFromDescription(
+        description: String?,
+        title: String,
+    ): String? =
+        description
+            ?.split("·")
+            ?.firstOrNull()
+            ?.trim()
+            ?.takeIf { it.isNotBlank() && !it.equals(title, ignoreCase = true) }
+
+    /** SoundCloud oEmbed titles look like "Track by Author"; strip the author suffix. */
+    internal fun soundCloudTitleWithoutAuthor(
+        rawTitle: String,
+        author: String?,
+    ): String =
+        if (author != null && rawTitle.endsWith(" by $author")) {
+            rawTitle.removeSuffix(" by $author")
+        } else {
+            rawTitle.substringBeforeLast(" by ")
+        }
 
     private fun httpGet(url: String): String? {
         val request =
@@ -141,7 +153,7 @@ object ExternalMusicLinkResolver {
         }
     }
 
-    private fun metaContent(
+    internal fun metaContent(
         html: String,
         property: String,
     ): String? {
