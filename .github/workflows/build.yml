@@ -1,16 +1,9 @@
 name: Build APKs
 
+# Manual only: the upstream per-push matrix build fails in this fork (no translation credits
+# in git history) and release builds are produced by build_and_release.yml instead.
 on:
   workflow_dispatch:
-  push:
-    branches: [ 'main', 'dev' ]
-    paths-ignore:
-      - 'README.md'
-      - 'fastlane/**'
-      - 'assets/**'
-      - '.github/**/*.md'
-      - '.github/FUNDING.yml'
-      - '.github/ISSUE_TEMPLATE/**'
 
 permissions:
   contents: write
