@@ -71,10 +71,25 @@ import moe.rukamori.archivetune.models.MediaMetadata
 import moe.rukamori.archivetune.models.toMediaMetadata
 import moe.rukamori.archivetune.ui.utils.YtimgResizePolicy
 import moe.rukamori.archivetune.ui.utils.resize
+import moe.rukamori.archivetune.utils.sortedByLocalizedArtist
 import java.text.Collator
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 import java.util.Locale
+
+// Apply the artist filter before combining the maps so SQLite can use both artist indexes.
+private const val DIRECT_ARTIST_LIBRARY_SONGS = """
+    SELECT song.id FROM song_artist_map JOIN song ON song_artist_map.songId = song.id
+    WHERE song_artist_map.artistId = artist.id AND (song.inLibrary IS NOT NULL OR song.isLocal = 1)
+"""
+
+private const val LOCAL_ALBUM_ARTIST_SONGS = """
+    SELECT song.id FROM album_artist_map JOIN song ON album_artist_map.albumId = song.albumId
+    WHERE album_artist_map.artistId = artist.id AND song.isLocal = 1
+"""
+
+private const val ARTIST_LIBRARY_SONG_COUNT =
+    "(SELECT COUNT(*) FROM ($DIRECT_ARTIST_LIBRARY_SONGS UNION $LOCAL_ALBUM_ARTIST_SONGS))"
 
 @Dao
 interface DatabaseDao {
@@ -136,13 +151,7 @@ interface DatabaseDao {
                     songsByRowIdAsc()
                 }
             ).map { songs ->
-                val collator = Collator.getInstance(Locale.getDefault())
-                collator.strength = Collator.PRIMARY
-                songs.sortedWith(
-                    compareBy(collator) { song ->
-                        song.artists.joinToString("") { artist -> artist.name }
-                    },
-                )
+                songs.sortedByLocalizedArtist { song -> song.artists.joinToString("") { artist -> artist.name } }
             }
         }
 
@@ -251,13 +260,7 @@ interface DatabaseDao {
                     likedSongsByRowIdAsc()
                 }
             ).map { songs ->
-                val collator = Collator.getInstance(Locale.getDefault())
-                collator.strength = Collator.PRIMARY
-                songs.sortedWith(
-                    compareBy(collator) { song ->
-                        song.artists.joinToString("") { artist -> artist.name }
-                    },
-                )
+                songs.sortedByLocalizedArtist { song -> song.artists.joinToString("") { artist -> artist.name } }
             }
         }
 
@@ -873,21 +876,21 @@ interface DatabaseDao {
     @Transaction
     @SuppressWarnings(RoomWarnings.QUERY_MISMATCH)
     @Query(
-        "SELECT *, (SELECT COUNT(1) FROM library_song_artist_map JOIN song ON library_song_artist_map.songId = song.id WHERE artistId = artist.id AND (song.inLibrary IS NOT NULL OR song.isLocal = 1)) AS songCount FROM artist WHERE songCount > 0 ORDER BY rowId",
+        "SELECT *, $ARTIST_LIBRARY_SONG_COUNT AS songCount FROM artist WHERE songCount > 0 ORDER BY rowId",
     )
     fun artistsByCreateDateAsc(): Flow<List<Artist>>
 
     @Transaction
     @SuppressWarnings(RoomWarnings.QUERY_MISMATCH)
     @Query(
-        "SELECT *, (SELECT COUNT(1) FROM library_song_artist_map JOIN song ON library_song_artist_map.songId = song.id WHERE artistId = artist.id AND (song.inLibrary IS NOT NULL OR song.isLocal = 1)) AS songCount FROM artist WHERE songCount > 0 ORDER BY name",
+        "SELECT *, $ARTIST_LIBRARY_SONG_COUNT AS songCount FROM artist WHERE songCount > 0 ORDER BY name",
     )
     fun artistsByNameAsc(): Flow<List<Artist>>
 
     @Transaction
     @SuppressWarnings(RoomWarnings.QUERY_MISMATCH)
     @Query(
-        "SELECT *, (SELECT COUNT(1) FROM library_song_artist_map JOIN song ON library_song_artist_map.songId = song.id WHERE artistId = artist.id AND (song.inLibrary IS NOT NULL OR song.isLocal = 1)) AS songCount FROM artist WHERE songCount > 0 ORDER BY songCount",
+        "SELECT *, $ARTIST_LIBRARY_SONG_COUNT AS songCount FROM artist WHERE songCount > 0 ORDER BY songCount",
     )
     fun artistsBySongCountAsc(): Flow<List<Artist>>
 
@@ -896,11 +899,7 @@ interface DatabaseDao {
     @Query(
         """
         SELECT artist.*,
-               (SELECT COUNT(1)
-                FROM library_song_artist_map
-                         JOIN song ON library_song_artist_map.songId = song.id
-                WHERE artistId = artist.id
-                  AND (song.inLibrary IS NOT NULL OR song.isLocal = 1)) AS songCount
+               $ARTIST_LIBRARY_SONG_COUNT AS songCount
         FROM artist
                  LEFT JOIN(SELECT artistId, SUM(totalPlayTime) AS totalPlayTime
                       FROM library_song_artist_map
@@ -918,21 +917,21 @@ interface DatabaseDao {
     @Transaction
     @SuppressWarnings(RoomWarnings.QUERY_MISMATCH)
     @Query(
-        "SELECT *, (SELECT COUNT(1) FROM library_song_artist_map JOIN song ON library_song_artist_map.songId = song.id WHERE artistId = artist.id AND (song.inLibrary IS NOT NULL OR song.isLocal = 1)) AS songCount FROM artist WHERE bookmarkedAt IS NOT NULL ORDER BY bookmarkedAt",
+        "SELECT *, $ARTIST_LIBRARY_SONG_COUNT AS songCount FROM artist WHERE bookmarkedAt IS NOT NULL ORDER BY bookmarkedAt",
     )
     fun artistsBookmarkedByCreateDateAsc(): Flow<List<Artist>>
 
     @Transaction
     @SuppressWarnings(RoomWarnings.QUERY_MISMATCH)
     @Query(
-        "SELECT *, (SELECT COUNT(1) FROM library_song_artist_map JOIN song ON library_song_artist_map.songId = song.id WHERE artistId = artist.id AND (song.inLibrary IS NOT NULL OR song.isLocal = 1)) AS songCount FROM artist WHERE bookmarkedAt IS NOT NULL ORDER BY name",
+        "SELECT *, $ARTIST_LIBRARY_SONG_COUNT AS songCount FROM artist WHERE bookmarkedAt IS NOT NULL ORDER BY name",
     )
     fun artistsBookmarkedByNameAsc(): Flow<List<Artist>>
 
     @Transaction
     @SuppressWarnings(RoomWarnings.QUERY_MISMATCH)
     @Query(
-        "SELECT *, (SELECT COUNT(1) FROM library_song_artist_map JOIN song ON library_song_artist_map.songId = song.id WHERE artistId = artist.id AND (song.inLibrary IS NOT NULL OR song.isLocal = 1)) AS songCount FROM artist WHERE bookmarkedAt IS NOT NULL ORDER BY songCount",
+        "SELECT *, $ARTIST_LIBRARY_SONG_COUNT AS songCount FROM artist WHERE bookmarkedAt IS NOT NULL ORDER BY songCount",
     )
     fun artistsBookmarkedBySongCountAsc(): Flow<List<Artist>>
 
@@ -941,11 +940,7 @@ interface DatabaseDao {
     @Query(
         """
         SELECT artist.*,
-               (SELECT COUNT(1)
-                FROM library_song_artist_map
-                         JOIN song ON library_song_artist_map.songId = song.id
-                WHERE artistId = artist.id
-                  AND (song.inLibrary IS NOT NULL OR song.isLocal = 1)) AS songCount
+               $ARTIST_LIBRARY_SONG_COUNT AS songCount
         FROM artist
                  LEFT JOIN(SELECT artistId, SUM(totalPlayTime) AS totalPlayTime
                       FROM library_song_artist_map
@@ -990,7 +985,7 @@ interface DatabaseDao {
 
     @SuppressWarnings(RoomWarnings.QUERY_MISMATCH)
     @Query(
-        "SELECT *, (SELECT COUNT(1) FROM library_song_artist_map JOIN song ON library_song_artist_map.songId = song.id WHERE artistId = artist.id AND (song.inLibrary IS NOT NULL OR song.isLocal = 1)) AS songCount FROM artist WHERE id = COALESCE((SELECT targetId FROM local_music_alias WHERE sourceId = :id AND kind = 'artist'), :id)",
+        "SELECT *, $ARTIST_LIBRARY_SONG_COUNT AS songCount FROM artist WHERE id = COALESCE((SELECT targetId FROM local_music_alias WHERE sourceId = :id AND kind = 'artist'), :id)",
     )
     fun artist(id: String): Flow<Artist?>
 
@@ -1102,9 +1097,7 @@ interface DatabaseDao {
 
         AlbumSortType.ARTIST -> {
             albumsByCreateDateAsc().map { albums ->
-                val collator = Collator.getInstance(Locale.getDefault())
-                collator.strength = Collator.PRIMARY
-                albums.sortedWith(compareBy(collator) { album -> album.artists.joinToString("") { artist -> artist.name } })
+                albums.sortedByLocalizedArtist { album -> album.artists.joinToString("") { artist -> artist.name } }
             }
         }
 
@@ -1145,9 +1138,7 @@ interface DatabaseDao {
 
         AlbumSortType.ARTIST -> {
             albumsLikedByCreateDateAsc().map { albums ->
-                val collator = Collator.getInstance(Locale.getDefault())
-                collator.strength = Collator.PRIMARY
-                albums.sortedWith(compareBy(collator) { album -> album.artists.joinToString("") { artist -> artist.name } })
+                albums.sortedByLocalizedArtist { album -> album.artists.joinToString("") { artist -> artist.name } }
             }
         }
 
@@ -1235,9 +1226,7 @@ interface DatabaseDao {
 
             AlbumSortType.ARTIST -> {
                 albumsByRowId(ids).map { albums ->
-                    val collator = Collator.getInstance(java.util.Locale.getDefault())
-                    collator.strength = Collator.PRIMARY
-                    albums.sortedWith(compareBy(collator) { album -> album.artists.joinToString("") { artist -> artist.name } })
+                    albums.sortedByLocalizedArtist { album -> album.artists.joinToString("") { artist -> artist.name } }
                 }
             }
 
@@ -1470,7 +1459,7 @@ interface DatabaseDao {
     @Transaction
     @SuppressWarnings(RoomWarnings.QUERY_MISMATCH)
     @Query(
-        "SELECT *, (SELECT COUNT(1) FROM library_song_artist_map JOIN song ON library_song_artist_map.songId = song.id WHERE artistId = artist.id AND (song.inLibrary IS NOT NULL OR song.isLocal = 1)) AS songCount FROM artist WHERE name LIKE '%' || :query || '%' AND songCount > 0 LIMIT :previewSize",
+        "SELECT *, $ARTIST_LIBRARY_SONG_COUNT AS songCount FROM artist WHERE name LIKE '%' || :query || '%' AND songCount > 0 LIMIT :previewSize",
     )
     fun searchArtists(
         query: String,
@@ -1478,7 +1467,7 @@ interface DatabaseDao {
     ): Flow<List<Artist>>
 
     @Query(
-        "SELECT COUNT(1) FROM artist WHERE name LIKE '%' || :query || '%' AND EXISTS(SELECT 1 FROM library_song_artist_map JOIN song ON library_song_artist_map.songId = song.id WHERE artistId = artist.id AND (song.inLibrary IS NOT NULL OR song.isLocal = 1))",
+        "SELECT COUNT(1) FROM artist WHERE name LIKE '%' || :query || '%' AND EXISTS($DIRECT_ARTIST_LIBRARY_SONGS UNION ALL $LOCAL_ALBUM_ARTIST_SONGS)",
     )
     suspend fun searchArtistsCount(query: String): Int
 

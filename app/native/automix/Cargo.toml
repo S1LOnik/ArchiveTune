@@ -1,0 +1,19 @@
+[package]
+name = "archivetune_automix"
+version = "0.1.0"
+edition = "2024"
+license = "GPL-3.0-only"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+jni = "0.21.1"
+realfft = "3.5.0"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+panic = "abort"
+strip = "symbols"

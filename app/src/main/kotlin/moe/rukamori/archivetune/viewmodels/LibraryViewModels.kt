@@ -94,10 +94,9 @@ import moe.rukamori.archivetune.utils.dataStore
 import moe.rukamori.archivetune.utils.get
 import moe.rukamori.archivetune.utils.isLocalMediaId
 import moe.rukamori.archivetune.utils.reportException
-import java.text.Collator
+import moe.rukamori.archivetune.utils.sortedByLocalizedArtist
 import java.time.Duration
 import java.time.LocalDateTime
-import java.util.Locale
 import javax.inject.Inject
 import kotlin.coroutines.cancellation.CancellationException
 
@@ -229,14 +228,9 @@ class LibrarySongsViewModel
                                             }
 
                                             SongSortType.ARTIST -> {
-                                                val collator =
-                                                    Collator.getInstance(Locale.getDefault())
-                                                collator.strength = Collator.PRIMARY
-                                                songs.sortedWith(
-                                                    compareBy<Song, String>(collator) { song ->
-                                                        song.artists.joinToString("") { artist -> artist.name }
-                                                    },
-                                                )
+                                                songs.sortedByLocalizedArtist { song ->
+                                                    song.artists.joinToString("") { artist -> artist.name }
+                                                }
                                             }
 
                                             SongSortType.PLAY_TIME -> {

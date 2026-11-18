@@ -135,6 +135,7 @@ class AutoMixAnalyzer(
 
         var extractor: MediaExtractor? = null
         var codec: MediaCodec? = null
+        var spectrum: AutoMixSpectrum? = null
         try {
             extractor = MediaExtractor()
             if (!openDataSource(trackId, uri, extractor)) return null
@@ -149,10 +150,9 @@ class AutoMixAnalyzer(
             codec.configure(format, null, null, 0)
             codec.start()
 
-            val fft = Fft(fftSize)
+            val fft = AutoMixSpectrum(fftSize).also { spectrum = it }
             val window = hannWindow(fftSize)
             val real = FloatArray(fftSize)
-            val imag = FloatArray(fftSize)
             val mag = FloatArray(fftSize / 2)
             val prevMag = FloatArray(fftSize / 2)
             val overlap = FloatArray(fftHop)
@@ -190,11 +190,10 @@ class AutoMixAnalyzer(
                     }
 
                     real[windowFill] = out * window[windowFill]
-                    imag[windowFill] = 0f
                     windowFill++
                     if (windowFill == fftSize) {
                         System.arraycopy(real, fftSize - fftHop, overlap, 0, fftHop)
-                        fft.magnitudeSpectrum(real, imag, mag)
+                        fft.magnitudeSpectrum(real, mag)
                         var fluxSum = 0f
                         var band = 0f
                         var total = 0f
@@ -211,7 +210,6 @@ class AutoMixAnalyzer(
                         totalSum += total
                         System.arraycopy(overlap, 0, real, 0, fftHop)
                         java.util.Arrays.fill(real, fftHop, fftSize, 0f)
-                        java.util.Arrays.fill(imag, 0, fftSize, 0f)
                         windowFill = fftHop
                     }
 
@@ -294,6 +292,7 @@ class AutoMixAnalyzer(
             Log.w(TAG, "decode failed: ${t.message}")
             return null
         } finally {
+            spectrum?.close()
             runCatching { codec?.stop() }
             runCatching { codec?.release() }
             runCatching { extractor?.release() }

@@ -67,8 +67,8 @@ android {
     applicationId = "moe.rukamori.archivetune"
         minSdk = 26
         targetSdk = 37
-        versionCode = 149
-        versionName = "16.2.1"
+        versionCode = 150
+        versionName = "16.2.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
@@ -517,8 +517,24 @@ dependencies {
     implementation("com.github.RouHim:jaudiotagger:1.4.31")
 }
 
+// Pass -PautoMixNdk=/path/to/ndk to package the Rust spectrum calculator.
+val autoMixNative = providers.gradleProperty("autoMixNdk").orNull?.let { ndkPath ->
+    val minimumApi = requireNotNull(android.defaultConfig.minSdk)
+    tasks.register<BuildAutoMixNativeTask>("buildAutoMixNative") {
+        crateDirectory.set(layout.projectDirectory.dir("native/automix"))
+        ndkDirectory.set(file(ndkPath))
+        rustVersion.set(providers.exec { commandLine("rustc", "--version", "--verbose") }.standardOutput.asText)
+        minApi.set(minimumApi)
+        cargoTargetDirectory.set(layout.buildDirectory.dir("intermediates/automixCargo"))
+        jniLibsDirectory.set(layout.buildDirectory.dir("generated/automixJniLibs"))
+    }
+}
+
 androidComponents {
     onVariants(selector().all()) { variant ->
+        autoMixNative?.let { task ->
+            variant.sources.jniLibs?.addGeneratedSourceDirectory(task, BuildAutoMixNativeTask::jniLibsDirectory)
+        }
         if (variant.productFlavors.any { (_, flavor) -> flavor == "automotive" }) return@onVariants
         val capitalizedVariantName =
             variant.name.replaceFirstChar { character ->
