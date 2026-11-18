@@ -274,7 +274,8 @@ fun LyricsScreen(
                 ).lyricsHelper()
         }
 
-    LaunchedEffect(mediaMetadata.id, currentLyrics?.lyrics, currentLyrics?.providerName) {
+    val lyricsForBackfill = currentLyrics?.takeUnless { it.lyrics == LyricsEntity.LYRICS_NOT_FOUND }
+    LaunchedEffect(mediaMetadata.id, lyricsForBackfill?.lyrics, lyricsForBackfill?.providerName) {
         if (mediaMetadata.isPodcast) return@LaunchedEffect
         val snapshot = currentLyrics
         val needsFetch =
@@ -299,6 +300,12 @@ fun LyricsScreen(
                 withContext(Dispatchers.IO) {
                     lyricsHelper.getLyricsWithProvider(mediaMetadata)
                 }
+            if (lyricsResult.lyrics == LyricsEntity.LYRICS_NOT_FOUND) {
+                if (playerConnection.mediaMetadata.value?.id == mediaMetadata.id) {
+                    playerConnection.service.lyricsLookupMissId.value = mediaMetadata.id
+                }
+                return@LaunchedEffect
+            }
             withContext(Dispatchers.IO) {
                 database.query {
                     if (hasValidLyrics) {

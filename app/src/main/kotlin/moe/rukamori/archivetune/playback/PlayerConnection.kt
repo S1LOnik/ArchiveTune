@@ -32,11 +32,13 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.withContext
 import moe.rukamori.archivetune.db.MusicDatabase
+import moe.rukamori.archivetune.db.entities.LyricsEntity
 import moe.rukamori.archivetune.extensions.currentMetadata
 import moe.rukamori.archivetune.extensions.getCurrentQueueIndex
 import moe.rukamori.archivetune.extensions.getQueueWindows
@@ -84,7 +86,13 @@ class PlayerConnection(
         }
     val currentLyrics =
         mediaMetadata.flatMapLatest { mediaMetadata ->
-            database.lyrics(mediaMetadata?.id)
+            val trackId = mediaMetadata?.id
+            val unavailable = trackId?.let {
+                LyricsEntity(id = it, lyrics = LyricsEntity.LYRICS_NOT_FOUND, updatedAt = 0)
+            }
+            combine(database.lyrics(trackId), service.lyricsLookupMissId) { cached, missId ->
+                cached ?: unavailable?.takeIf { missId == trackId }
+            }
         }
     val currentFormat =
         mediaMetadata.flatMapLatest { mediaMetadata ->

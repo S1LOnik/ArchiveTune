@@ -193,6 +193,7 @@ import moe.rukamori.archivetune.constants.StopMusicOnTaskClearKey
 import moe.rukamori.archivetune.constants.TogetherClientIdKey
 import moe.rukamori.archivetune.constants.WakelockKey
 import moe.rukamori.archivetune.db.MusicDatabase
+import moe.rukamori.archivetune.db.entities.LyricsEntity
 import moe.rukamori.archivetune.db.entities.AlbumEntity
 import moe.rukamori.archivetune.db.entities.ArtistEntity
 import moe.rukamori.archivetune.db.entities.Event
@@ -579,6 +580,7 @@ class MusicService :
     private val historyRecordingJobs = ConcurrentHashMap<Long, kotlinx.coroutines.Deferred<ImmediateHistoryResult>>()
 
     val currentMediaMetadata = MutableStateFlow<moe.rukamori.archivetune.models.MediaMetadata?>(null)
+    internal val lyricsLookupMissId = MutableStateFlow<String?>(null)
     val queueRestoreCompleted = MutableStateFlow(false)
     val infiniteQueueLoading = MutableStateFlow(false)
     private val playerInitialized = MutableStateFlow(false)
@@ -1447,17 +1449,22 @@ class MusicService :
         ) { mediaMetadata, showLyrics ->
             mediaMetadata to showLyrics
         }.collectLatest(ioScope) { (mediaMetadata, showLyrics) ->
-            if (showLyrics && mediaMetadata != null && !mediaMetadata.isPodcast && database
-                    .lyrics(mediaMetadata.id)
-                    .first() == null
-            ) {
-                val lyrics = lyricsHelper.getLyrics(mediaMetadata)
-                database.query {
-                    insertLyricsIfAbsent(
-                        id = mediaMetadata.id,
-                        lyrics = lyrics,
-                    )
-                }
+            lyricsLookupMissId.value = null
+            if (!showLyrics || mediaMetadata == null || mediaMetadata.isPodcast) return@collectLatest
+            val cached = database.lyrics(mediaMetadata.id).first()
+            if (cached != null && cached.lyrics != LyricsEntity.LYRICS_NOT_FOUND) return@collectLatest
+
+            val result = lyricsHelper.getLyricsWithProvider(mediaMetadata)
+            if (result.lyrics == LyricsEntity.LYRICS_NOT_FOUND) {
+                if (currentMediaMetadata.value?.id == mediaMetadata.id) lyricsLookupMissId.value = mediaMetadata.id
+                return@collectLatest
+            }
+            database.query {
+                replaceLyricsIfAbsentOrNotFound(
+                    id = mediaMetadata.id,
+                    lyrics = result.lyrics,
+                    providerName = result.providerName,
+                )
             }
         }
 

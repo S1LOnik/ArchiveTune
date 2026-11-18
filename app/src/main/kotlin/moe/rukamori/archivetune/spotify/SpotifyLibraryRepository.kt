@@ -31,6 +31,7 @@ import moe.rukamori.archivetune.constants.SpotifyLibraryPlaylistsCacheKey
 import moe.rukamori.archivetune.constants.SpotifySpDcKey
 import moe.rukamori.archivetune.constants.SpotifySpKeyKey
 import moe.rukamori.archivetune.spotify.models.SpotifyAlbum
+import moe.rukamori.archivetune.spotify.models.SpotifyPaging
 import moe.rukamori.archivetune.spotify.models.SpotifyPlaylist
 import moe.rukamori.archivetune.spotify.models.SpotifyPlaylistTracksRef
 import moe.rukamori.archivetune.spotify.models.SpotifySearchResult
@@ -48,6 +49,13 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
+
+// The server counts library entries that the playlist parser may filter out.
+internal fun SpotifyPaging<*>.nextSpotifyPlaylistOffset(requestedOffset: Int, requestedLimit: Int): Int? {
+    val pageSize = limit.takeIf { it in 1..requestedLimit } ?: requestedLimit
+    val next = requestedOffset.toLong() + pageSize
+    return next.takeIf { it < total }?.toInt()
+}
 
 @Singleton
 class SpotifyLibraryRepository
@@ -646,7 +654,6 @@ class SpotifyLibraryRepository
                     spotifyCallWithTokenRetry {
                         Spotify.myPlaylists(limit = limit, offset = offset).getOrThrow()
                     }
-                if (page.items.isEmpty()) break
                 playlists +=
                     page.items
                         .filterNot { isLikedSongsPlaylistId(it.id) || it.name.equals("Liked Songs", ignoreCase = true) }
@@ -659,8 +666,7 @@ class SpotifyLibraryRepository
                                 ?: playlist
                         }
                     }
-                offset += page.items.size
-                if (offset >= page.total || page.items.size < limit) break
+                offset = page.nextSpotifyPlaylistOffset(offset, limit) ?: break
             }
 
             return playlists

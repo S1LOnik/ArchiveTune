@@ -765,6 +765,9 @@ interface DatabaseDao {
     @Query("SELECT * FROM song WHERE id IN (:songIds)")
     fun songsByIds(songIds: List<String>): Flow<List<Song>>
 
+    @Query("UPDATE song SET dateDownload = :cachedAt WHERE id IN (:songIds) AND dateDownload IS NULL")
+    fun markCachedSongsDownloadedAt(songIds: List<String>, cachedAt: LocalDateTime)
+
     @Query("SELECT * FROM podcast WHERE browseId = :browseId LIMIT 1")
     fun podcast(browseId: String): Flow<PodcastEntity?>
 
