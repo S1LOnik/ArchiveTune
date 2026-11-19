@@ -381,7 +381,7 @@ fun NavigationBarSettings(navController: NavController, scrollTo: String? = null
                         range = 0.2f..2f,
                         valueLabel = { "${(it * 100).roundToInt()}%" },
                         default = NAVIGATION_BAR_GLASS_GLOW_INTENSITY_DEFAULT,
-                        enabled = navigationBarGlassGlow,
+                        enabled = navigationBarGlassGlow && (liquidGlassNavBarEnabled || sukisuLiquidGlassNavBar),
                     )
                 }
 
@@ -421,7 +421,7 @@ fun NavigationBarSettings(navController: NavController, scrollTo: String? = null
                                 cornerRadius = navigationBarCornerRadius,
                             )
                         },
-                        enabled = !liquidGlassNavBarEnabled,
+                        enabled = !sukisuLiquidGlassNavBar && !navigationBarBitchord,
                     )
                 }
 
@@ -445,7 +445,7 @@ fun NavigationBarSettings(navController: NavController, scrollTo: String? = null
                                 cornerRadius = navigationBarCornerRadius,
                             )
                         },
-                        enabled = !liquidGlassNavBarEnabled,
+                        enabled = !liquidGlassNavBarEnabled && !sukisuLiquidGlassNavBar,
                     )
                 }
 
@@ -469,7 +469,7 @@ fun NavigationBarSettings(navController: NavController, scrollTo: String? = null
                                 cornerRadius = navigationBarCornerRadius,
                             )
                         },
-                        enabled = !liquidGlassNavBarEnabled,
+                        enabled = !liquidGlassNavBarEnabled && !sukisuLiquidGlassNavBar && !navigationBarBitchord && !navigationBarFrostedBlur,
                     )
                 }
 
@@ -493,7 +493,7 @@ fun NavigationBarSettings(navController: NavController, scrollTo: String? = null
                                 cornerRadius = navigationBarCornerRadius,
                             )
                         },
-                        enabled = !liquidGlassNavBarEnabled,
+                        enabled = !liquidGlassNavBarEnabled && !sukisuLiquidGlassNavBar && !navigationBarBitchord && !navigationBarFrostedBlur,
                     )
                 }
 
@@ -517,7 +517,7 @@ fun NavigationBarSettings(navController: NavController, scrollTo: String? = null
                                 cornerRadius = navigationBarCornerRadius,
                             )
                         },
-                        enabled = !liquidGlassNavBarEnabled,
+                        enabled = !liquidGlassNavBarEnabled && !sukisuLiquidGlassNavBar && !navigationBarBitchord && !hideNavigationBarLabels,
                     )
                 }
 
@@ -541,7 +541,7 @@ fun NavigationBarSettings(navController: NavController, scrollTo: String? = null
                                 cornerRadius = tempRadius,
                             )
                         },
-                        enabled = !liquidGlassNavBarEnabled,
+                        enabled = !liquidGlassNavBarEnabled && !sukisuLiquidGlassNavBar && !navigationBarBitchord,
                     )
                 }
 
@@ -563,7 +563,7 @@ fun NavigationBarSettings(navController: NavController, scrollTo: String? = null
                             onNavigationBarLabelSpacingChange(NAVIGATION_BAR_LABEL_SPACING_DEFAULT)
                             onNavigationBarCornerRadiusChange(NAVIGATION_BAR_CORNER_RADIUS_DEFAULT)
                         },
-                        enabled = !allDefaults && !liquidGlassNavBarEnabled,
+                        enabled = !allDefaults,
                         shapes = ButtonDefaults.shapes(),
                         modifier = Modifier
                             .fillMaxWidth()

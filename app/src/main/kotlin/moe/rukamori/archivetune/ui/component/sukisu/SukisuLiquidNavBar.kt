@@ -18,6 +18,7 @@ import androidx.compose.animation.core.EaseOut
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import moe.rukamori.archivetune.ui.component.glassGlowOverlay
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -111,6 +112,7 @@ fun SukisuLiquidNavBar(
     backdrop: Backdrop?,
     isSelected: (Screens) -> Boolean,
     onItemClick: (Screens, Boolean) -> Unit,
+    glowStrength: Float = 0f,
 ) {
     if (items.isEmpty()) return
 
@@ -354,7 +356,8 @@ fun SukisuLiquidNavBar(
                 Modifier
                     .widthIn(max = FloatingNavigationBarMaxWidth)
                     .fillMaxWidth()
-                    .height(SukisuBarHeight),
+                    .height(SukisuBarHeight)
+                    .glassGlowOverlay(glowStrength, pillShape),
             contentAlignment = Alignment.CenterStart,
         ) {
             if (backdrop != null) {

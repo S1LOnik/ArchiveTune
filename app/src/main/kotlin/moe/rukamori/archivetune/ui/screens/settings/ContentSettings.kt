@@ -9,12 +9,7 @@
 
 package moe.rukamori.archivetune.ui.screens.settings
 
-import android.content.Intent
-import android.os.Build
-import android.provider.Settings
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
@@ -22,22 +17,24 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import moe.rukamori.archivetune.aicontentfilter.DefaultAiMusicAuthors
+import moe.rukamori.archivetune.aicontentfilter.authorFilterKey
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.core.net.toUri
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import moe.rukamori.archivetune.LocalPlayerAwareWindowInsets
 import moe.rukamori.archivetune.R
@@ -53,34 +50,13 @@ import moe.rukamori.archivetune.ui.utils.backToMain
 import moe.rukamori.archivetune.utils.rememberEnumPreference
 import moe.rukamori.archivetune.utils.rememberPreference
 import moe.rukamori.archivetune.utils.setAppLocale
-import moe.rukamori.archivetune.viewmodels.AiContentFilterSettingsEffect
-import moe.rukamori.archivetune.viewmodels.AiContentFilterSettingsState
-import moe.rukamori.archivetune.viewmodels.ContentSettingsViewModel
 import java.util.Locale
 
 @Composable
 fun ContentSettings(
     navController: NavController,
-    viewModel: ContentSettingsViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
-    val aiContentFilterState by viewModel.aiContentFilterState.collectAsStateWithLifecycle()
-    val snackbarHostState = remember { SnackbarHostState() }
-
-    LaunchedEffect(viewModel, context) {
-        viewModel.aiContentFilterEffects.collect { effect ->
-            when (effect) {
-                is AiContentFilterSettingsEffect.ShowMessage -> {
-                    snackbarHostState.showSnackbar(context.getString(effect.messageResId))
-                }
-
-                is AiContentFilterSettingsEffect.OpenUrl -> {
-                    context.startActivity(Intent(Intent.ACTION_VIEW, effect.url.toUri()))
-                }
-            }
-        }
-    }
-
     val (useSystemLanguage, onUseSystemLanguageChange) = rememberPreference(key = UseSystemLanguageKey, defaultValue = true)
 
     val (contentLanguage, onContentLanguageChange) = rememberPreference(key = ContentLanguageKey, defaultValue = "system")
@@ -195,13 +171,8 @@ fun ContentSettings(
             }
         }
 
-        AiContentFilterPreferences(
-            state = aiContentFilterState,
-            onEnabledChange = viewModel::setAiContentFilterEnabled,
-            onIncludeModerateChange = viewModel::setAiContentFilterIncludeModerate,
-            onRefresh = viewModel::refreshAiContentFilter,
-            onOpenSource = viewModel::openAiContentFilterSource,
-        )
+        AiContentFilterPreferences()
+        YouTubeLikesPreferences()
 
         PreferenceGroup(title = stringResource(R.string.app_language)) {
             item {
@@ -264,98 +235,82 @@ fun ContentSettings(
         },
     )
 
-    Box(Modifier.fillMaxSize()) {
-        SnackbarHost(
-            hostState = snackbarHostState,
-            modifier = Modifier.align(Alignment.BottomCenter),
+}
+
+@Composable
+private fun AiContentFilterPreferences() {
+    val (enabled, setEnabled) = rememberPreference(AiContentFilterEnabledKey, false)
+    val (authors, setAuthors) = rememberPreference(AiMusicAuthorsKey, DefaultAiMusicAuthors)
+    var editor by rememberSaveable { mutableStateOf<String?>(null) }
+    editor?.let { draft ->
+        AlertDialog(
+            onDismissRequest = { editor = null },
+            title = { Text(stringResource(R.string.ai_music_authors)) },
+            text = {
+                Column {
+                    Text(stringResource(R.string.ai_music_authors_help))
+                    OutlinedTextField(
+                        value = draft,
+                        onValueChange = { editor = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 3,
+                        maxLines = 7,
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    setAuthors(draft.lineSequence().map(String::trim).filter(String::isNotEmpty)
+                        .distinctBy(::authorFilterKey).toSet())
+                    editor = null
+                }) { Text(stringResource(android.R.string.ok)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { editor = null }) { Text(stringResource(android.R.string.cancel)) }
+            },
         )
+    }
+    PreferenceGroup(title = stringResource(R.string.ai_content_filter)) {
+        item {
+            SwitchPreference(
+                title = { Text(stringResource(R.string.ai_music_filter_enable)) },
+                description = stringResource(R.string.ai_music_filter_summary),
+                icon = { Icon(painterResource(R.drawable.auto_awesome), null) },
+                checked = enabled,
+                onCheckedChange = setEnabled,
+            )
+        }
+        item {
+            PreferenceEntry(
+                title = { Text(stringResource(R.string.ai_music_authors)) },
+                description = stringResource(R.string.ai_music_authors_count, authors.size),
+                icon = { Icon(painterResource(R.drawable.person), null) },
+                onClick = { editor = authors.sorted().joinToString("\n") },
+            )
+        }
     }
 }
 
 @Composable
-private fun AiContentFilterPreferences(
-    state: AiContentFilterSettingsState,
-    onEnabledChange: (Boolean) -> Unit,
-    onIncludeModerateChange: (Boolean) -> Unit,
-    onRefresh: () -> Unit,
-    onOpenSource: () -> Unit,
-) {
-    PreferenceGroup(title = stringResource(R.string.ai_content_filter)) {
-        when (state) {
-            AiContentFilterSettingsState.Loading -> {
-                item {
-                    PreferenceEntry(
-                        title = { Text(stringResource(R.string.ai_content_filter)) },
-                        description = stringResource(R.string.loading),
-                        icon = { Icon(painterResource(R.drawable.auto_awesome), null) },
-                        isEnabled = false,
-                    )
-                }
-            }
-
-            AiContentFilterSettingsState.Empty -> {
-                Unit
-            }
-
-            is AiContentFilterSettingsState.Error -> {
-                item {
-                    PreferenceEntry(
-                        title = { Text(stringResource(R.string.ai_content_filter)) },
-                        description = stringResource(state.messageResId),
-                        icon = { Icon(painterResource(R.drawable.auto_awesome), null) },
-                        onClick = onRefresh,
-                    )
-                }
-            }
-
-            is AiContentFilterSettingsState.Success -> {
-                val model = state.model
-                item {
-                    SwitchPreference(
-                        title = { Text(stringResource(R.string.ai_content_filter_hide)) },
-                        description = stringResource(R.string.ai_content_filter_hide_summary),
-                        icon = { Icon(painterResource(R.drawable.auto_awesome), null) },
-                        checked = model.enabled,
-                        onCheckedChange = onEnabledChange,
-                    )
-                }
-                item {
-                    SwitchPreference(
-                        title = { Text(stringResource(R.string.ai_content_filter_moderate)) },
-                        description = stringResource(R.string.ai_content_filter_moderate_summary),
-                        icon = { Icon(painterResource(R.drawable.filter_alt), null) },
-                        checked = model.includeModerateConfidence,
-                        onCheckedChange = onIncludeModerateChange,
-                        isEnabled = model.enabled,
-                    )
-                }
-                item {
-                    PreferenceEntry(
-                        title = { Text(stringResource(R.string.ai_content_filter_update)) },
-                        description =
-                            if (model.refreshing) {
-                                stringResource(R.string.loading)
-                            } else {
-                                stringResource(
-                                    R.string.ai_content_filter_list_counts,
-                                    model.blocklistCount,
-                                    model.warnlistCount,
-                                )
-                            },
-                        icon = { Icon(painterResource(R.drawable.sync), null) },
-                        onClick = onRefresh,
-                        isEnabled = !model.refreshing,
-                    )
-                }
-                item {
-                    PreferenceEntry(
-                        title = { Text(stringResource(R.string.ai_content_filter_source)) },
-                        description = stringResource(R.string.ai_content_filter_source_summary),
-                        icon = { Icon(painterResource(R.drawable.info), null) },
-                        onClick = onOpenSource,
-                    )
-                }
-            }
+private fun YouTubeLikesPreferences() {
+    val (videos, setVideos) = rememberPreference(YouTubeLikesIncludeVideosKey, false)
+    val (podcasts, setPodcasts) = rememberPreference(YouTubeLikesIncludePodcastsKey, false)
+    PreferenceGroup(title = stringResource(R.string.youtube_likes_filter)) {
+        item {
+            SwitchPreference(
+                title = { Text(stringResource(R.string.youtube_likes_include_videos)) },
+                icon = { Icon(painterResource(R.drawable.slow_motion_video), null) },
+                checked = videos,
+                onCheckedChange = setVideos,
+            )
+        }
+        item {
+            SwitchPreference(
+                title = { Text(stringResource(R.string.youtube_likes_include_podcasts)) },
+                icon = { Icon(painterResource(R.drawable.mic), null) },
+                checked = podcasts,
+                onCheckedChange = setPodcasts,
+            )
         }
     }
 }

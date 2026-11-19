@@ -77,6 +77,7 @@ import moe.rukamori.archivetune.ui.component.PreferenceEntry
 import moe.rukamori.archivetune.ui.component.PreferenceGroup
 import moe.rukamori.archivetune.ui.component.PreferenceGroupScope
 import moe.rukamori.archivetune.ui.component.SliderPreference
+import moe.rukamori.archivetune.constants.ShowCastInPlayerMenuKey
 import moe.rukamori.archivetune.ui.component.SwitchPreference
 import moe.rukamori.archivetune.ui.component.TextFieldDialog
 import moe.rukamori.archivetune.ui.utils.backToMain
@@ -91,6 +92,7 @@ import moe.rukamori.archivetune.viewmodels.SponsorBlockSettingsViewModel
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PlayerSettings(navController: NavController) {
+    val (showCast, setShowCast) = rememberPreference(ShowCastInPlayerMenuKey, true)
     val playbackPerformanceSettingsViewModel: PlaybackPerformanceSettingsViewModel =
         hiltViewModel()
     val playbackPerformanceSettingsState by
@@ -333,6 +335,15 @@ fun PlayerSettings(navController: NavController) {
                 .padding(bottom = SettingsDimensions.ScreenBottomPadding),
         ) {
             PreferenceGroup(title = stringResource(R.string.player)) {
+                if (moe.rukamori.archivetune.BuildConfig.FLAVOR.contains("gms", ignoreCase = true)) {
+                    item {
+                        SwitchPreference(
+                            title = { Text(stringResource(R.string.show_cast_in_player_menu)) },
+                            checked = showCast,
+                            onCheckedChange = setShowCast,
+                        )
+                    }
+                }
                 item {
                     EnumListPreference(
                         title = { Text(stringResource(R.string.audio_quality)) },

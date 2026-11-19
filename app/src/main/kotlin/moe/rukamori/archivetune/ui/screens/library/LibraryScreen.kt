@@ -177,6 +177,8 @@ fun LibraryScreen(
             modifier =
                 Modifier
                     .fillMaxSize()
+                    .windowInsetsPadding(WindowInsets.statusBars)
+                    .clipToBounds()
                     .layout { measurable, constraints ->
                         val offset = scrollBehavior.state.heightOffset.roundToInt().coerceAtMost(0)
                         val placeable = measurable.measure(
@@ -189,7 +191,6 @@ fun LibraryScreen(
                             placeable.placeRelative(0, offset)
                         }
                     }
-                    .windowInsetsPadding(WindowInsets.statusBars)
                     .padding(top = AppBarHeight),
         ) {
             val tabListState = rememberLazyListState()

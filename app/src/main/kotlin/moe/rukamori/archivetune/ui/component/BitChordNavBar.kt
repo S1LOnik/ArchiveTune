@@ -77,6 +77,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import moe.rukamori.archivetune.constants.HideNavigationBarLabelsKey
+import moe.rukamori.archivetune.utils.rememberPreference
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -107,6 +109,7 @@ fun BitChordNavBar(
     frostedOverlayAlpha: Float = 0.30f,
     liquidGlassBackdrop: ThrottledLayerBackdrop? = null,
 ) {
+    val (hideLabels) = rememberPreference(HideNavigationBarLabelsKey, false)
     val haptic = LocalHapticFeedback.current
     val density = LocalDensity.current
     val canLiquidGlass =
@@ -284,6 +287,7 @@ fun BitChordNavBar(
                 for (index in 0 until itemCount) {
                     BitChordNavBarItem(
                         label = itemLabel(index),
+                        showLabel = !hideLabels,
                         icon = itemIcon(index),
                         selected = index == selectedIndex,
                         onSelect = { selectIndex(index) },
@@ -308,6 +312,7 @@ private fun Modifier.borderGuard(): Modifier =
 @Composable
 private fun BitChordNavBarItem(
     label: String,
+    showLabel: Boolean,
     icon: ImageVector,
     selected: Boolean,
     onSelect: () -> Unit,
@@ -339,7 +344,7 @@ private fun BitChordNavBarItem(
     ) {
         Icon(
             imageVector = icon,
-            contentDescription = null,
+            contentDescription = if (showLabel) null else label,
             tint = tint,
             modifier =
                 Modifier
@@ -349,14 +354,16 @@ private fun BitChordNavBarItem(
                         scaleY = iconScale
                     },
         )
-        Spacer(Modifier.height(BitChordTabIconLabelGap))
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = tint,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+        if (showLabel) {
+            Spacer(Modifier.height(BitChordTabIconLabelGap))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = tint,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }
 

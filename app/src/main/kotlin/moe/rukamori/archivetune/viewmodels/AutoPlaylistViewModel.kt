@@ -29,6 +29,8 @@ import moe.rukamori.archivetune.constants.AutoPlaylistSongSortDescendingKey
 import moe.rukamori.archivetune.constants.AutoPlaylistSongSortType
 import moe.rukamori.archivetune.constants.AutoPlaylistSongSortTypeKey
 import moe.rukamori.archivetune.constants.HideExplicitKey
+import moe.rukamori.archivetune.constants.YouTubeLikesIncludeVideosKey
+import moe.rukamori.archivetune.constants.YouTubeLikesIncludePodcastsKey
 import moe.rukamori.archivetune.constants.HideVideoKey
 import moe.rukamori.archivetune.constants.SongSortType
 import moe.rukamori.archivetune.db.MusicDatabase
@@ -164,10 +166,15 @@ class AutoPlaylistViewModel
                                 ?: true
                         ),
                         it[HideExplicitKey] ?: false,
-                        it[HideVideoKey] ?: false,
+                        Triple(
+                            it[HideVideoKey] ?: false,
+                            it[YouTubeLikesIncludeVideosKey] ?: false,
+                            it[YouTubeLikesIncludePodcastsKey] ?: false,
+                        ),
                     )
                 }.distinctUntilChanged()
-                .flatMapLatest { (sortDesc, hideExplicit, hideVideo) ->
+                .flatMapLatest { (sortDesc, hideExplicit, videoAndPodcastFilters) ->
+                    val (hideVideo, includeVideos, includePodcasts) = videoAndPodcastFilters
                     val (sortType, descending) = sortDesc
                     val songSortType = sortType.toSongSortType()
                     when (playlist) {
@@ -177,7 +184,13 @@ class AutoPlaylistViewModel
                         }
 
                         "liked_ytm" -> {
-                            database.likedSongs(songSortType, descending, youtubeMusicOnly = true).map { songs ->
+                            database.likedSongs(
+                                songSortType,
+                                descending,
+                                youtubeMusicOnly = true,
+                                includeVideos = includeVideos,
+                                includePodcasts = includePodcasts,
+                            ).map { songs ->
                                 songs.filterExplicit(hideExplicit)
                             }
                         }

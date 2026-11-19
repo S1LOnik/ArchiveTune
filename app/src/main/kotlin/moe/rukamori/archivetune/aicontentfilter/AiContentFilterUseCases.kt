@@ -7,113 +7,45 @@
 
 package moe.rukamori.archivetune.aicontentfilter
 
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.combine
 import moe.rukamori.archivetune.innertube.models.AlbumItem
 import moe.rukamori.archivetune.innertube.models.Artist
 import moe.rukamori.archivetune.innertube.models.ArtistItem
-import moe.rukamori.archivetune.innertube.models.EpisodeItem
-import moe.rukamori.archivetune.innertube.models.PlaylistItem
-import moe.rukamori.archivetune.innertube.models.PodcastItem
 import moe.rukamori.archivetune.innertube.models.SongItem
 import moe.rukamori.archivetune.innertube.models.YTItem
 import javax.inject.Inject
 
 class ObserveAiContentFilterUseCase
     @Inject
-    constructor(
-        private val repository: AiContentFilterRepository,
-    ) {
-        operator fun invoke(): Flow<Pair<AiContentFilterSettings, AiContentFilterStatus>> =
-            combine(repository.observeSettings(), repository.observeStatus(), ::Pair)
-    }
-
-class UpdateAiContentFilterSettingsUseCase
-    @Inject
-    constructor(
-        private val repository: AiContentFilterRepository,
-    ) {
-        suspend fun setEnabled(enabled: Boolean) {
-            repository.setEnabled(enabled)
-        }
-
-        suspend fun setIncludeModerateConfidence(enabled: Boolean) {
-            repository.setIncludeModerateConfidence(enabled)
-        }
-    }
-
-class RefreshAiContentFilterUseCase
-    @Inject
-    constructor(
-        private val repository: AiContentFilterRepository,
-    ) {
-        suspend operator fun invoke(force: Boolean): AiContentFilterRefreshResult = repository.refreshIfStale(force)
+    constructor(private val repository: AiContentFilterRepository) {
+        operator fun invoke() = repository.observeSettings()
     }
 
 class LoadAiContentFilterPolicyUseCase
     @Inject
-    constructor(
-        private val repository: AiContentFilterRepository,
-    ) {
-        suspend operator fun invoke(): AiContentFilterPolicy {
+    constructor(private val repository: AiContentFilterRepository) {
+        suspend operator fun invoke(): Set<String> {
             val settings = repository.getSettings()
-            if (!settings.enabled) return AiContentFilterPolicy.Disabled
-
-            repository.refreshIfStale()
-            val lists = repository.loadLists()
-            val blockedKeys =
-                if (settings.includeModerateConfidence) {
-                    lists.blocklist + lists.warnlist
-                } else {
-                    lists.blocklist
-                }
-            return AiContentFilterPolicy(
-                enabled = true,
-                blockedChannelKeys = blockedKeys,
-            )
+            if (!settings.enabled) return emptySet()
+            return settings.authors.mapTo(mutableSetOf(), ::authorFilterKey)
         }
     }
 
 class FilterAiContentUseCase
     @Inject
     constructor() {
-        operator fun <T : YTItem> invoke(
-            items: List<T>,
-            policy: AiContentFilterPolicy,
-        ): List<T> {
-            if (!policy.enabled || policy.blockedChannelKeys.isEmpty()) return items
-            return items.filterNot { item -> item.matches(policy.blockedChannelKeys) }
+        operator fun <T : YTItem> invoke(items: List<T>, policy: Set<String>): List<T> {
+            if (policy.isEmpty()) return items
+            return items.filterNot { item ->
+                when (item) {
+                    is SongItem -> !item.isPodcast && item.artists.any { it.matches(policy) }
+                    is AlbumItem -> item.artists.orEmpty().any { it.matches(policy) }
+                    is ArtistItem -> "name:${normalizeAuthorName(item.title)}" in policy ||
+                        "id:${item.id}" in policy || "id:${item.channelId}" in policy
+                    else -> false
+                }
+            }
         }
 
-        private fun YTItem.matches(blockedChannelKeys: Set<String>): Boolean = creatorKeys().any(blockedChannelKeys::contains)
-
-        private fun YTItem.creatorKeys(): Sequence<String> =
-            when (this) {
-                is SongItem -> {
-                    artists.asSequence().flatMap { artist -> artist.keys() }
-                }
-
-                is AlbumItem -> {
-                    artists.orEmpty().asSequence().flatMap { artist -> artist.keys() }
-                }
-
-                is PlaylistItem -> {
-                    author?.keys().orEmpty()
-                }
-
-                is ArtistItem -> {
-                    sequenceOf(title, id, channelId)
-                        .filterNotNull()
-                        .mapNotNull(::normalizeChannelKey)
-                }
-
-                is PodcastItem -> author?.keys().orEmpty()
-
-                is EpisodeItem -> podcast?.keys().orEmpty()
-            }
-
-        private fun Artist.keys(): Sequence<String> =
-            sequenceOf(name, id)
-                .filterNotNull()
-                .mapNotNull(::normalizeChannelKey)
+        private fun Artist.matches(keys: Set<String>) =
+            "name:${normalizeAuthorName(name)}" in keys || (id != null && "id:$id" in keys)
     }

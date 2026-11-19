@@ -48,6 +48,11 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.AlertDialog
+import moe.rukamori.archivetune.constants.YouTubeLikesIncludeVideosKey
+import moe.rukamori.archivetune.constants.YouTubeLikesIncludePodcastsKey
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.IconButton
@@ -146,52 +151,24 @@ fun LibraryPlaylistsScreen(
         .playlistIdsByTags(
             if (selectedTagIds.isEmpty()) emptyList() else selectedTagIds.toList(),
         ).collectAsStateWithLifecycle(initialValue = emptyList())
-    // [FIX-ZCODE] W10: this tab is the YouTube Music tab, so the counter and the Liked
-    // playlist it opens must show YouTube content only (see liked_ytm in AutoPlaylistViewModel)
-    val likedSongsCount by database.youtubeLikedSongsCount().collectAsStateWithLifecycle(initialValue = 0)
+    val (includeVideos) = rememberPreference(YouTubeLikesIncludeVideosKey, false)
+    val (includePodcasts) = rememberPreference(YouTubeLikesIncludePodcastsKey, false)
+    val likedSongsCount by remember(database, includeVideos, includePodcasts) {
+        database.youtubeLikedSongsCount(includeVideos, includePodcasts)
+    }.collectAsStateWithLifecycle(initialValue = 0)
 
     var showHidden by rememberSaveable { mutableStateOf(false) }
 
     var showVisibilityManager by rememberSaveable { mutableStateOf(false) }
-    var playlistQuery by rememberSaveable { mutableStateOf("") }
     if (showVisibilityManager) {
-        AlertDialog(
-            onDismissRequest = { showVisibilityManager = false },
-            title = { Text(stringResource(R.string.manage_playlist_visibility)) },
-            text = {
-                Column {
-                    androidx.compose.material3.OutlinedTextField(
-                        value = playlistQuery,
-                        onValueChange = { playlistQuery = it },
-                        label = { Text(stringResource(R.string.search)) },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    LazyColumn(Modifier.heightIn(max = 360.dp)) {
-                        items(
-                            items = playlists.filter { it.playlist.name.contains(playlistQuery.trim(), ignoreCase = true) },
-                            key = { it.id },
-                        ) { playlist ->
-                            val toggle = {
-                                database.query { updatePlaylistVisibility(playlist.id, !playlist.playlist.isHidden) }
-                            }
-                            Row(
-                                modifier = Modifier.fillMaxWidth()
-                                    .then(Modifier.clickable(onClick = toggle))
-                                    .padding(vertical = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Checkbox(checked = !playlist.playlist.isHidden, onCheckedChange = { toggle() })
-                                Text(playlist.playlist.name)
-                            }
-                        }
-                    }
+        PlaylistVisibilityDialog(
+            playlists = playlists,
+            onDismiss = { showVisibilityManager = false },
+            onApply = { ids, hidden ->
+                database.transaction {
+                    ids.chunked(500).forEach { updatePlaylistVisibility(it, hidden) }
                 }
-            },
-            confirmButton = {
-                TextButton(onClick = { showVisibilityManager = false }) {
-                    Text(stringResource(android.R.string.ok))
-                }
+                showVisibilityManager = false
             },
         )
     }
@@ -1150,4 +1127,77 @@ fun YouTubeMusicLikedCard(
             color = MaterialTheme.colorScheme.error,
         )
     }
+}
+
+@Composable
+private fun PlaylistVisibilityDialog(
+    playlists: List<Playlist>,
+    onDismiss: () -> Unit,
+    onApply: (List<String>, Boolean) -> Unit,
+) {
+    var query by rememberSaveable { mutableStateOf("") }
+    var selection by rememberSaveable { mutableStateOf(arrayListOf<String>()) }
+    val filtered = remember(playlists, query) {
+        playlists.filter { it.playlist.name.contains(query.trim(), ignoreCase = true) }
+    }
+    val selectedIds = remember(selection) { selection.toSet() }
+    val selected = playlists.filter { it.id in selectedIds }
+    val filteredIds = remember(filtered) { filtered.mapTo(mutableSetOf()) { it.id } }
+    val allSelected = filteredIds.isNotEmpty() && selectedIds.containsAll(filteredIds)
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.manage_playlist_visibility)) },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    label = { Text(stringResource(R.string.search)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                TextButton(
+                    enabled = filteredIds.isNotEmpty(),
+                    onClick = {
+                        selection = ArrayList(if (allSelected) selectedIds - filteredIds else selectedIds + filteredIds)
+                    },
+                ) {
+                    Text(stringResource(if (allSelected) R.string.playlist_clear_matches else R.string.playlist_select_matches))
+                }
+                LazyColumn(Modifier.heightIn(max = 300.dp)) {
+                    items(filtered, key = { it.id }) { playlist ->
+                        val checked = playlist.id in selectedIds
+                        Row(
+                            modifier = Modifier.fillMaxWidth().toggleable(checked, role = Role.Checkbox) { select ->
+                                selection = ArrayList(if (select) selectedIds + playlist.id else selectedIds - playlist.id)
+                            }.padding(vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Checkbox(checked = checked, onCheckedChange = null, modifier = Modifier.padding(12.dp))
+                            Column {
+                                Text(playlist.playlist.name)
+                                if (playlist.playlist.isHidden) Text(
+                                    stringResource(R.string.playlist_hidden_locally),
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onApply(selected.map { it.id }, true) },
+                enabled = selected.any { !it.playlist.isHidden },
+            ) { Text(stringResource(R.string.playlist_hide_selected)) }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = { onApply(selected.map { it.id }, false) },
+                enabled = selected.any { it.playlist.isHidden },
+            ) { Text(stringResource(R.string.playlist_show_selected)) }
+        },
+    )
 }

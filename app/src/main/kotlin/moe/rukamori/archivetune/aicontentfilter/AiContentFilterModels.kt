@@ -12,38 +12,11 @@ import androidx.compose.runtime.Immutable
 @Immutable
 data class AiContentFilterSettings(
     val enabled: Boolean,
-    val includeModerateConfidence: Boolean,
+    val authors: Set<String>,
 )
 
-@Immutable
-data class AiContentFilterStatus(
-    val blocklistCount: Int,
-    val warnlistCount: Int,
-    val lastUpdatedEpochMillis: Long,
+// Each channel states that its music is generated with Suno in its channel description.
+internal val DefaultAiMusicAuthors = setOf(
+    "https://www.youtube.com/channel/UCCmPdCuqNXqoPjWkYRaWgwQ",
+    "https://www.youtube.com/channel/UCs2kYL2gjrIniec7EDUPSZg",
 )
-
-data class AiContentFilterPolicy(
-    val enabled: Boolean,
-    val blockedChannelKeys: Set<String>,
-) {
-    companion object {
-        val Disabled =
-            AiContentFilterPolicy(
-                enabled = false,
-                blockedChannelKeys = emptySet(),
-            )
-    }
-}
-
-data class AiChannelLists(
-    val blocklist: Set<String>,
-    val warnlist: Set<String>,
-)
-
-sealed interface AiContentFilterRefreshResult {
-    data class Success(
-        val status: AiContentFilterStatus,
-    ) : AiContentFilterRefreshResult
-
-    data object Unavailable : AiContentFilterRefreshResult
-}

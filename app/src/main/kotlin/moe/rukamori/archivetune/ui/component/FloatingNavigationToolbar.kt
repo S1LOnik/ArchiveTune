@@ -137,7 +137,7 @@ val LocalNavigationBarBackdrop = compositionLocalOf<NavigationBarBackdrop?> { nu
 private val NavigationItemsMaxWidth = 360.dp
 private val NavigationItemVerticalPadding = 8.dp
 
-private val SukiSUBarHeight = 64.dp
+internal val SukiSUBarHeight = 64.dp
 private val SukiSUItemPadding = 4.dp
 
 private const val FrostedNavBarBlurRadiusPx = 60f
@@ -211,7 +211,7 @@ fun FloatingNavigationToolbar(
     val canLiquidGlass = liquidGlass && liquidGlassBackdrop != null && !isPreS
     val glassTuning = LocalLiquidGlassTuning.current
     val resolvedBarHeight =
-        if (canLiquidGlass) SukiSUBarHeight else NavigationBarHeight * navBarHeightMultiplier
+        if (canLiquidGlass) SukiSUBarHeight else NavigationBarHeight * navBarHeightMultiplier.coerceIn(0.8f, 1.4f)
 
     val itemVerticalPadding =
         if (canLiquidGlass) SukiSUItemPadding else NavigationItemVerticalPadding
@@ -224,29 +224,14 @@ fun FloatingNavigationToolbar(
                 RoundedCornerShape(navBarCornerRadius.dp)
             }
         }
-    val navigationContainerColor =
-        if (canLiquidGlass) {
-            Color.Transparent
-        } else if (canBlurBackdrop) {
-            if (pureBlack) {
-                Color.Black.copy(alpha = 0.45f)
-            } else {
-                MaterialTheme.colorScheme.surfaceContainer
-            }
-        } else if (pureBlack) {
-            if (tintFrostedBlur) {
-                tintedNavBarBaseColor
-            } else {
-                Color.Black
-            }
-        } else if (tintFrostedBlur) {
-            tintedNavBarBaseColor
-        } else {
-            val baseColor = MaterialTheme.colorScheme.surfaceContainer
-            val effectiveAlpha =
-                navBarOpacity * (1f - navBarTransparency)
-            baseColor.copy(alpha = effectiveAlpha.coerceIn(0.05f, 1f))
-        }
+    val effectiveAlpha = (navBarOpacity * (1f - navBarTransparency)).coerceIn(0.05f, 1f)
+    val navigationContainerColor = when {
+        canLiquidGlass -> Color.Transparent
+        canBlurBackdrop -> if (pureBlack) Color.Black.copy(alpha = 0.45f) else MaterialTheme.colorScheme.surfaceContainer
+        tintFrostedBlur -> tintedNavBarBaseColor.copy(alpha = effectiveAlpha)
+        pureBlack -> Color.Black.copy(alpha = effectiveAlpha)
+        else -> MaterialTheme.colorScheme.surfaceContainer.copy(alpha = effectiveAlpha)
+    }
     val motionScheme = MaterialTheme.motionScheme
     val (disableAnimations) = rememberPreference(DisableAnimationsKey, defaultValue = false)
     val (hideNavigationLabels) = rememberPreference(HideNavigationBarLabelsKey, defaultValue = false)

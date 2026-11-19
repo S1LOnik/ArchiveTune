@@ -20,6 +20,27 @@ import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.net.Uri
 import android.os.Build
+import moe.rukamori.archivetune.ui.component.sukisu.SukisuLiquidNavBar
+import moe.rukamori.archivetune.ui.component.rememberThrottledBackdrop
+import moe.rukamori.archivetune.ui.component.glassSource
+import moe.rukamori.archivetune.ui.component.SukiSUBarHeight
+import moe.rukamori.archivetune.ui.component.NavigationBarGlassGlowKey
+import moe.rukamori.archivetune.ui.component.NavigationBarGlassGlowIntensityKey
+import moe.rukamori.archivetune.ui.component.NavigationBarBackdrop
+import moe.rukamori.archivetune.ui.component.NAVIGATION_BAR_GLASS_GLOW_INTENSITY_DEFAULT
+import moe.rukamori.archivetune.ui.component.BitChordNavBar
+import moe.rukamori.archivetune.constants.SukisuLiquidGlassNavBarKey
+import moe.rukamori.archivetune.constants.NavigationBarTintFrostedBlurKey
+import moe.rukamori.archivetune.constants.NavigationBarHeightKey
+import moe.rukamori.archivetune.constants.NavigationBarFrostedBlurKey
+import moe.rukamori.archivetune.constants.NavigationBarBitchordKey
+import moe.rukamori.archivetune.constants.NAVIGATION_BAR_HEIGHT_DEFAULT
+import moe.rukamori.archivetune.constants.LiquidGlassNavBarEnabledKey
+import moe.rukamori.archivetune.constants.LiquidGlassEnabledKey
+import androidx.compose.ui.res.vectorResource
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.graphics.vector.ImageVector
 import android.os.Bundle
 import android.os.IBinder
 import android.provider.OpenableColumns
@@ -995,7 +1016,7 @@ class MainActivity : ComponentActivity() {
                 // [FIX-ZCODE] Wave 9: splash constellation (ported from YumaPlayer). The
                 // logo vector is sampled in the background; the splash overlay plays on top
                 // of the content and reveals it on burst.
-                LaunchedEffect(Unit) {
+                if (savedInstanceState == null) LaunchedEffect(Unit) {
                     val path =
                         withContext(Dispatchers.Default) {
                             moe.rukamori.archivetune.ui.component.splash.SplashVectorLoader
@@ -1005,7 +1026,7 @@ class MainActivity : ComponentActivity() {
                     moe.rukamori.archivetune.ui.component.splash.SplashSlots.vectorVersion++
                 }
                 val splashState = rememberAppSplashState(
-                    activity = this@MainActivity,
+                    allowSplash = savedInstanceState == null,
                     isReady = true,
                     disableAnimations = disableAnimations,
                     onReadyChange = {},
@@ -1179,15 +1200,42 @@ class MainActivity : ComponentActivity() {
                         currentRoute == Screens.Home.route &&
                             (allLocalItems.isNotEmpty() || allYtItems.isNotEmpty())
 
-                    fun getBottomNavPadding(): Dp =
-                        if (shouldShowNavigationBar && !useRail) {
-                            NavigationBarHeight
-                        } else {
-                            0.dp
-                        }
-
+                    val (navHeightMultiplier) = rememberPreference(NavigationBarHeightKey, NAVIGATION_BAR_HEIGHT_DEFAULT)
+                    val (frostedNavBar) = rememberPreference(NavigationBarFrostedBlurKey, false)
+                    val (tintedNavBar) = rememberPreference(NavigationBarTintFrostedBlurKey, false)
+                    val (bitChordNavBar) = rememberPreference(NavigationBarBitchordKey, false)
+                    val (glassEnabled) = rememberPreference(LiquidGlassEnabledKey, true)
+                    val (glassNavBarEnabled) = rememberPreference(LiquidGlassNavBarEnabledKey, false)
+                    val (sukisuNavBarEnabled) = rememberPreference(SukisuLiquidGlassNavBarKey, false)
+                    val (glowEnabled) = rememberPreference(NavigationBarGlassGlowKey, true)
+                    val (glowIntensity) = rememberPreference(
+                        NavigationBarGlassGlowIntensityKey,
+                        NAVIGATION_BAR_GLASS_GLOW_INTENSITY_DEFAULT,
+                    )
+                    val supportsGlass = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+                    val sukisuNavBar = supportsGlass && glassEnabled && sukisuNavBarEnabled
+                    val glassNavBar = supportsGlass && glassEnabled && glassNavBarEnabled
                     val floatingBarsBottomPadding = NavigationBarBottomPadding
-                    val navVisibleHeight = NavigationBarHeight
+                    val navVisibleHeight = if (glassNavBar || sukisuNavBar) {
+                        SukiSUBarHeight
+                    } else {
+                        NavigationBarHeight * navHeightMultiplier.coerceIn(0.8f, 1.4f)
+                    }
+                    val navBackdrop = if (
+                        !useRail && shouldShowNavigationBar && supportsGlass &&
+                        (glassNavBar || sukisuNavBar || frostedNavBar || bitChordNavBar)
+                    ) {
+                        rememberThrottledBackdrop(if (pureBlack) Color.Black else MaterialTheme.colorScheme.surface)
+                    } else {
+                        null
+                    }
+                    val frostedBackdrop = remember(navBackdrop) {
+                        navBackdrop?.let { NavigationBarBackdrop(it.graphicsLayer) }
+                    }
+                    val navGlow = if (glowEnabled) glowIntensity else 0f
+
+                    fun getBottomNavPadding(): Dp =
+                        if (shouldShowNavigationBar && !useRail) navVisibleHeight else 0.dp
 
                     // [FIX-ZCODE] Wave 7 (owner report): Navigation bar settings did nothing — the
                     // compact-behavior preference was never consumed by the UI. Ported from donor 18.0:
@@ -1206,23 +1254,32 @@ class MainActivity : ComponentActivity() {
                     val navBarScrollDensity = LocalDensity.current
                     val navBarHideScrollThresholdPx = with(navBarScrollDensity) { 14.dp.toPx() }
                     val navBarScrollHideConnection =
-                        remember(navBarHideScrollThresholdPx) {
+                        remember(navBarHideScrollThresholdPx, navigationBarCompactBehavior, currentRoute) {
                             object : NestedScrollConnection {
+                                private var dragDistance = 0f
+
                                 override fun onPostScroll(
                                     consumed: Offset,
                                     available: Offset,
                                     source: NestedScrollSource,
                                 ): Offset {
                                     if (source == NestedScrollSource.UserInput &&
-                                        navigationBarCompactBehavior == NavigationBarCompactBehavior.ADAPTIVE
+                                        navigationBarCompactBehavior == NavigationBarCompactBehavior.ADAPTIVE &&
+                                        consumed.y != 0f
                                     ) {
-                                        if (consumed.y < -navBarHideScrollThresholdPx) {
-                                            isBottomUiCompact = true
-                                        } else if (consumed.y > navBarHideScrollThresholdPx) {
-                                            isBottomUiCompact = false
+                                        if ((dragDistance < 0f) != (consumed.y < 0f)) dragDistance = 0f
+                                        dragDistance += consumed.y
+                                        if (kotlin.math.abs(dragDistance) >= navBarHideScrollThresholdPx) {
+                                            isBottomUiCompact = dragDistance < 0f
+                                            dragDistance = 0f
                                         }
                                     }
                                     return Offset.Zero
+                                }
+
+                                override suspend fun onPreFling(available: androidx.compose.ui.unit.Velocity): androidx.compose.ui.unit.Velocity {
+                                    dragDistance = 0f
+                                    return androidx.compose.ui.unit.Velocity.Zero
                                 }
                             }
                         }
@@ -2425,37 +2482,65 @@ class MainActivity : ComponentActivity() {
                                                         }
                                                     },
                                         ) {
-                                            FloatingNavigationToolbar(
-                                                items = navigationItems,
-                                                pureBlack = pureBlack,
-                                                modifier =
-                                                    Modifier
-                                                        .align(Alignment.BottomCenter)
-                                                        .padding(
-                                                            start = NavigationBarHorizontalPadding,
-                                                            end = NavigationBarHorizontalPadding,
-                                                            bottom = bottomInset + floatingBarsBottomPadding,
-                                                        ).height(navVisibleHeight),
-                                                isSelected = { screen ->
-                                                    navBackStackEntry?.destination?.hierarchy?.any { it.route == screen.route } ==
-                                                        true
-                                                },
-                                                onItemClick = { screen, isSelected ->
-                                                    val wasPlayerActive = playerBottomSheetState.isExpandedOrExpanding
-                                                    if (wasPlayerActive) {
-                                                        playerBottomSheetState.collapse(
-                                                            if (disableAnimations) snap() else spring(),
-                                                        )
-                                                    }
-                                                    if (!wasPlayerActive || !isSelected) {
-                                                        handlePrimaryNavigationClick(screen, isSelected)
-                                                    }
-                                                },
-                                                onSearchItemDoubleClick = {
-                                                    searchSource = SearchSource.ONLINE
-                                                    openSearch()
-                                                },
-                                            )
+                                            val toolbarModifier = Modifier
+                                                .align(Alignment.BottomCenter)
+                                                .padding(
+                                                    start = NavigationBarHorizontalPadding,
+                                                    end = NavigationBarHorizontalPadding,
+                                                    bottom = bottomInset + floatingBarsBottomPadding,
+                                                ).height(navVisibleHeight)
+                                            val isSelected: (Screens) -> Boolean = { screen ->
+                                                navBackStackEntry?.destination?.hierarchy?.any { it.route == screen.route } == true
+                                            }
+                                            val onToolbarClick: (Screens, Boolean) -> Unit = { screen, selected ->
+                                                val wasPlayerActive = playerBottomSheetState.isExpandedOrExpanding
+                                                if (wasPlayerActive) {
+                                                    playerBottomSheetState.collapse(if (disableAnimations) snap() else spring())
+                                                }
+                                                if (!wasPlayerActive || !selected) handlePrimaryNavigationClick(screen, selected)
+                                            }
+                                            when {
+                                                bitChordNavBar -> BitChordNavBar(
+                                                    barHeight = navVisibleHeight,
+                                                    selectedRoute = navigationItems.firstOrNull(isSelected)?.route,
+                                                    onRouteSelected = { route ->
+                                                        navigationItems.firstOrNull { it.route == route }?.let { screen ->
+                                                            onToolbarClick(screen, isSelected(screen))
+                                                        }
+                                                    },
+                                                    itemCount = navigationItems.size,
+                                                    itemRoute = { navigationItems[it].route },
+                                                    itemLabel = { stringResource(navigationItems[it].titleId) },
+                                                    itemIcon = { ImageVector.vectorResource(navigationItems[it].iconIdInactive) },
+                                                    modifier = toolbarModifier,
+                                                    frostedBackdrop = frostedBackdrop,
+                                                )
+                                                sukisuNavBar -> SukisuLiquidNavBar(
+                                                    items = navigationItems,
+                                                    modifier = toolbarModifier,
+                                                    backdrop = navBackdrop,
+                                                    glowStrength = navGlow,
+                                                    isSelected = isSelected,
+                                                    onItemClick = onToolbarClick,
+                                                )
+                                                else -> FloatingNavigationToolbar(
+                                                    items = navigationItems,
+                                                    pureBlack = pureBlack,
+                                                    modifier = toolbarModifier,
+                                                    frostedBlur = frostedNavBar,
+                                                    tintFrostedBlur = tintedNavBar,
+                                                    frostedBackdrop = frostedBackdrop,
+                                                    liquidGlass = glassNavBar,
+                                                    liquidGlassBackdrop = navBackdrop,
+                                                    glowStrength = if (glassNavBar) navGlow else 0f,
+                                                    isSelected = isSelected,
+                                                    onItemClick = onToolbarClick,
+                                                    onSearchItemDoubleClick = {
+                                                        searchSource = SearchSource.ONLINE
+                                                        openSearch()
+                                                    },
+                                                )
+                                            }
                                         }
 
                                         // [FIX-ZCODE] Wave 7: compact circle row shown while the navbar is collapsed
@@ -2514,8 +2599,8 @@ class MainActivity : ComponentActivity() {
                                                                 false,
                                                             )
                                                         },
-                                                        backdrop = null,
-                                                        glowStrength = 0f,
+                                                        backdrop = navBackdrop?.takeIf { glassNavBar || sukisuNavBar },
+                                                        glowStrength = if (glassNavBar || sukisuNavBar) navGlow else 0f,
                                                         modifier = Modifier.align(Alignment.CenterStart),
                                                         tint = MaterialTheme.colorScheme.primary,
                                                     )
@@ -2537,8 +2622,8 @@ class MainActivity : ComponentActivity() {
                                                                     )
                                                                 }
                                                             },
-                                                            backdrop = null,
-                                                            glowStrength = 0f,
+                                                            backdrop = navBackdrop?.takeIf { glassNavBar || sukisuNavBar },
+                                                            glowStrength = if (glassNavBar || sukisuNavBar) navGlow else 0f,
                                                             modifier = Modifier.align(Alignment.CenterEnd),
                                                         )
                                                     }
@@ -2807,6 +2892,14 @@ class MainActivity : ComponentActivity() {
                                                 topAppBarScrollBehavior.nestedScrollConnection,
                                             ).nestedScroll(
                                                 navBarScrollHideConnection,
+                                            ).then(
+                                                if (navBackdrop != null) {
+                                                    Modifier.glassSource(navBackdrop).onGloballyPositioned { coordinates ->
+                                                        frostedBackdrop?.contentOffsetInRoot = coordinates.positionInRoot()
+                                                    }
+                                                } else {
+                                                    Modifier
+                                                },
                                             ),
                                 ) {
                                     navigationBuilder(
@@ -2919,7 +3012,7 @@ class MainActivity : ComponentActivity() {
 
                     // [FIX-ZCODE] Wave 9: splash constellation overlay on top of the
                     // content (content starts at alpha 0 and is revealed on burst).
-                    moe.rukamori.archivetune.ui.component.splash.SplashOverlay(
+                    if (splashState.splashEnabled && !splashState.splashDone) moe.rukamori.archivetune.ui.component.splash.SplashOverlay(
                         isDark = useDarkTheme,
                         onBurstStart = splashState.onBurstStart,
                         onDismiss = splashState.onSplashDismiss,

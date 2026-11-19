@@ -429,8 +429,10 @@ object DownloadSourceConfig {
 }
 
 val AiContentFilterEnabledKey = booleanPreferencesKey("aiContentFilterEnabled")
-val AiContentFilterIncludeModerateKey = booleanPreferencesKey("aiContentFilterIncludeModerate")
-val AiContentFilterLastUpdatedKey = longPreferencesKey("aiContentFilterLastUpdated")
+val AiMusicAuthorsKey = stringSetPreferencesKey("aiMusicAuthors")
+val YouTubeLikesIncludeVideosKey = booleanPreferencesKey("youtubeLikesIncludeVideos")
+val YouTubeLikesIncludePodcastsKey = booleanPreferencesKey("youtubeLikesIncludePodcasts")
+val ShowCastInPlayerMenuKey = booleanPreferencesKey("showCastInPlayerMenu")
 val AiMixLastGeneratedAtKey = longPreferencesKey("aiMixLastGeneratedAt")
 val ProxyEnabledKey = booleanPreferencesKey("proxyEnabled")
 val ProxyHostKey = stringPreferencesKey("proxyHost")
@@ -767,8 +769,13 @@ enum class QuickPicksDisplayMode {
     CARD,
     LIST,
     GRID,
+    COVER_STRIP,
+    MOSAIC,
 }
 
+enum class HomeFeedStyle { STANDARD, COMPACT, GALLERY }
+
+val HomeFeedStyleKey = stringPreferencesKey("homeFeedStyle")
 val QuickPicksDisplayModeKey = stringPreferencesKey("quickPicksDisplayMode")
 
 enum class SongFilter {

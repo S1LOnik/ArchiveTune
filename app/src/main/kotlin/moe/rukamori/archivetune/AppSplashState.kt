@@ -1,6 +1,5 @@
 package moe.rukamori.archivetune
 
-import androidx.activity.ComponentActivity
 import androidx.compose.animation.core.EaseOut
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -11,9 +10,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import moe.rukamori.archivetune.constants.SplashOverlayEnabledKey
 import moe.rukamori.archivetune.ui.component.splash.SplashConfig
@@ -37,12 +34,13 @@ data class AppSplashState(
 
 @Composable
 fun rememberAppSplashState(
-    activity: ComponentActivity,
+    allowSplash: Boolean,
     isReady: Boolean,
     disableAnimations: Boolean,
     onReadyChange: (Boolean) -> Unit,
 ): AppSplashState {
-    val splashEnabled by rememberPreference(SplashOverlayEnabledKey, defaultValue = true)
+    val splashPreference by rememberPreference(SplashOverlayEnabledKey, defaultValue = true)
+    val splashEnabled = allowSplash && splashPreference && !disableAnimations
     LaunchedEffect(Unit) {
         val isEnabled = snapshotFlow { splashEnabled }.first()
         if (isEnabled) {
@@ -55,8 +53,9 @@ fun rememberAppSplashState(
     var coldSplash by remember(isReady) { mutableStateOf(splashEnabled) }
     var contentVisible by remember(isReady) { mutableStateOf(!coldSplash || disableAnimations) }
     var splashDone by remember(isReady) { mutableStateOf(!splashEnabled || disableAnimations) }
-    LaunchedEffect(contentVisible) {
-        if (contentVisible && (!splashEnabled || disableAnimations)) {
+    LaunchedEffect(splashEnabled) {
+        if (!splashEnabled) {
+            contentVisible = true
             splashDone = true
         }
     }

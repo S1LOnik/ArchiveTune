@@ -13,6 +13,20 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.foundation.layout.height
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.Velocity
+import moe.rukamori.archivetune.LocalAnimationsDisabled
+import moe.rukamori.archivetune.R
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -29,6 +43,7 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -276,12 +291,48 @@ fun BottomSheetMenu(
     val density = LocalDensity.current
     val configuration = LocalConfiguration.current
 
-    val maxPopupHeight =
-        configuration.screenHeightDp.dp * if (immersive) {
-            0.72f
-        } else {
-            0.40f
+    var expanded by remember(state.isVisible, immersive) { mutableStateOf(false) }
+    var handleDrag by remember(state.isVisible) { mutableFloatStateOf(0f) }
+    val threshold = with(density) { 32.dp.toPx() }
+    val gestureConnection = remember(state, threshold, state.isVisible) {
+        object : NestedScrollConnection {
+            private var dragDistance = 0f
+
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                if (source != NestedScrollSource.UserInput || expanded || available.y >= 0f) return Offset.Zero
+                dragDistance = (dragDistance + available.y).coerceAtMost(0f)
+                if (dragDistance < -threshold) {
+                    expanded = true
+                    dragDistance = 0f
+                }
+                return Offset(0f, available.y)
+            }
+
+            override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+                if (source != NestedScrollSource.UserInput || available.y <= 0f) return Offset.Zero
+                dragDistance = (dragDistance + available.y).coerceAtLeast(0f)
+                if (dragDistance > threshold) {
+                    state.dismiss()
+                    dragDistance = 0f
+                }
+                return Offset(0f, available.y)
+            }
+
+            override suspend fun onPreFling(available: Velocity): Velocity {
+                dragDistance = 0f
+                return Velocity.Zero
+            }
         }
+    }
+    val maxPopupHeight by animateDpAsState(
+        targetValue = configuration.screenHeightDp.dp * when {
+            immersive && expanded -> 1f
+            immersive -> 0.72f
+            else -> 0.40f
+        },
+        animationSpec = tween(if (LocalAnimationsDisabled.current) 0 else 200),
+        label = "menuHeight",
+    )
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
 
     Box(modifier = modifier.fillMaxSize()) {
@@ -334,6 +385,7 @@ fun BottomSheetMenu(
                         },
                     )
                     .clip(menuShape)
+                    .then(if (immersive) Modifier.nestedScroll(gestureConnection) else Modifier)
                     .clickable(
                         interactionSource = popupInteractionSource,
                         indication = null,
@@ -359,19 +411,34 @@ fun BottomSheetMenu(
                 }
             }
 
-            Column(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = if (immersive && expanded) Modifier.fillMaxWidth().statusBarsPadding() else Modifier.fillMaxWidth()) {
                 if (immersive) {
                     Box(
-                        modifier =
-                            Modifier
-                                .padding(top = 10.dp, bottom = 8.dp)
-                                .size(width = 40.dp, height = 4.dp)
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(36.dp)
+                            .draggable(
+                                state = rememberDraggableState { handleDrag += it },
+                                orientation = Orientation.Vertical,
+                                onDragStarted = { handleDrag = 0f },
+                                onDragStopped = {
+                                    if (handleDrag < -threshold) expanded = true
+                                    if (handleDrag > threshold) state.dismiss()
+                                    handleDrag = 0f
+                                },
+                            )
+                            .clickable(
+                                onClickLabel = stringResource(if (expanded) R.string.player_menu_collapse else R.string.player_menu_expand),
+                                onClick = { expanded = !expanded },
+                            ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Box(
+                            Modifier.size(width = 40.dp, height = 4.dp)
                                 .clip(RoundedCornerShape(percent = 50))
-                                .background(
-                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
-                                )
-                                .align(Alignment.CenterHorizontally),
-                    )
+                                .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)),
+                        )
+                    }
                 } else if (glassModifier == null) {
                     Box(
                         modifier =

@@ -265,7 +265,6 @@ class HomeViewModel
         private val presentationPreferences = observeHomePresentationPreferences()
         private val aiContentFilterSettings =
             observeAiContentFilter()
-                .map { (settings, _) -> settings }
                 .distinctUntilChanged()
 
         private val localContent =
@@ -431,7 +430,7 @@ class HomeViewModel
             )
         }
 
-        private suspend fun loadPersonalizedQuickPicks(): Boolean {
+        private suspend fun loadPersonalizedQuickPicks(aiContentFilterPolicy: Set<String>): Boolean {
             if (quickPicksMode.first() != QuickPicks.QUICK_PICKS) return false
             val excludedSongIds = remoteQuickPicks.value?.items.orEmpty().mapTo(mutableSetOf(), YTItem::id)
             val songs =
@@ -440,7 +439,8 @@ class HomeViewModel
                     reportException(throwable)
                     return false
                 }
-            if (songs.isEmpty()) return false
+            val visibleSongs = filterAiContent(songs, aiContentFilterPolicy)
+            if (visibleSongs.isEmpty()) return false
 
             remoteQuickPicks.value =
                 HomePage.Section(
@@ -448,7 +448,7 @@ class HomeViewModel
                     label = null,
                     thumbnail = null,
                     endpoint = null,
-                    items = songs,
+                    items = visibleSongs,
                     numItemsPerColumn = 4,
                 )
             return true
@@ -776,7 +776,7 @@ class HomeViewModel
                                 if (throwable is CancellationException) throw throwable
                                 reportException(throwable)
                                 loadError.value = R.string.error_unknown
-                                loadPersonalizedQuickPicks()
+                                loadPersonalizedQuickPicks(aiContentFilterPolicy)
                                 return@launch
                             }
                         val filteredPage =
@@ -806,7 +806,7 @@ class HomeViewModel
                             if (recommendations != null) {
                                 remoteQuickPicks.value = recommendations
                             } else {
-                                loadPersonalizedQuickPicks()
+                                loadPersonalizedQuickPicks(aiContentFilterPolicy)
                             }
                         }
                     }

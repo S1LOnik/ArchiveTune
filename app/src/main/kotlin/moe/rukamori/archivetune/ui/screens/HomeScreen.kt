@@ -34,6 +34,11 @@ import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
+import moe.rukamori.archivetune.constants.HomeFeedStyle
+import moe.rukamori.archivetune.constants.HomeFeedStyleKey
+import moe.rukamori.archivetune.utils.rememberEnumPreference
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -82,7 +87,7 @@ import moe.rukamori.archivetune.ui.utils.SnapLayoutInfoProvider
 import moe.rukamori.archivetune.viewmodels.HomeViewModel
 
 private val HomeFeedMaxWidth = 1_200.dp
-private val HomeSectionSpacing = 18.dp
+internal val LocalHomeFeedStyle = staticCompositionLocalOf { HomeFeedStyle.STANDARD }
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -211,19 +216,22 @@ fun HomeScreen(
             }
 
             is HomeScreenState.Success -> {
-                HomeContent(
-                    uiState = state.uiState,
-                    mediaMetadata = mediaMetadata,
-                    isPlaying = isPlaying,
-                    navController = navController,
-                    playerConnection = playerConnection,
-                    menuState = menuState,
-                    haptic = haptic,
-                    scope = scope,
-                    lazyListState = lazyListState,
-                    forgottenFavoritesGridState = forgottenFavoritesGridState,
-                    onAction = viewModel::onAction,
-                )
+                val (homeStyle) = rememberEnumPreference(HomeFeedStyleKey, HomeFeedStyle.STANDARD)
+                CompositionLocalProvider(LocalHomeFeedStyle provides homeStyle) {
+                    HomeContent(
+                        uiState = state.uiState,
+                        mediaMetadata = mediaMetadata,
+                        isPlaying = isPlaying,
+                        navController = navController,
+                        playerConnection = playerConnection,
+                        menuState = menuState,
+                        haptic = haptic,
+                        scope = scope,
+                        lazyListState = lazyListState,
+                        forgottenFavoritesGridState = forgottenFavoritesGridState,
+                        onAction = viewModel::onAction,
+                    )
+                }
             }
         }
     }
@@ -303,6 +311,11 @@ private fun HomeContent(
         uiState
             .takeIf { it.quickPicksMode == QuickPicks.QUICK_PICKS }
             ?.remoteQuickPicks
+    val feedWidth = when (LocalHomeFeedStyle.current) {
+        HomeFeedStyle.COMPACT -> 760.dp
+        HomeFeedStyle.GALLERY -> 1_400.dp
+        HomeFeedStyle.STANDARD -> HomeFeedMaxWidth
+    }
     val tonalStart = MaterialTheme.colorScheme.primaryContainer
     val tonalMiddle = MaterialTheme.colorScheme.secondaryContainer
     Box(modifier = modifier.fillMaxSize()) {
@@ -332,7 +345,7 @@ private fun HomeContent(
         ) {
             BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                 val forgottenItemWidthFactor = if (maxWidth * 0.475f >= 320.dp) 0.475f else 0.9f
-                val forgottenItemWidth = maxWidth.coerceAtMost(HomeFeedMaxWidth) * forgottenItemWidthFactor
+                val forgottenItemWidth = maxWidth.coerceAtMost(feedWidth) * forgottenItemWidthFactor
                 val forgottenSnapLayoutInfoProvider =
                     remember(forgottenFavoritesGridState, forgottenItemWidthFactor) {
                         SnapLayoutInfoProvider(
@@ -371,7 +384,7 @@ private fun HomeContent(
                     contentPadding = LocalPlayerAwareWindowInsets.current.asPaddingValues(),
                     modifier =
                         Modifier
-                            .widthIn(max = HomeFeedMaxWidth)
+                            .widthIn(max = feedWidth)
                             .fillMaxWidth()
                             .align(Alignment.TopCenter),
                 ) {
@@ -739,6 +752,12 @@ private fun androidx.compose.foundation.lazy.LazyListScope.sectionSpacer(key: St
         key = "home_section_spacer_$key",
         contentType = "section_spacer",
     ) {
-        Spacer(Modifier.height(HomeSectionSpacing))
+        Spacer(Modifier.height(
+            when (LocalHomeFeedStyle.current) {
+                HomeFeedStyle.COMPACT -> 6.dp
+                HomeFeedStyle.GALLERY -> 26.dp
+                HomeFeedStyle.STANDARD -> 18.dp
+            },
+        ))
     }
 }

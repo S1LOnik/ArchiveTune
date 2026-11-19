@@ -11,6 +11,7 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -318,26 +319,24 @@ fun LibraryMixScreen(
                     }
                 }
 
-                if (supportArchiveTuneAvailable) {
-                    item(key = "free_internet_meme") {
-                        Column(
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp)
-                                .clip(RoundedCornerShape(20.dp))
-                                .background(MaterialTheme.colorScheme.surfaceContainer),
-                        ) {
-                            androidx.compose.foundation.Image(
-                                painter = painterResource(R.drawable.free_internet_meme),
-                                contentDescription = null,
-                                alignment = Alignment.TopCenter,
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxWidth().height(120.dp),
-                            )
-                            Text(
-                                text = stringResource(R.string.free_internet_meme_caption),
-                                style = MaterialTheme.typography.titleSmall,
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                            )
-                        }
+                item(key = "free_internet_meme") {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp)
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(MaterialTheme.colorScheme.surfaceContainer),
+                    ) {
+                        Image(
+                            painter = painterResource(R.drawable.free_internet_meme),
+                            contentDescription = null,
+                            alignment = Alignment.TopCenter,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxWidth().height(120.dp),
+                        )
+                        Text(
+                            text = stringResource(R.string.free_internet_meme_caption),
+                            style = MaterialTheme.typography.titleSmall,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                        )
                     }
                 }
 

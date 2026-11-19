@@ -62,9 +62,14 @@ import moe.rukamori.archivetune.cast.CastScreenState
 import moe.rukamori.archivetune.cast.CastUiState
 import moe.rukamori.archivetune.cast.CastViewModel
 import moe.rukamori.archivetune.ui.component.NewAction
+import moe.rukamori.archivetune.constants.ShowCastInPlayerMenuKey
+import moe.rukamori.archivetune.utils.rememberPreference
 
 @Composable
 fun rememberCastPlayerMenuAction(): NewAction? {
+    val (showCast) = rememberPreference(ShowCastInPlayerMenuKey, true)
+    if (!showCast) return null
+
     val context = LocalContext.current
     val viewModel: CastViewModel = viewModel()
     val routePickerViewModel: CastRoutePickerViewModel = viewModel()

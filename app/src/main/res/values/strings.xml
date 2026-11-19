@@ -2283,4 +2283,26 @@
     <string name="quick_picks_display_mode_grid">Cover grid</string>
     <string name="manage_playlist_visibility">Choose visible playlists</string>
     <string name="free_internet_meme_caption">We’re for a free internet. The pixels are free too.</string>
+    <string name="ai_music_filter_enable">Hide music from listed authors</string>
+    <string name="ai_music_filter_summary">Uses your list of artists on Home and in search.</string>
+    <string name="ai_music_authors">AI music authors</string>
+    <string name="ai_music_authors_count">Authors in your list: %1$d</string>
+    <string name="ai_music_authors_help">Add one exact artist name, channel ID, or YouTube channel link per line.</string>
+    <string name="youtube_likes_filter">YouTube Music liked tracks</string>
+    <string name="youtube_likes_include_videos">Include music videos</string>
+    <string name="youtube_likes_include_podcasts">Include podcasts</string>
+    <string name="playlist_select_matches">Select all results</string>
+    <string name="playlist_clear_matches">Clear results selection</string>
+    <string name="playlist_hidden_locally">Hidden on this device</string>
+    <string name="playlist_hide_selected">Hide selected</string>
+    <string name="playlist_show_selected">Show selected</string>
+    <string name="show_cast_in_player_menu">Show Cast in the player menu</string>
+    <string name="quick_picks_display_mode_cover_strip">Cover strip</string>
+    <string name="quick_picks_display_mode_mosaic">Mosaic</string>
+    <string name="player_menu_expand">Expand player menu</string>
+    <string name="player_menu_collapse">Collapse player menu</string>
+    <string name="home_feed_style">Home layout</string>
+    <string name="home_feed_style_standard">Standard</string>
+    <string name="home_feed_style_compact">Compact</string>
+    <string name="home_feed_style_gallery">Gallery</string>
 </resources>

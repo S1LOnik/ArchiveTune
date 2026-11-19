@@ -106,6 +106,8 @@ import moe.rukamori.archivetune.constants.PlayerDesignStyleKey
 import moe.rukamori.archivetune.constants.RemovedPlayerDesignStyles
 import moe.rukamori.archivetune.constants.PlaylistTagOrderKey
 import moe.rukamori.archivetune.constants.PureBlackKey
+import moe.rukamori.archivetune.constants.HomeFeedStyle
+import moe.rukamori.archivetune.constants.HomeFeedStyleKey
 import moe.rukamori.archivetune.constants.QuickPicksDisplayMode
 import moe.rukamori.archivetune.constants.QuickPicksDisplayModeKey
 import moe.rukamori.archivetune.constants.RandomThemeOnStartupKey
@@ -316,6 +318,7 @@ fun AppearanceSettings(navController: NavController) {
                 .toPlaylistTagOrder(availablePlaylistTags.map(PlaylistTagUiModel::id))
                 .mapNotNull { tagId -> tagsById[tagId] }
         }
+    val (homeFeedStyle, setHomeFeedStyle) = rememberEnumPreference(HomeFeedStyleKey, HomeFeedStyle.STANDARD)
     val (quickPicksDisplayMode, onQuickPicksDisplayModeChange) =
         rememberEnumPreference(
             QuickPicksDisplayModeKey,
@@ -1084,6 +1087,21 @@ fun AppearanceSettings(navController: NavController) {
             PreferenceGroup(title = stringResource(R.string.misc)) {
                 item {
                     EnumListPreference(
+                        title = { Text(stringResource(R.string.home_feed_style)) },
+                        icon = { Icon(painterResource(R.drawable.home_outlined), null) },
+                        selectedValue = homeFeedStyle,
+                        onValueSelected = setHomeFeedStyle,
+                        valueText = {
+                            when (it) {
+                                HomeFeedStyle.STANDARD -> stringResource(R.string.home_feed_style_standard)
+                                HomeFeedStyle.COMPACT -> stringResource(R.string.home_feed_style_compact)
+                                HomeFeedStyle.GALLERY -> stringResource(R.string.home_feed_style_gallery)
+                            }
+                        },
+                    )
+                }
+                item {
+                    EnumListPreference(
                         title = { Text(stringResource(R.string.quick_picks_display_mode)) },
                         icon = { Icon(painterResource(R.drawable.grid_view), null) },
                         selectedValue = quickPicksDisplayMode,
@@ -1093,6 +1111,8 @@ fun AppearanceSettings(navController: NavController) {
                                 QuickPicksDisplayMode.CARD -> stringResource(R.string.quick_picks_display_mode_card)
                                 QuickPicksDisplayMode.LIST -> stringResource(R.string.quick_picks_display_mode_list)
                                 QuickPicksDisplayMode.GRID -> stringResource(R.string.quick_picks_display_mode_grid)
+                                QuickPicksDisplayMode.COVER_STRIP -> stringResource(R.string.quick_picks_display_mode_cover_strip)
+                                QuickPicksDisplayMode.MOSAIC -> stringResource(R.string.quick_picks_display_mode_mosaic)
                             }
                         },
                     )

@@ -119,6 +119,7 @@ import moe.rukamori.archivetune.spotify.models.SpotifyTrack
 import moe.rukamori.archivetune.R
 import moe.rukamori.archivetune.constants.ListItemHeight
 import moe.rukamori.archivetune.constants.ListThumbnailSize
+import moe.rukamori.archivetune.constants.HomeFeedStyle
 import moe.rukamori.archivetune.constants.QuickPicksDisplayMode
 import moe.rukamori.archivetune.constants.ShowMixSongTitlesKey
 import moe.rukamori.archivetune.constants.ThumbnailCornerRadius
@@ -237,23 +238,33 @@ fun HomeSectionHeader(
     onClick: (() -> Unit)? = null,
     actionContent: (@Composable () -> Unit)? = null,
 ) {
+    val feedStyle = LocalHomeFeedStyle.current
+    val compact = feedStyle == HomeFeedStyle.COMPACT
+    val gallery = feedStyle == HomeFeedStyle.GALLERY
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         modifier =
             modifier
                 .fillMaxWidth()
-                .heightIn(min = 64.dp)
+                .heightIn(min = if (compact) 44.dp else 64.dp)
                 .then(if (onClick != null && actionContent == null) Modifier.clickable(onClick = onClick) else Modifier)
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+                .padding(horizontal = 16.dp, vertical = if (compact) 4.dp else 8.dp),
     ) {
+        if (gallery) {
+            Box(
+                Modifier.size(width = 4.dp, height = 24.dp)
+                    .clip(MaterialTheme.shapes.small)
+                    .background(MaterialTheme.colorScheme.primary),
+            )
+        }
         thumbnail?.invoke()
         Column(
             verticalArrangement = Arrangement.Center,
             modifier =
                 Modifier
                     .weight(1f)
-                    .heightIn(min = 48.dp)
+                    .heightIn(min = if (compact) 36.dp else 48.dp)
                     .then(if (onClick != null && actionContent != null) Modifier.clickable(onClick = onClick) else Modifier),
         ) {
             label?.let {
@@ -267,7 +278,11 @@ fun HomeSectionHeader(
             }
             Text(
                 text = title,
-                style = MaterialTheme.typography.titleLargeEmphasized,
+                style = when (feedStyle) {
+                    HomeFeedStyle.COMPACT -> MaterialTheme.typography.titleMedium
+                    HomeFeedStyle.GALLERY -> MaterialTheme.typography.headlineSmall
+                    HomeFeedStyle.STANDARD -> MaterialTheme.typography.titleLargeEmphasized
+                },
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
@@ -306,10 +321,19 @@ fun QuickPicksSection(
     val distinctQuickPicks = remember(quickPicks) { quickPicks.distinctBy { it.id } }
 
     when (displayMode) {
-        QuickPicksDisplayMode.CARD, QuickPicksDisplayMode.GRID -> {
+        QuickPicksDisplayMode.CARD, QuickPicksDisplayMode.GRID,
+        QuickPicksDisplayMode.COVER_STRIP, QuickPicksDisplayMode.MOSAIC -> {
             BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
-                val grid = displayMode == QuickPicksDisplayMode.GRID
+                val rows = when (displayMode) {
+                    QuickPicksDisplayMode.COVER_STRIP -> 1
+                    QuickPicksDisplayMode.GRID -> 2
+                    QuickPicksDisplayMode.MOSAIC -> 3
+                    else -> 0
+                }
+                val grid = rows > 0
                 val heroHeight = when {
+                    rows == 1 -> ((maxWidth - 42.dp) / 2).coerceIn(110.dp, 188.dp)
+                    rows == 3 -> ((maxWidth - 62.dp) / 4).coerceIn(76.dp, 124.dp)
                     grid -> ((maxWidth - 52.dp) / 3).coerceIn(80.dp, 160.dp)
                     maxWidth >= 840.dp -> 380.dp
                     maxWidth >= 600.dp -> 356.dp
@@ -322,7 +346,7 @@ fun QuickPicksSection(
 
                 QuickPickArtworkLayout(
                     count = distinctQuickPicks.size,
-                    grid = grid,
+                    rows = rows,
                     width = heroMaxWidth,
                     height = heroHeight,
                 ) { index, artworkModifier ->
@@ -554,10 +578,19 @@ fun RemoteQuickPicksSection(
         }
 
     when (displayMode) {
-        QuickPicksDisplayMode.CARD, QuickPicksDisplayMode.GRID -> {
+        QuickPicksDisplayMode.CARD, QuickPicksDisplayMode.GRID,
+        QuickPicksDisplayMode.COVER_STRIP, QuickPicksDisplayMode.MOSAIC -> {
             BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
-                val grid = displayMode == QuickPicksDisplayMode.GRID
+                val rows = when (displayMode) {
+                    QuickPicksDisplayMode.COVER_STRIP -> 1
+                    QuickPicksDisplayMode.GRID -> 2
+                    QuickPicksDisplayMode.MOSAIC -> 3
+                    else -> 0
+                }
+                val grid = rows > 0
                 val heroHeight = when {
+                    rows == 1 -> ((maxWidth - 42.dp) / 2).coerceIn(110.dp, 188.dp)
+                    rows == 3 -> ((maxWidth - 62.dp) / 4).coerceIn(76.dp, 124.dp)
                     grid -> ((maxWidth - 52.dp) / 3).coerceIn(80.dp, 160.dp)
                     maxWidth >= 840.dp -> 380.dp
                     maxWidth >= 600.dp -> 356.dp
@@ -570,7 +603,7 @@ fun RemoteQuickPicksSection(
 
                 QuickPickArtworkLayout(
                     count = songs.size,
-                    grid = grid,
+                    rows = rows,
                     width = heroMaxWidth,
                     height = heroHeight,
                 ) { index, artworkModifier ->
@@ -778,17 +811,17 @@ fun RemoteQuickPicksSection(
 @Composable
 private fun QuickPickArtworkLayout(
     count: Int,
-    grid: Boolean,
+    rows: Int,
     width: androidx.compose.ui.unit.Dp,
     height: androidx.compose.ui.unit.Dp,
     content: @Composable (Int, Modifier) -> Unit,
 ) {
-    val shape = if (grid) MaterialTheme.shapes.large else MaterialTheme.shapes.extraLarge
+    val shape = if (rows > 0) MaterialTheme.shapes.large else MaterialTheme.shapes.extraLarge
     val border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.72f))
-    if (grid) {
+    if (rows > 0) {
         LazyHorizontalGrid(
-            rows = GridCells.Fixed(2),
-            modifier = Modifier.fillMaxWidth().height(height * 2 + 10.dp),
+            rows = GridCells.Fixed(rows),
+            modifier = Modifier.fillMaxWidth().height(height * rows + 10.dp * (rows - 1)),
             contentPadding = PaddingValues(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
