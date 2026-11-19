@@ -86,9 +86,11 @@ import com.kyant.backdrop.highlight.Highlight
 import com.kyant.backdrop.highlight.HighlightStyle
 import com.kyant.backdrop.shadow.Shadow as KyantShadow
 import kotlinx.coroutines.launch
+import moe.rukamori.archivetune.LocalAnimationsDisabled
 import moe.rukamori.archivetune.constants.DisableAnimationsKey
 import moe.rukamori.archivetune.constants.FloatingNavigationBarMaxWidth
 import moe.rukamori.archivetune.constants.HideNavigationBarLabelsKey
+import moe.rukamori.archivetune.ui.motion.LocalMotionConfig
 import moe.rukamori.archivetune.ui.component.InnerShadow
 import moe.rukamori.archivetune.ui.component.LiquidGlassDragAnimation
 import moe.rukamori.archivetune.ui.component.innerShadow
@@ -117,7 +119,9 @@ fun SukisuLiquidNavBar(
     if (items.isEmpty()) return
 
     val (hideLabels) = rememberPreference(HideNavigationBarLabelsKey, defaultValue = false)
-    val (disableAnimations) = rememberPreference(DisableAnimationsKey, defaultValue = false)
+    val motionConfig = LocalMotionConfig.current
+    val (disableAnimationsPref) = rememberPreference(DisableAnimationsKey, defaultValue = false)
+    val disableAnimations = LocalAnimationsDisabled.current || disableAnimationsPref || !motionConfig.animationsEnabled
 
     val isDark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
     val pillShape = remember { CircleShape }
@@ -209,10 +213,9 @@ fun SukisuLiquidNavBar(
 
     fun activateTab(index: Int) {
         if (index !in 0 until tabsCount) return
-        if (currentIndex != index) {
-            currentIndex = index
-            onItemClickUpdated.value(itemsUpdated.value[index], false)
-        }
+        val wasSelected = currentIndex == index
+        currentIndex = index
+        onItemClickUpdated.value(itemsUpdated.value[index], wasSelected)
         dampedDragAnimation.animateToValue(index.toFloat())
     }
 
@@ -280,7 +283,7 @@ fun SukisuLiquidNavBar(
             { lerp(1f, 1.2f, dampedDragAnimation.pressProgress) }
         }
 
-    val glassIsNight = isSystemInDarkTheme()
+    val glassIsNight = isDark
     val glassSelectedColor =
         if (glassIsNight) Color.White else MaterialTheme.colorScheme.onSurface
     val glassUnselectedColor =
@@ -478,18 +481,14 @@ fun SukisuLiquidNavBar(
                     items.forEachIndexed { index, screen ->
                         val selected = isSelected(screen)
                         val iconScale = remember(screen) { Animatable(1f) }
-                        LaunchedEffect(selected, disableAnimations) {
-                            if (disableAnimations) {
+                        LaunchedEffect(selected, disableAnimations, motionConfig) {
+                            if (disableAnimations || !motionConfig.pressFeedbackEnabled) {
                                 iconScale.snapTo(1f)
                             } else if (selected) {
-                                iconScale.snapTo(0.8f)
+                                iconScale.snapTo(0.84f)
                                 iconScale.animateTo(
                                     targetValue = 1f,
-                                    animationSpec =
-                                        spring(
-                                            dampingRatio = Spring.DampingRatioMediumBouncy,
-                                            stiffness = Spring.StiffnessMediumLow,
-                                        ),
+                                    animationSpec = motionConfig.pressSpring(),
                                 )
                             } else {
                                 iconScale.snapTo(1f)
@@ -512,7 +511,7 @@ fun SukisuLiquidNavBar(
                             icon = {
                                 Crossfade(
                                     targetState = selected,
-                                    animationSpec = tween(durationMillis = 150),
+                                    animationSpec = tween(durationMillis = if (disableAnimations) 0 else 150),
                                     label = "sukisuNavItemIcon",
                                 ) { isSelected ->
                                     Icon(

@@ -16,6 +16,9 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.EaseOut
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import moe.rukamori.archivetune.LocalAnimationsDisabled
+import moe.rukamori.archivetune.ui.motion.LocalMotionConfig
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -233,7 +236,9 @@ fun FloatingNavigationToolbar(
         else -> MaterialTheme.colorScheme.surfaceContainer.copy(alpha = effectiveAlpha)
     }
     val motionScheme = MaterialTheme.motionScheme
-    val (disableAnimations) = rememberPreference(DisableAnimationsKey, defaultValue = false)
+    val motionConfig = LocalMotionConfig.current
+    val (disableAnimationsPref) = rememberPreference(DisableAnimationsKey, defaultValue = false)
+    val disableAnimations = LocalAnimationsDisabled.current || disableAnimationsPref || !motionConfig.animationsEnabled
     val (hideNavigationLabels) = rememberPreference(HideNavigationBarLabelsKey, defaultValue = false)
     val density = LocalDensity.current
 
@@ -249,7 +254,7 @@ fun FloatingNavigationToolbar(
     val itemColors =
         when {
             canLiquidGlass -> {
-                val glassIsNight = isSystemInDarkTheme()
+                val glassIsNight = isDarkScheme
                 val glassSelectedColor =
                     if (glassIsNight) Color.White else MaterialTheme.colorScheme.onSurface
                 val glassUnselectedColor =
@@ -420,12 +425,10 @@ fun FloatingNavigationToolbar(
                 indicatorX.snapTo(targetX)
                 indicatorPlaced = true
             } else {
-                withContext(FullMotionDurationScale) {
-                    indicatorX.animateTo(
-                        targetValue = targetX,
-                        animationSpec = spring(dampingRatio = 0.72f, stiffness = Spring.StiffnessMediumLow),
-                    )
-                }
+                indicatorX.animateTo(
+                    targetValue = targetX,
+                    animationSpec = motionConfig.navSpring(),
+                )
             }
         }
     }
@@ -609,22 +612,15 @@ fun FloatingNavigationToolbar(
                             val selected = isSelected(screen)
 
                             val iconScale = remember(screen) { Animatable(1f) }
-                            LaunchedEffect(selected, disableAnimations) {
-                                if (disableAnimations) {
+                            LaunchedEffect(selected, disableAnimations, motionConfig) {
+                                if (disableAnimations || !motionConfig.pressFeedbackEnabled) {
                                     iconScale.snapTo(1f)
                                 } else if (selected) {
-                                    iconScale.snapTo(0.8f)
-
-                                    withContext(FullMotionDurationScale) {
-                                        iconScale.animateTo(
-                                            targetValue = 1f,
-                                            animationSpec =
-                                                spring(
-                                                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                                                    stiffness = Spring.StiffnessMediumLow,
-                                                ),
-                                        )
-                                    }
+                                    iconScale.snapTo(0.84f)
+                                    iconScale.animateTo(
+                                        targetValue = 1f,
+                                        animationSpec = motionConfig.pressSpring(),
+                                    )
                                 } else {
                                     iconScale.snapTo(1f)
                                 }
@@ -694,7 +690,7 @@ fun FloatingNavigationToolbar(
                                     ) {
                                         Crossfade(
                                             targetState = selected,
-                                            animationSpec = motionScheme.fastEffectsSpec(),
+                                            animationSpec = if (disableAnimations) tween(0) else motionScheme.fastEffectsSpec(),
                                             label = "navigationItemIcon",
                                         ) { isSelected ->
                                             Icon(
@@ -718,7 +714,7 @@ fun FloatingNavigationToolbar(
                                     {
                                         if (canLiquidGlass) {
                                             val nightGlassLabelStyle =
-                                                if (isSystemInDarkTheme()) {
+                                                if (isDarkScheme) {
                                                     LocalTextStyle.current.copy(
                                                         shadow =
                                                             Shadow(
@@ -761,7 +757,7 @@ fun FloatingNavigationToolbar(
             val dragAnim = dampedDragAnimation
             if (pillWidth > 0.dp && pillHeight > 0.dp && dragAnim != null && tabWidthPx > 0f) {
                 val pillShape = RoundedCornerShape(percent = 50)
-                val isDark = isSystemInDarkTheme()
+                val isDark = isDarkScheme
 
                 val pillFallbackColor = MaterialTheme.colorScheme.surfaceContainerHigh
                 Box(

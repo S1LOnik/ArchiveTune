@@ -37,6 +37,9 @@ import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.util.fastCoerceIn
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.kyant.backdrop.RuntimeShader
 import com.kyant.backdrop.asComposeShader
 import com.kyant.backdrop.isRuntimeShaderSupported
@@ -58,11 +61,12 @@ private class SukisuDeviceTilt internal constructor(
 @Composable
 private fun rememberSukisuDeviceTilt(): State<SukisuDeviceTilt> {
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val tilt =
         remember {
             mutableStateOf(SukisuDeviceTilt(gravityX = 0f, gravityY = -1f))
         }
-    DisposableEffect(context) {
+    DisposableEffect(context, lifecycleOwner) {
         val sensorManager =
             context.getSystemService(Context.SENSOR_SERVICE) as? SensorManager
         val sensor =
@@ -71,6 +75,7 @@ private fun rememberSukisuDeviceTilt(): State<SukisuDeviceTilt> {
         if (sensorManager == null || sensor == null) {
             onDispose { }
         } else {
+            var registered = false
             val listener =
                 object : SensorEventListener {
                     override fun onSensorChanged(event: SensorEvent) {
@@ -87,8 +92,31 @@ private fun rememberSukisuDeviceTilt(): State<SukisuDeviceTilt> {
                         accuracy: Int,
                     ) {}
                 }
-            sensorManager.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_UI)
-            onDispose { sensorManager.unregisterListener(listener) }
+            fun updateRegistration(started: Boolean) {
+                if (started && !registered) {
+                    registered = sensorManager.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_UI)
+                } else if (!started && registered) {
+                    sensorManager.unregisterListener(listener)
+                    registered = false
+                }
+            }
+            updateRegistration(lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED))
+            val observer = LifecycleEventObserver { _, event ->
+                when (event) {
+                    Lifecycle.Event.ON_START,
+                    Lifecycle.Event.ON_RESUME,
+                    -> updateRegistration(true)
+                    Lifecycle.Event.ON_STOP,
+                    Lifecycle.Event.ON_DESTROY,
+                    -> updateRegistration(false)
+                    else -> Unit
+                }
+            }
+            lifecycleOwner.lifecycle.addObserver(observer)
+            onDispose {
+                lifecycleOwner.lifecycle.removeObserver(observer)
+                updateRegistration(false)
+            }
         }
     }
     return tilt

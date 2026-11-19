@@ -312,8 +312,8 @@ private fun HomeContent(
             .takeIf { it.quickPicksMode == QuickPicks.QUICK_PICKS }
             ?.remoteQuickPicks
     val feedWidth = when (LocalHomeFeedStyle.current) {
-        HomeFeedStyle.COMPACT -> 760.dp
-        HomeFeedStyle.GALLERY -> 1_400.dp
+        HomeFeedStyle.COMPACT, HomeFeedStyle.NOW -> 760.dp
+        HomeFeedStyle.GALLERY, HomeFeedStyle.COVERS -> 1_400.dp
         HomeFeedStyle.STANDARD -> HomeFeedMaxWidth
     }
     val tonalStart = MaterialTheme.colorScheme.primaryContainer
@@ -754,8 +754,8 @@ private fun androidx.compose.foundation.lazy.LazyListScope.sectionSpacer(key: St
     ) {
         Spacer(Modifier.height(
             when (LocalHomeFeedStyle.current) {
-                HomeFeedStyle.COMPACT -> 6.dp
-                HomeFeedStyle.GALLERY -> 26.dp
+                HomeFeedStyle.COMPACT, HomeFeedStyle.NOW -> 6.dp
+                HomeFeedStyle.GALLERY, HomeFeedStyle.COVERS -> 26.dp
                 HomeFeedStyle.STANDARD -> 18.dp
             },
         ))

@@ -279,8 +279,8 @@ fun HomeSectionHeader(
             Text(
                 text = title,
                 style = when (feedStyle) {
-                    HomeFeedStyle.COMPACT -> MaterialTheme.typography.titleMedium
-                    HomeFeedStyle.GALLERY -> MaterialTheme.typography.headlineSmall
+                    HomeFeedStyle.COMPACT, HomeFeedStyle.NOW -> MaterialTheme.typography.titleMedium
+                    HomeFeedStyle.GALLERY, HomeFeedStyle.COVERS -> MaterialTheme.typography.headlineSmall
                     HomeFeedStyle.STANDARD -> MaterialTheme.typography.titleLargeEmphasized
                 },
                 fontWeight = FontWeight.SemiBold,

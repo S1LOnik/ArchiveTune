@@ -1096,6 +1096,8 @@ fun AppearanceSettings(navController: NavController) {
                                 HomeFeedStyle.STANDARD -> stringResource(R.string.home_feed_style_standard)
                                 HomeFeedStyle.COMPACT -> stringResource(R.string.home_feed_style_compact)
                                 HomeFeedStyle.GALLERY -> stringResource(R.string.home_feed_style_gallery)
+                                HomeFeedStyle.NOW -> stringResource(R.string.home_feed_style_compact)
+                                HomeFeedStyle.COVERS -> stringResource(R.string.home_feed_style_gallery)
                             }
                         },
                     )

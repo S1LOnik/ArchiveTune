@@ -17,6 +17,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.PredictiveBackHandler
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -28,6 +29,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import moe.rukamori.archivetune.constants.BackAnimationStyle
+import moe.rukamori.archivetune.ui.motion.LocalMotionConfig
 
 val LocalBackAnimationStyle = staticCompositionLocalOf { BackAnimationStyle.DEFAULT }
 
@@ -45,17 +47,24 @@ class PredictiveSheetBackState {
     val progress: Animatable<Float, AnimationVector1D> = Animatable(0f)
 
     var gestureActive by mutableStateOf(false)
+    var committed by mutableStateOf(false)
 }
 
 @Composable
 fun rememberPredictiveSheetBackState(): PredictiveSheetBackState {
     val state = remember { PredictiveSheetBackState() }
-    LaunchedEffect(state.gestureActive) {
+    val animationsEnabled = LocalMotionConfig.current.animationsEnabled
+    LaunchedEffect(state.gestureActive, state.committed, animationsEnabled) {
         if (!state.gestureActive && state.progress.value > 0f) {
-            state.progress.animateTo(
-                targetValue = 0f,
-                animationSpec = spring(dampingRatio = 0.85f, stiffness = 380f),
-            )
+            if (state.committed || !animationsEnabled) {
+                state.progress.snapTo(0f)
+                state.committed = false
+            } else {
+                state.progress.animateTo(
+                    targetValue = 0f,
+                    animationSpec = spring(dampingRatio = 0.85f, stiffness = 380f),
+                )
+            }
         }
     }
     return state
@@ -70,9 +79,11 @@ fun PredictiveStyleBackHandler(
     if (LocalBackAnimationStyle.current == BackAnimationStyle.PREDICTIVE) {
         val onBackUpdated = rememberUpdatedState(onBack)
         PredictiveBackHandler(enabled = enabled) { events ->
+            backState.committed = false
             backState.gestureActive = true
             try {
                 events.collect { event -> backState.progress.snapTo(event.progress) }
+                backState.committed = true
                 onBackUpdated.value()
             } finally {
                 backState.gestureActive = false

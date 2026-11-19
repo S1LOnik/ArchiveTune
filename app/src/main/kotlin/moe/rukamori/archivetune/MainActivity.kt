@@ -37,6 +37,31 @@ import moe.rukamori.archivetune.constants.NavigationBarBitchordKey
 import moe.rukamori.archivetune.constants.NAVIGATION_BAR_HEIGHT_DEFAULT
 import moe.rukamori.archivetune.constants.LiquidGlassNavBarEnabledKey
 import moe.rukamori.archivetune.constants.LiquidGlassEnabledKey
+import moe.rukamori.archivetune.constants.BackgroundMotionPolicy
+import moe.rukamori.archivetune.constants.HapticIntensity
+import moe.rukamori.archivetune.constants.HapticIntensityKey
+import moe.rukamori.archivetune.constants.MINI_PLAYER_BAR_HEIGHT_DP
+import moe.rukamori.archivetune.constants.MiniPlayerStyle
+import moe.rukamori.archivetune.constants.MiniPlayerStyleKey
+import moe.rukamori.archivetune.constants.MotionArtworkTransitionsKey
+import moe.rukamori.archivetune.constants.MotionDecorativeBackgroundKey
+import moe.rukamori.archivetune.constants.MotionPressFeedbackKey
+import moe.rukamori.archivetune.constants.MotionProfile
+import moe.rukamori.archivetune.constants.MotionProfileKey
+import moe.rukamori.archivetune.constants.MotionScreenTransitionsKey
+import moe.rukamori.archivetune.constants.PlayerBackgroundMotionPolicyKey
+import moe.rukamori.archivetune.ui.component.LocalBottomUiCompactFraction
+import moe.rukamori.archivetune.ui.component.LocalLiquidGlassBackdrop
+import moe.rukamori.archivetune.ui.component.LocalMenuGlassBackdrop
+import moe.rukamori.archivetune.ui.component.LocalNavigationBarBackdrop
+import moe.rukamori.archivetune.ui.component.PlayerBackController
+import moe.rukamori.archivetune.ui.motion.ArchiveTuneHapticKind
+import moe.rukamori.archivetune.ui.motion.LocalHapticIntensity
+import moe.rukamori.archivetune.ui.motion.LocalMotionConfig
+import moe.rukamori.archivetune.ui.motion.LocalPlayerBackgroundMotionPolicy
+import moe.rukamori.archivetune.ui.motion.MotionConfig
+import moe.rukamori.archivetune.ui.motion.performArchiveTuneHaptic
+import moe.rukamori.archivetune.ui.motion.rememberSystemAnimatorScale
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -88,6 +113,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.only
@@ -166,6 +193,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextRange
@@ -848,9 +876,41 @@ class MainActivity : ComponentActivity() {
             val customThemeColorValue by rememberPreference(CustomThemeColorKey, defaultValue = "default")
             val darkTheme by rememberEnumPreference(DarkModeKey, defaultValue = DarkMode.AUTO)
             val defaultDisableAnimations = remember(this@MainActivity) { applicationContext.isLowRamDevice() }
-            val disableAnimations by rememberPreference(
+            val disableAnimationsPref by rememberPreference(
                 DisableAnimationsKey,
                 defaultValue = defaultDisableAnimations,
+            )
+            val motionProfile by rememberEnumPreference(MotionProfileKey, MotionProfile.SYSTEM)
+            val motionScreenTransitions by rememberPreference(MotionScreenTransitionsKey, true)
+            val motionArtworkTransitions by rememberPreference(MotionArtworkTransitionsKey, true)
+            val motionPressFeedback by rememberPreference(MotionPressFeedbackKey, true)
+            val motionDecorativeBackground by rememberPreference(MotionDecorativeBackgroundKey, true)
+            val systemAnimatorScale = rememberSystemAnimatorScale()
+            val motionConfig =
+                remember(
+                    motionProfile,
+                    disableAnimationsPref,
+                    systemAnimatorScale,
+                    motionScreenTransitions,
+                    motionArtworkTransitions,
+                    motionPressFeedback,
+                    motionDecorativeBackground,
+                ) {
+                    MotionConfig(
+                        profile = motionProfile,
+                        legacyDisableAnimations = disableAnimationsPref,
+                        systemAnimatorScale = systemAnimatorScale,
+                        screenTransitionsChannel = motionScreenTransitions,
+                        artworkMotionChannel = motionArtworkTransitions,
+                        pressFeedbackChannel = motionPressFeedback,
+                        decorativeBackgroundChannel = motionDecorativeBackground,
+                    )
+                }
+            val disableAnimations = !motionConfig.animationsEnabled
+            val hapticIntensity by rememberEnumPreference(HapticIntensityKey, HapticIntensity.STANDARD)
+            val playerBackgroundMotionPolicy by rememberEnumPreference(
+                PlayerBackgroundMotionPolicyKey,
+                BackgroundMotionPolicy.RESPECT_POWER_SAVER,
             )
             val fontPreference by rememberEnumPreference(FontPreferenceKey, defaultValue = AppFontPreference.DEFAULT)
             val backAnimationStyle by rememberEnumPreference(
@@ -977,6 +1037,11 @@ class MainActivity : ComponentActivity() {
                 }
                 androidx.compose.runtime.CompositionLocalProvider(
                     androidx.compose.ui.platform.LocalDensity provides scaledDensity,
+                    LocalMotionConfig provides motionConfig,
+                    LocalAnimationsDisabled provides disableAnimations,
+                    moe.rukamori.archivetune.ui.component.LocalBackAnimationStyle provides backAnimationStyle,
+                    LocalHapticIntensity provides hapticIntensity,
+                    LocalPlayerBackgroundMotionPolicy provides playerBackgroundMotionPolicy,
                 ) {
                 val navController = rememberNavController()
                 val onboardingViewModel: OnboardingViewModel = hiltViewModel()
@@ -1291,10 +1356,7 @@ class MainActivity : ComponentActivity() {
                                 if (disableAnimations) {
                                     snap()
                                 } else {
-                                    spring(
-                                        dampingRatio = Spring.DampingRatioNoBouncy,
-                                        stiffness = 400f,
-                                    )
+                                    motionConfig.navSpring()
                                 },
                             label = "bottomUiCompactFraction",
                         )
@@ -1340,10 +1402,17 @@ class MainActivity : ComponentActivity() {
 
                     val bottomNavigationBarHeightState = animateDpAsState(
                         targetValue = if (shouldShowNavigationBar && !useRail && !isBottomUiCompact) navVisibleHeight else 0.dp,
-                        animationSpec = if (disableAnimations) snap() else NavigationBarAnimationSpec,
+                        animationSpec = if (disableAnimations) snap() else motionConfig.navSpring(),
                         label = "",
                     )
                     val bottomNavigationBarHeight by bottomNavigationBarHeightState
+                    val miniPlayerStyle by rememberEnumPreference(MiniPlayerStyleKey, MiniPlayerStyle.STANDARD)
+                    val miniPlayerCollapsedHeight =
+                        if (miniPlayerStyle == MiniPlayerStyle.BAR) {
+                            MINI_PLAYER_BAR_HEIGHT_DP.dp
+                        } else {
+                            MiniPlayerHeight
+                        }
 
                     val playerBottomSheetState =
                         rememberBottomSheetState(
@@ -1353,7 +1422,7 @@ class MainActivity : ComponentActivity() {
                                     (if (shouldShowNavigationBar && !useRail) floatingBarsBottomPadding else 0.dp) +
                                     getBottomNavPadding() +
                                     MiniPlayerBottomSpacing +
-                                    MiniPlayerHeight,
+                                    miniPlayerCollapsedHeight,
                             expandedBound = maxHeight,
                         )
                     var homeOverflowMenuExpanded by rememberSaveable { mutableStateOf(false) }
@@ -1443,7 +1512,7 @@ class MainActivity : ComponentActivity() {
                         setSystemBarAppearance(isDarkStatusBar)
                     }
 
-                    val miniPlayerAnchor by remember {
+                    val miniPlayerAnchor by remember(playerBottomSheetState) {
                         derivedStateOf {
                             when {
                                 playerBottomSheetState.isExpanded -> EXPANDED_ANCHOR
@@ -1475,36 +1544,39 @@ class MainActivity : ComponentActivity() {
                         setStatusBarsHidden(shouldHideStatusBars)
                     }
 
+                    val currentYearInMusicSheetState = rememberUpdatedState(playerBottomSheetState)
                     LaunchedEffect(isYearInMusicScreen, playerConnection) {
                         val connection = playerConnection ?: return@LaunchedEffect
-                        val player = connection.player
 
                         if (isYearInMusicScreen) {
+                            val sheet = currentYearInMusicSheetState.value
                             if (yearInMusicSavedPlayerAnchor == -1) {
                                 yearInMusicSavedPlayerAnchor =
                                     when {
-                                        playerBottomSheetState.isExpanded -> EXPANDED_ANCHOR
-                                        playerBottomSheetState.isCollapsed -> COLLAPSED_ANCHOR
-                                        playerBottomSheetState.isDismissed -> DISMISSED_ANCHOR
+                                        sheet.isExpanded -> EXPANDED_ANCHOR
+                                        sheet.isCollapsed -> COLLAPSED_ANCHOR
+                                        sheet.isDismissed -> DISMISSED_ANCHOR
                                         else -> COLLAPSED_ANCHOR
                                     }
                             }
 
-                            if (!playerBottomSheetState.isDismissed) {
-                                playerBottomSheetState.dismiss()
+                            if (!sheet.isDismissed) {
+                                sheet.dismiss()
                             }
                         } else if (yearInMusicSavedPlayerAnchor != -1) {
                             val anchorToRestore = yearInMusicSavedPlayerAnchor
                             yearInMusicSavedPlayerAnchor = -1
 
-                            if (!awaitRestorablePlayback(connection)) {
-                                playerBottomSheetState.dismiss()
+                            val canRestore = awaitRestorablePlayback(connection)
+                            val sheet = currentYearInMusicSheetState.value
+                            if (!canRestore) {
+                                sheet.dismiss()
                             } else {
                                 when (anchorToRestore) {
-                                    EXPANDED_ANCHOR -> playerBottomSheetState.expandSoft()
-                                    COLLAPSED_ANCHOR -> playerBottomSheetState.collapseSoft()
-                                    DISMISSED_ANCHOR -> playerBottomSheetState.collapseSoft()
-                                    else -> playerBottomSheetState.collapseSoft()
+                                    EXPANDED_ANCHOR -> sheet.expandSoft()
+                                    COLLAPSED_ANCHOR -> sheet.collapseSoft()
+                                    DISMISSED_ANCHOR -> sheet.collapseSoft()
+                                    else -> sheet.collapseSoft()
                                 }
                             }
                         }
@@ -1514,6 +1586,8 @@ class MainActivity : ComponentActivity() {
                         remember(
                             useRail,
                             bottomInset,
+                            navVisibleHeight,
+                            miniPlayerCollapsedHeight,
                             shouldShowNavigationBar,
                             playerBottomSheetState.isDismissed,
                         ) {
@@ -1522,7 +1596,7 @@ class MainActivity : ComponentActivity() {
                                 bottom += getBottomNavPadding() + floatingBarsBottomPadding
                             }
                             if (!playerBottomSheetState.isDismissed) {
-                                bottom += MiniPlayerHeight + MiniPlayerBottomSpacing
+                                bottom += miniPlayerCollapsedHeight + MiniPlayerBottomSpacing
                             }
                             windowsInsets
                                 .only(
@@ -1883,21 +1957,41 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                     val haptic = LocalHapticFeedback.current
+                    val rootView = LocalView.current
                     val (enableHapticFeedback) = rememberPreference(EnableHapticFeedbackKey, true)
                     val customHaptic =
-                        remember(haptic, enableHapticFeedback) {
+                        remember(rootView, haptic, enableHapticFeedback, hapticIntensity) {
                             object : HapticFeedback {
                                 override fun performHapticFeedback(hapticFeedbackType: HapticFeedbackType) {
-                                    if (enableHapticFeedback) {
-                                        haptic.performHapticFeedback(hapticFeedbackType)
-                                    }
+                                    val kind =
+                                        if (hapticFeedbackType == HapticFeedbackType.LongPress) {
+                                            ArchiveTuneHapticKind.LONG_PRESS
+                                        } else {
+                                            ArchiveTuneHapticKind.SELECTION
+                                        }
+                                    performArchiveTuneHaptic(
+                                        view = rootView,
+                                        hapticFeedback = haptic,
+                                        intensity = hapticIntensity,
+                                        legacyEnabled = enableHapticFeedback,
+                                        kind = kind,
+                                    )
                                 }
                             }
                         }
+                    val imeBottomPx = WindowInsets.ime.getBottom(density)
+                    val isImeVisible = imeBottomPx > 0
 
                     CompositionLocalProvider(
                         LocalHapticFeedback provides customHaptic,
                         LocalAnimationsDisabled provides disableAnimations,
+                        LocalMotionConfig provides motionConfig,
+                        LocalHapticIntensity provides hapticIntensity,
+                        LocalPlayerBackgroundMotionPolicy provides playerBackgroundMotionPolicy,
+                        LocalNavigationBarBackdrop provides frostedBackdrop,
+                        LocalLiquidGlassBackdrop provides navBackdrop,
+                        LocalMenuGlassBackdrop provides navBackdrop,
+                        LocalBottomUiCompactFraction provides bottomUiCompactFractionState,
                         LocalDatabase provides database,
                         LocalContentColor provides if (pureBlack) Color.White else contentColorFor(MaterialTheme.colorScheme.surface),
                         LocalPlayerConnection provides playerConnection,
@@ -2340,13 +2434,19 @@ class MainActivity : ComponentActivity() {
                                         ) {
                                             Crossfade(
                                                 targetState = searchSource,
-                                                animationSpec = tween(durationMillis = if (disableAnimations) 0 else 300),
+                                                animationSpec = tween(durationMillis = if (disableAnimations) 0 else 260),
                                                 label = "",
                                                 modifier =
                                                     Modifier
                                                         .fillMaxSize()
+                                                        .imePadding()
                                                         .padding(
-                                                            bottom = if (!playerBottomSheetState.isDismissed) MiniPlayerHeight else 0.dp,
+                                                            bottom =
+                                                                if (!playerBottomSheetState.isDismissed && !isImeVisible) {
+                                                                    miniPlayerCollapsedHeight
+                                                                } else {
+                                                                    0.dp
+                                                                },
                                                         ).navigationBarsPadding(),
                                             ) { searchSource ->
                                                 when (searchSource) {
@@ -2382,16 +2482,27 @@ class MainActivity : ComponentActivity() {
                                     }
                                 },
                                 bottomBar = {
-                                    Box {
+                                    val hideCollapsedBottomChromeForIme =
+                                        isImeVisible && !playerBottomSheetState.isExpandedOrExpanding
+                                    val playerBackController = remember { PlayerBackController() }
+                                    Box(
+                                        modifier =
+                                            Modifier.graphicsLayer {
+                                                if (hideCollapsedBottomChromeForIme) {
+                                                    alpha = 0f
+                                                    translationY = 600f
+                                                }
+                                            },
+                                    ) {
                                         val navigationProximityProvider: () -> Float =
-                                            remember(playerBottomSheetState, bottomNavigationBarHeightState) {
+                                            remember(playerBottomSheetState, bottomNavigationBarHeightState, navVisibleHeight, miniPlayerCollapsedHeight) {
                                                 {
                                                     val navRatio =
                                                         (bottomNavigationBarHeightState.value / navVisibleHeight).coerceIn(0f, 1f)
                                                     val isNavTransitioning =
                                                         bottomNavigationBarHeightState.value > 0.dp &&
                                                             bottomNavigationBarHeightState.value < navVisibleHeight
-                                                    val morphThreshold = MiniPlayerHeight + MiniPlayerBottomSpacing
+                                                    val morphThreshold = miniPlayerCollapsedHeight + MiniPlayerBottomSpacing
                                                     val swipeDeviation =
                                                         if (isNavTransitioning && playerBottomSheetState.targetAnchor == COLLAPSED_ANCHOR) {
                                                             0.dp
@@ -2417,6 +2528,7 @@ class MainActivity : ComponentActivity() {
                                             compactFractionState = bottomUiCompactFractionState,
                                             compactHorizontalPadding = NavigationBarHorizontalPadding,
                                             compactReserveEndControl = true,
+                                            backController = playerBackController,
                                             navbarHiddenOffset = {
                                                 if (shouldShowNavigationBar && !useRail) {
                                                     val hideFraction =
@@ -2426,10 +2538,16 @@ class MainActivity : ComponentActivity() {
                                                                     navVisibleHeight
                                                                 )
 
+                                                    val compactEffectiveHeight =
+                                                        if (miniPlayerStyle == MiniPlayerStyle.BAR) {
+                                                            miniPlayerCollapsedHeight
+                                                        } else {
+                                                            MiniPlayerCompactHeight
+                                                        }
                                                     val compactPillCentreLine =
                                                         bottomInset +
                                                             floatingBarsBottomPadding +
-                                                            (navVisibleHeight + MiniPlayerCompactHeight) / 2
+                                                            (navVisibleHeight + compactEffectiveHeight) / 2
                                                     with(navBarScrollDensity) {
                                                         (playerBottomSheetState.collapsedBound - compactPillCentreLine).toPx() * hideFraction
                                                     }
@@ -2546,7 +2664,7 @@ class MainActivity : ComponentActivity() {
                                             !playerBottomSheetState.isDismissed ||
                                             bottomUiCompactFractionState.value > 0.01f
                                         ) {
-                                            val compactRowVisible by remember {
+                                            val compactRowVisible by remember(playerBottomSheetState, bottomUiCompactFractionState) {
                                                 derivedStateOf {
                                                     bottomUiCompactFractionState.value *
                                                         (1f - playerBottomSheetState.progress.coerceIn(0f, 1f)) > 0.01f
@@ -2634,7 +2752,7 @@ class MainActivity : ComponentActivity() {
                                                 navVisibleHeight +
                                                 HomeOverflowFabSpacing +
                                                 if (playerBottomSheetState.isCollapsed) {
-                                                    MiniPlayerHeight + MiniPlayerBottomSpacing
+                                                    miniPlayerCollapsedHeight + MiniPlayerBottomSpacing
                                                 } else {
                                                     0.dp
                                                 }
@@ -2754,33 +2872,6 @@ class MainActivity : ComponentActivity() {
                                 },
                                 modifier = Modifier.fillMaxSize(),
                             ) {
-                                var transitionDirection =
-                                    AnimatedContentTransitionScope.SlideDirection.Left
-
-                                if (navigationItems.fastAny { it.route == navBackStackEntry?.destination?.route }) {
-                                    if (navigationItems.fastAny { it.route == previousTab }) {
-                                        val curIndex =
-                                            navigationItems.indexOf(
-                                                navigationItems.fastFirstOrNull {
-                                                    it.route == navBackStackEntry?.destination?.route
-                                                },
-                                            )
-
-                                        val prevIndex =
-                                            navigationItems.indexOf(
-                                                navigationItems.fastFirstOrNull {
-                                                    it.route == previousTab
-                                                },
-                                            )
-
-                                        if (prevIndex > curIndex) {
-                                            AnimatedContentTransitionScope.SlideDirection.Right.also {
-                                                transitionDirection = it
-                                            }
-                                        }
-                                    }
-                                }
-
                                 NavHost(
                                     navController = navController,
                                     startDestination =
@@ -2794,84 +2885,118 @@ class MainActivity : ComponentActivity() {
                                             }
                                         },
                                     enterTransition = {
-                                        // [FIX-ZCODE] T1: consume BackAnimationStyle here (donor pattern);
-                                        // previously the pref was provided but never read by NavHost
-                                        if (disableAnimations) {
-                                            fadeIn(tween(0))
-                                        } else if (
+                                        val tabDuration = motionConfig.tabTransitionDurationMs()
+                                        val subDuration = motionConfig.subScreenTransitionDurationMs()
+                                        val initialTabIndex = navigationItems.indexOfFirst { it.route == initialState.destination.route }
+                                        val targetTabIndex = navigationItems.indexOfFirst { it.route == targetState.destination.route }
+                                        when {
+                                            disableAnimations || !motionConfig.screenTransitionsEnabled ->
+                                                fadeIn(tween(0))
+                                            initialTabIndex >= 0 && targetTabIndex >= 0 && initialTabIndex != targetTabIndex -> {
+                                                val dir = if (targetTabIndex > initialTabIndex) 1 else -1
+                                                slideInHorizontally(
+                                                    animationSpec = tween(tabDuration, easing = FastOutSlowInEasing),
+                                                    initialOffsetX = { (it * 0.16f).roundToInt() * dir },
+                                                ) + fadeIn(tween(tabDuration, easing = FastOutSlowInEasing))
+                                            }
                                             backAnimationStyle == BackAnimationStyle.PREDICTIVE &&
-                                            targetState.destination.route !in topLevelScreens
-                                        ) {
-                                            slideInHorizontally(
-                                                animationSpec = tween(360, easing = FastOutSlowInEasing),
-                                                initialOffsetX = { it },
-                                            ) + fadeIn(tween(240, delayMillis = 40, easing = FastOutSlowInEasing))
-                                        } else {
-                                            fadeIn(tween(260, delayMillis = 60, easing = FastOutSlowInEasing)) +
-                                                scaleIn(
-                                                    animationSpec = tween(260, delayMillis = 60, easing = FastOutSlowInEasing),
-                                                    initialScale = 0.94f,
-                                                )
+                                                targetState.destination.route !in topLevelScreens ->
+                                                slideInHorizontally(
+                                                    animationSpec = tween(subDuration, easing = FastOutSlowInEasing),
+                                                    initialOffsetX = { it },
+                                                ) + fadeIn(tween((subDuration * 0.7f).roundToInt(), delayMillis = 30, easing = FastOutSlowInEasing))
+                                            else ->
+                                                fadeIn(tween(tabDuration, delayMillis = 40, easing = FastOutSlowInEasing)) +
+                                                    scaleIn(
+                                                        animationSpec = tween(tabDuration, delayMillis = 40, easing = FastOutSlowInEasing),
+                                                        initialScale = 0.96f,
+                                                    )
                                         }
                                     },
                                     exitTransition = {
-                                        if (disableAnimations) {
-                                            fadeOut(tween(0))
-                                        } else if (
+                                        val tabDuration = motionConfig.tabTransitionDurationMs()
+                                        val subDuration = motionConfig.subScreenTransitionDurationMs()
+                                        val initialTabIndex = navigationItems.indexOfFirst { it.route == initialState.destination.route }
+                                        val targetTabIndex = navigationItems.indexOfFirst { it.route == targetState.destination.route }
+                                        when {
+                                            disableAnimations || !motionConfig.screenTransitionsEnabled ->
+                                                fadeOut(tween(0))
+                                            initialTabIndex >= 0 && targetTabIndex >= 0 && initialTabIndex != targetTabIndex -> {
+                                                val dir = if (targetTabIndex > initialTabIndex) 1 else -1
+                                                slideOutHorizontally(
+                                                    animationSpec = tween(tabDuration, easing = FastOutSlowInEasing),
+                                                    targetOffsetX = { -(it * 0.16f).roundToInt() * dir },
+                                                ) + fadeOut(tween((tabDuration * 0.8f).roundToInt(), easing = LinearOutSlowInEasing))
+                                            }
                                             backAnimationStyle == BackAnimationStyle.PREDICTIVE &&
-                                            targetState.destination.route !in topLevelScreens
-                                        ) {
-                                            slideOutHorizontally(
-                                                animationSpec = tween(360, easing = FastOutSlowInEasing),
-                                                targetOffsetX = { -it / 3 },
-                                            ) + fadeOut(tween(200, easing = LinearOutSlowInEasing))
-                                        } else {
-                                            fadeOut(tween(220, easing = LinearOutSlowInEasing))
+                                                targetState.destination.route !in topLevelScreens ->
+                                                slideOutHorizontally(
+                                                    animationSpec = tween(subDuration, easing = FastOutSlowInEasing),
+                                                    targetOffsetX = { -it / 3 },
+                                                ) + fadeOut(tween((subDuration * 0.6f).roundToInt(), easing = LinearOutSlowInEasing))
+                                            else ->
+                                                fadeOut(tween((tabDuration * 0.85f).roundToInt(), easing = LinearOutSlowInEasing))
                                         }
                                     },
                                     popEnterTransition = {
-                                        if (disableAnimations) {
-                                            fadeIn(tween(0))
-                                        } else if ((
-                                                initialState.destination.route in topLevelScreens ||
-                                                    initialState.destination.route?.startsWith(OnlineSearchResultRoutePrefix) == true
-                                            ) &&
-                                            targetState.destination.route in topLevelScreens
-                                        ) {
-                                            fadeIn(tween(250))
-                                        } else if (backAnimationStyle == BackAnimationStyle.PREDICTIVE) {
-                                            slideInHorizontally(
-                                                animationSpec = tween(360, easing = FastOutSlowInEasing),
-                                                initialOffsetX = { -it / 3 },
-                                            ) + fadeIn(tween(240, delayMillis = 40, easing = FastOutSlowInEasing))
-                                        } else {
-                                            fadeIn(tween(260, delayMillis = 60, easing = FastOutSlowInEasing)) +
-                                                scaleIn(
-                                                    animationSpec = tween(260, delayMillis = 60, easing = FastOutSlowInEasing),
-                                                    initialScale = 0.94f,
-                                                )
+                                        val tabDuration = motionConfig.tabTransitionDurationMs()
+                                        val subDuration = motionConfig.subScreenTransitionDurationMs()
+                                        val initialTabIndex = navigationItems.indexOfFirst { it.route == initialState.destination.route }
+                                        val targetTabIndex = navigationItems.indexOfFirst { it.route == targetState.destination.route }
+                                        when {
+                                            disableAnimations || !motionConfig.screenTransitionsEnabled ->
+                                                fadeIn(tween(0))
+                                            initialTabIndex >= 0 && targetTabIndex >= 0 && initialTabIndex != targetTabIndex -> {
+                                                val dir = if (targetTabIndex > initialTabIndex) 1 else -1
+                                                slideInHorizontally(
+                                                    animationSpec = tween(tabDuration, easing = FastOutSlowInEasing),
+                                                    initialOffsetX = { (it * 0.16f).roundToInt() * dir },
+                                                ) + fadeIn(tween(tabDuration, easing = FastOutSlowInEasing))
+                                            }
+                                            (initialState.destination.route in topLevelScreens ||
+                                                initialState.destination.route?.startsWith(OnlineSearchResultRoutePrefix) == true) &&
+                                                targetState.destination.route in topLevelScreens ->
+                                                fadeIn(tween(tabDuration))
+                                            backAnimationStyle == BackAnimationStyle.PREDICTIVE ->
+                                                slideInHorizontally(
+                                                    animationSpec = tween(subDuration, easing = FastOutSlowInEasing),
+                                                    initialOffsetX = { -it / 3 },
+                                                ) + fadeIn(tween((subDuration * 0.7f).roundToInt(), delayMillis = 30, easing = FastOutSlowInEasing))
+                                            else ->
+                                                fadeIn(tween(tabDuration, delayMillis = 40, easing = FastOutSlowInEasing)) +
+                                                    scaleIn(
+                                                        animationSpec = tween(tabDuration, delayMillis = 40, easing = FastOutSlowInEasing),
+                                                        initialScale = 0.96f,
+                                                    )
                                         }
                                     },
                                     popExitTransition = {
-                                        if (disableAnimations) {
-                                            fadeOut(tween(0))
-                                        } else if ((
-                                                initialState.destination.route in topLevelScreens ||
-                                                    initialState.destination.route?.startsWith(OnlineSearchResultRoutePrefix) == true
-                                            ) &&
-                                            targetState.destination.route in topLevelScreens
-                                        ) {
-                                            fadeOut(tween(200))
-                                        } else if (
+                                        val tabDuration = motionConfig.tabTransitionDurationMs()
+                                        val subDuration = motionConfig.subScreenTransitionDurationMs()
+                                        val initialTabIndex = navigationItems.indexOfFirst { it.route == initialState.destination.route }
+                                        val targetTabIndex = navigationItems.indexOfFirst { it.route == targetState.destination.route }
+                                        when {
+                                            disableAnimations || !motionConfig.screenTransitionsEnabled ->
+                                                fadeOut(tween(0))
+                                            initialTabIndex >= 0 && targetTabIndex >= 0 && initialTabIndex != targetTabIndex -> {
+                                                val dir = if (targetTabIndex > initialTabIndex) 1 else -1
+                                                slideOutHorizontally(
+                                                    animationSpec = tween(tabDuration, easing = FastOutSlowInEasing),
+                                                    targetOffsetX = { -(it * 0.16f).roundToInt() * dir },
+                                                ) + fadeOut(tween((tabDuration * 0.8f).roundToInt(), easing = LinearOutSlowInEasing))
+                                            }
+                                            (initialState.destination.route in topLevelScreens ||
+                                                initialState.destination.route?.startsWith(OnlineSearchResultRoutePrefix) == true) &&
+                                                targetState.destination.route in topLevelScreens ->
+                                                fadeOut(tween((tabDuration * 0.8f).roundToInt()))
                                             backAnimationStyle == BackAnimationStyle.PREDICTIVE &&
-                                            initialState.destination.route !in topLevelScreens
-                                        ) {
-                                            slideOutHorizontally(
-                                                animationSpec = tween(360, easing = FastOutSlowInEasing),
-                                                targetOffsetX = { it },
-                                            ) + fadeOut(tween(280, easing = LinearOutSlowInEasing))
-                                        } else {
-                                            fadeOut(tween(220, easing = LinearOutSlowInEasing))
+                                                initialState.destination.route !in topLevelScreens ->
+                                                slideOutHorizontally(
+                                                    animationSpec = tween(subDuration, easing = FastOutSlowInEasing),
+                                                    targetOffsetX = { it },
+                                                ) + fadeOut(tween((subDuration * 0.78f).roundToInt(), easing = LinearOutSlowInEasing))
+                                            else ->
+                                                fadeOut(tween((tabDuration * 0.85f).roundToInt(), easing = LinearOutSlowInEasing))
                                         }
                                     },
                                     modifier =
@@ -2913,10 +3038,6 @@ class MainActivity : ComponentActivity() {
                                     )
                                 }
                             }
-                        }
-
-                        BackHandler(enabled = playerBottomSheetState.isExpanded && !aodModeEnabled) {
-                            playerBottomSheetState.collapseSoft()
                         }
 
                         BottomSheetMenu(

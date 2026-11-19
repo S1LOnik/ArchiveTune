@@ -773,7 +773,7 @@ enum class QuickPicksDisplayMode {
     MOSAIC,
 }
 
-enum class HomeFeedStyle { STANDARD, COMPACT, GALLERY }
+enum class HomeFeedStyle { STANDARD, COMPACT, GALLERY, NOW, COVERS }
 
 val HomeFeedStyleKey = stringPreferencesKey("homeFeedStyle")
 val QuickPicksDisplayModeKey = stringPreferencesKey("quickPicksDisplayMode")
@@ -1762,3 +1762,60 @@ val MascotAiProviderKey = stringPreferencesKey("mascot_ai_provider")
 val MascotAiApiKeyKey = stringPreferencesKey("mascot_ai_api_key")
 val MascotAiCustomEndpointKey = stringPreferencesKey("mascot_ai_custom_endpoint")
 val MascotAiModelKey = stringPreferencesKey("mascot_ai_model")
+
+// ArchiveTune 16.5 Motion, Studio, Home, MiniPlayer, Menu & Lyrics preferences
+enum class MotionProfile {
+    SYSTEM,
+    FAST,
+    SMOOTH,
+    REDUCED,
+}
+
+val MotionProfileKey = stringPreferencesKey("motionProfile")
+val MotionScreenTransitionsKey = booleanPreferencesKey("motionScreenTransitions")
+val MotionArtworkTransitionsKey = booleanPreferencesKey("motionArtworkTransitions")
+val MotionPressFeedbackKey = booleanPreferencesKey("motionPressFeedback")
+val MotionDecorativeBackgroundKey = booleanPreferencesKey("motionDecorativeBackground")
+
+enum class HapticIntensity {
+    OFF,
+    LIGHT,
+    STANDARD,
+    STRONG,
+}
+
+val HapticIntensityKey = stringPreferencesKey("hapticIntensity")
+
+enum class BackgroundMotionPolicy {
+    WHILE_PLAYING_OPEN,
+    RESPECT_POWER_SAVER,
+    NEVER,
+}
+
+val PlayerBackgroundMotionPolicyKey = stringPreferencesKey("playerBackgroundMotionPolicy")
+
+val HomeSectionOrderKey = stringPreferencesKey("homeSectionOrder")
+val HomeHiddenSectionsKey = stringSetPreferencesKey("homeHiddenSections")
+
+enum class MiniPlayerStyle {
+    STANDARD,
+    BAR,
+}
+
+val MiniPlayerStyleKey = stringPreferencesKey("miniPlayerStyle")
+
+const val MINI_PLAYER_BAR_HEIGHT_DP = 54
+
+val PlayerMenuPinnedActionsKey = stringPreferencesKey("playerMenuPinnedActions")
+const val DEFAULT_PLAYER_MENU_PINNED_ACTIONS = "RADIO,ADD_TO_PLAYLIST,QUEUE,DOWNLOAD"
+
+enum class LyricsDisplayCharacter {
+    READING,
+    FOCUS,
+    STAGE,
+}
+
+val LyricsDisplayCharacterKey = stringPreferencesKey("lyricsDisplayCharacter")
+
+val SavedAppearanceProfilesKey = stringPreferencesKey("savedAppearanceProfilesJson")
+val ActiveAppearanceProfileIdKey = stringPreferencesKey("activeAppearanceProfileId")

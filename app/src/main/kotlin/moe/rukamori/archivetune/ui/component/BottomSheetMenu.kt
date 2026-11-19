@@ -11,22 +11,31 @@ package moe.rukamori.archivetune.ui.component
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
+import androidx.compose.material3.IconButton
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Velocity
 import moe.rukamori.archivetune.LocalAnimationsDisabled
 import moe.rukamori.archivetune.R
+import moe.rukamori.archivetune.constants.BackAnimationStyle
+import moe.rukamori.archivetune.ui.motion.LocalMotionConfig
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -158,23 +167,30 @@ fun BottomSheetMenu(
     val scrimInteractionSource = remember { MutableInteractionSource() }
     val popupInteractionSource = remember { MutableInteractionSource() }
 
-    LaunchedEffect(state.isVisible) {
+    val motionConfig = LocalMotionConfig.current
+    val animationsEnabled = !LocalAnimationsDisabled.current && motionConfig.animationsEnabled
+
+    LaunchedEffect(state.isVisible, animationsEnabled) {
         if (state.isVisible) {
             renderState = true
-            enterProgress.snapTo(0f)
-            enterProgress.animateTo(
-                targetValue = 1f,
-                animationSpec =
-                    spring(
-                        dampingRatio = Spring.DampingRatioNoBouncy,
-                        stiffness = Spring.StiffnessMediumLow,
-                    ),
-            )
+            if (!animationsEnabled) {
+                enterProgress.snapTo(1f)
+            } else {
+                enterProgress.snapTo(0f)
+                enterProgress.animateTo(
+                    targetValue = 1f,
+                    animationSpec = motionConfig.sheetSpring(),
+                )
+            }
         } else if (renderState) {
-            enterProgress.animateTo(
-                targetValue = 0f,
-                animationSpec = tween(durationMillis = 200),
-            )
+            if (animationsEnabled) {
+                enterProgress.animateTo(
+                    targetValue = 0f,
+                    animationSpec = motionConfig.microTween(200),
+                )
+            } else {
+                enterProgress.snapTo(0f)
+            }
             focusManager.clearFocus()
             renderState = false
         }
@@ -294,12 +310,14 @@ fun BottomSheetMenu(
     var expanded by remember(state.isVisible, immersive) { mutableStateOf(false) }
     var handleDrag by remember(state.isVisible) { mutableFloatStateOf(0f) }
     val threshold = with(density) { 32.dp.toPx() }
-    val gestureConnection = remember(state, threshold, state.isVisible) {
+    val gestureConnection = remember(state, threshold, state.isVisible, immersive) {
         object : NestedScrollConnection {
             private var dragDistance = 0f
 
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                if (source != NestedScrollSource.UserInput || expanded || available.y >= 0f) return Offset.Zero
+                if (source != NestedScrollSource.UserInput || !immersive || expanded || available.y >= 0f) {
+                    return Offset.Zero
+                }
                 dragDistance = (dragDistance + available.y).coerceAtMost(0f)
                 if (dragDistance < -threshold) {
                     expanded = true
@@ -309,17 +327,43 @@ fun BottomSheetMenu(
             }
 
             override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
-                if (source != NestedScrollSource.UserInput || available.y <= 0f) return Offset.Zero
+                if (source != NestedScrollSource.UserInput || available.y <= 0f) {
+                    if (consumed.y != 0f) dragDistance = 0f
+                    return Offset.Zero
+                }
                 dragDistance = (dragDistance + available.y).coerceAtLeast(0f)
-                if (dragDistance > threshold) {
-                    state.dismiss()
+                handleDrag = (handleDrag + available.y).coerceAtLeast(0f)
+                if (dragDistance > threshold * 1.4f) {
+                    if (immersive && expanded) {
+                        expanded = false
+                    } else {
+                        state.dismiss()
+                    }
                     dragDistance = 0f
+                    handleDrag = 0f
                 }
                 return Offset(0f, available.y)
             }
 
             override suspend fun onPreFling(available: Velocity): Velocity {
+                if (dragDistance > threshold) {
+                    if (immersive && expanded) {
+                        expanded = false
+                    } else {
+                        state.dismiss()
+                    }
+                    dragDistance = 0f
+                    handleDrag = 0f
+                    return available
+                }
                 dragDistance = 0f
+                handleDrag = 0f
+                return Velocity.Zero
+            }
+
+            override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
+                dragDistance = 0f
+                handleDrag = 0f
                 return Velocity.Zero
             }
         }
@@ -328,19 +372,23 @@ fun BottomSheetMenu(
         targetValue = configuration.screenHeightDp.dp * when {
             immersive && expanded -> 1f
             immersive -> 0.72f
-            else -> 0.40f
+            else -> 0.44f
         },
-        animationSpec = tween(if (LocalAnimationsDisabled.current) 0 else 200),
+        animationSpec = if (!animationsEnabled) snap() else motionConfig.microTween(200),
         label = "menuHeight",
     )
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val predictiveBackStyle = LocalBackAnimationStyle.current == BackAnimationStyle.PREDICTIVE
 
     Box(modifier = modifier.fillMaxSize()) {
         Box(
             modifier =
                 Modifier
                     .fillMaxSize()
-                    .graphicsLayer { this.alpha = alpha }
+                    .graphicsLayer {
+                        val backFade = if (predictiveBackStyle) 1f - 0.35f * menuPredictiveBack.progress.value else 1f
+                        this.alpha = alpha * backFade
+                    }
                     .background(Color.Black.copy(alpha = 0.50f))
                     .clickable(
                         interactionSource = scrimInteractionSource,
@@ -365,9 +413,16 @@ fun BottomSheetMenu(
                     .heightIn(max = maxPopupHeight)
                     .fillMaxWidth()
                     .graphicsLayer {
-                        this.alpha = alpha
+                        val p = if (predictiveBackStyle) menuPredictiveBack.progress.value else 0f
+                        val scale = 1f - 0.06f * p
+                        scaleX = scale
+                        scaleY = scale
+                        this.alpha = alpha * (1f - 0.22f * p)
 
-                        translationY = with(density) { (1f - alpha) * 48.dp.toPx() }
+                        translationY =
+                            with(density) {
+                                (1f - alpha) * 48.dp.toPx() + p * 36.dp.toPx() + (handleDrag * 0.35f).coerceAtLeast(0f)
+                            }
                     }
                     .shadow(
                         elevation = (24f * glassTuning.shadowFactor).dp,
@@ -385,7 +440,7 @@ fun BottomSheetMenu(
                         },
                     )
                     .clip(menuShape)
-                    .then(if (immersive) Modifier.nestedScroll(gestureConnection) else Modifier)
+                    .nestedScroll(gestureConnection)
                     .clickable(
                         interactionSource = popupInteractionSource,
                         indication = null,
@@ -413,12 +468,13 @@ fun BottomSheetMenu(
 
             Column(modifier = if (immersive && expanded) Modifier.fillMaxWidth().statusBarsPadding() else Modifier.fillMaxWidth()) {
                 if (immersive) {
+                    val closeDesc = stringResource(R.string.close_dialog)
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(36.dp)
+                            .height(40.dp)
                             .draggable(
-                                state = rememberDraggableState { handleDrag += it },
+                                state = rememberDraggableState { handleDrag = (handleDrag + it).coerceAtLeast(-threshold * 2f) },
                                 orientation = Orientation.Vertical,
                                 onDragStarted = { handleDrag = 0f },
                                 onDragStopped = {
@@ -438,19 +494,41 @@ fun BottomSheetMenu(
                                 .clip(RoundedCornerShape(percent = 50))
                                 .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)),
                         )
+                        androidx.compose.material3.IconButton(
+                            onClick = state::dismiss,
+                            modifier =
+                                Modifier
+                                    .align(Alignment.CenterEnd)
+                                    .padding(end = 6.dp)
+                                    .size(36.dp)
+                                    .semantics { contentDescription = closeDesc },
+                        ) {
+                            androidx.compose.material3.Icon(
+                                painter = painterResource(R.drawable.close),
+                                contentDescription = closeDesc,
+                                tint = contentInk.copy(alpha = 0.72f),
+                                modifier = Modifier.size(18.dp),
+                            )
+                        }
                     }
                 } else if (glassModifier == null) {
                     Box(
                         modifier =
                             Modifier
-                                .padding(top = 10.dp, bottom = 6.dp)
-                                .size(width = 32.dp, height = 4.dp)
-                                .clip(RoundedCornerShape(percent = 50))
-                                .background(
-                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f),
-                                )
-                                .align(Alignment.CenterHorizontally),
-                    )
+                                .fillMaxWidth()
+                                .padding(top = 8.dp, bottom = 4.dp, end = 6.dp),
+                    ) {
+                        Box(
+                            modifier =
+                                Modifier
+                                    .size(width = 32.dp, height = 4.dp)
+                                    .clip(RoundedCornerShape(percent = 50))
+                                    .background(
+                                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f),
+                                    )
+                                    .align(Alignment.Center),
+                        )
+                    }
                 }
 
                 CompositionLocalProvider(

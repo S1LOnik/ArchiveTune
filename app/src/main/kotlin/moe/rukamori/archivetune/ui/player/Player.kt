@@ -1355,29 +1355,22 @@ fun BottomSheetPlayer(
                 },
 
         backgroundColor = {
-            val progress =
-                ((state.value - state.collapsedBound) / (state.expandedBound - state.collapsedBound))
-                    .coerceIn(0f, 1f)
-            val fadeProgress =
-                if (progress < 0.2f) {
-                    ((0.2f - progress) / 0.2f).coerceIn(0f, 1f)
-                } else {
-                    0f
-                }
+            val progress = state.progress.coerceIn(0f, 1f)
+            val backgroundAlpha = (progress / 0.28f).coerceIn(0f, 1f)
             when (playerDesignStyle) {
-                PlayerDesignStyle.V9 -> dynamicBgColor.copy(alpha = 1f - fadeProgress)
-                PlayerDesignStyle.V10 -> dynamicV10FieldColor.copy(alpha = 1f - fadeProgress)
-                PlayerDesignStyle.V7 -> Color.Black.copy(alpha = 1f - fadeProgress)
+                PlayerDesignStyle.V9 -> dynamicBgColor.copy(alpha = backgroundAlpha)
+                PlayerDesignStyle.V10 -> dynamicV10FieldColor.copy(alpha = backgroundAlpha)
+                PlayerDesignStyle.V7 -> Color.Black.copy(alpha = backgroundAlpha)
                 else ->
                     when (playerBackground) {
                         PlayerBackgroundStyle.BLUR, PlayerBackgroundStyle.GRADIENT ->
-                            sheetSurfaceColor.copy(alpha = 1f - fadeProgress)
+                            sheetSurfaceColor.copy(alpha = backgroundAlpha)
 
                         else ->
                             if (useBlackBackground) {
-                                Color.Black.copy(alpha = 1f - fadeProgress)
+                                Color.Black.copy(alpha = backgroundAlpha)
                             } else {
-                                sheetSurfaceColor.copy(alpha = 1f - fadeProgress)
+                                sheetSurfaceColor.copy(alpha = backgroundAlpha)
                             }
                     }
             }
@@ -1385,7 +1378,8 @@ fun BottomSheetPlayer(
         onDismiss = {
             playerConnection.service.stopAndClearPlayback(clearPersistentState = true)
         },
-        backHandlerEnabled = !aodModeEnabled && !isInlineLyricsOpen && !anyStylePageOverlayOpen,
+        backHandlerEnabled = !aodModeEnabled && !isInlineLyricsOpen && !anyStylePageOverlayOpen && !queueSheetState.isExpandedOrExpanding,
+        collapsedClickEnabled = false,
         keepContentAlive = true,
         morphMode = playerDesignStyle == PlayerDesignStyle.SPATIALFLOW,
         navbarHiddenOffset = navbarHiddenOffset,
@@ -1431,6 +1425,7 @@ fun BottomSheetPlayer(
                         spatialFlowMiniArtworkRect.value = rect
                     }
                 },
+                onExpand = state::expandSoft,
             )
         },
     ) {

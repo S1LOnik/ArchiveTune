@@ -21,6 +21,7 @@ package moe.rukamori.archivetune.ui.component
 import android.os.Build
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -78,6 +79,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import moe.rukamori.archivetune.constants.HideNavigationBarLabelsKey
+import moe.rukamori.archivetune.ui.motion.ArchiveTuneHapticKind
+import moe.rukamori.archivetune.ui.motion.LocalMotionConfig
+import moe.rukamori.archivetune.ui.motion.rememberArchiveTuneHapticTrigger
 import moe.rukamori.archivetune.utils.rememberPreference
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -110,10 +114,15 @@ fun BitChordNavBar(
     liquidGlassBackdrop: ThrottledLayerBackdrop? = null,
 ) {
     val (hideLabels) = rememberPreference(HideNavigationBarLabelsKey, false)
-    val haptic = LocalHapticFeedback.current
+    val motionConfig = LocalMotionConfig.current
+    val animationsEnabled = motionConfig.animationsEnabled
+    val triggerHaptic = rememberArchiveTuneHapticTrigger()
     val density = LocalDensity.current
+    val resolvedFrostedBackdrop = frostedBackdrop ?: LocalNavigationBarBackdrop.current
+    val resolvedLiquidGlassBackdrop =
+        liquidGlassBackdrop ?: (LocalLiquidGlassBackdrop.current as? ThrottledLayerBackdrop)
     val canLiquidGlass =
-        liquidGlassBackdrop != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+        resolvedLiquidGlassBackdrop != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
     val pillShape = RoundedCornerShape(percent = 50)
 
     var selectedIndex by remember {
@@ -144,24 +153,25 @@ fun BitChordNavBar(
     val animatedPillOffset by
         animateFloatAsState(
             targetValue = selectedIndex * tabStepPx,
-            animationSpec = BitChordGlassSpring,
+            animationSpec = if (!animationsEnabled) snap() else motionConfig.navSpring(),
             label = "BitChordNavPillOffset",
         )
+    val pillDisplayOffsetPx = animatedPillOffset + dragOffset.floatValue
     val pillTargetPx = selectedIndex * tabStepPx + dragOffset.floatValue
     val pillLag =
-        if (tabStepPx > 0f) {
-            (abs(pillTargetPx - animatedPillOffset) / tabStepPx).coerceIn(0f, 1f)
-        } else {
+        if (!animationsEnabled || tabStepPx <= 0f) {
             0f
+        } else {
+            (abs(pillTargetPx - animatedPillOffset) / tabStepPx).coerceIn(0f, 1f)
         }
 
     fun selectIndex(index: Int) {
         val clamped = index.coerceIn(0, itemCount - 1)
+        triggerHaptic(ArchiveTuneHapticKind.SELECTION)
         if (clamped != selectedIndex) {
-            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
             selectedIndex = clamped
-            onRouteSelected(itemRoute(clamped))
         }
+        onRouteSelected(itemRoute(clamped))
     }
 
     Surface(
@@ -172,9 +182,9 @@ fun BitChordNavBar(
                 .padding(horizontal = BitChordBarGutter)
                 .padding(bottom = 2.dp)
                 .then(
-                    if (liquidGlassBackdrop != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    if (canLiquidGlass && resolvedLiquidGlassBackdrop != null) {
                         Modifier.liquidGlass(
-                            backdrop = liquidGlassBackdrop,
+                            backdrop = resolvedLiquidGlassBackdrop,
                             shape = pillShape,
                             interactive = false,
                             baseColor = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -203,7 +213,7 @@ fun BitChordNavBar(
                     .padding(horizontal = BitChordPillInset, vertical = BitChordPillInset)
                     .onGloballyPositioned { rowWidthPx = it.size.width.toFloat() },
         ) {
-            if (frostedBackdrop != null && !canLiquidGlass) {
+            if (resolvedFrostedBackdrop != null && !canLiquidGlass) {
                 var barPositionInRoot by remember { mutableStateOf(Offset.Zero) }
                 Box(
                     modifier =
@@ -219,9 +229,9 @@ fun BitChordNavBar(
                                 alpha = frostedOverlayAlpha
                                 clip = true
                             }.drawBehind {
-                                val offset = frostedBackdrop.contentOffsetInRoot - barPositionInRoot
+                                val offset = resolvedFrostedBackdrop.contentOffsetInRoot - barPositionInRoot
                                 translate(offset.x, offset.y) {
-                                    runCatching { drawLayer(frostedBackdrop.layer) }
+                                    runCatching { drawLayer(resolvedFrostedBackdrop.layer) }
                                 }
                             }.onGloballyPositioned { coordinates ->
                                 barPositionInRoot = coordinates.positionInRoot()
@@ -233,7 +243,7 @@ fun BitChordNavBar(
                 Box(
                     modifier =
                         Modifier
-                            .offset { IntOffset(pillTargetPx.roundToInt().coerceAtLeast(0), 0) }
+                            .offset { IntOffset(pillDisplayOffsetPx.roundToInt().coerceAtLeast(0), 0) }
                             .width(tabWidthDp)
                             .fillMaxHeight()
                             .graphicsLayer {
@@ -249,17 +259,23 @@ fun BitChordNavBar(
                 modifier =
                     Modifier
                         .fillMaxSize()
-                        .pointerInput(itemCount) {
+                        .pointerInput(itemCount, tabStepPx) {
                             var totalDrag = 0f
                             detectHorizontalDragGestures(
                                 onDragStart = { totalDrag = 0f },
+                                onDragCancel = {
+                                    totalDrag = 0f
+                                    dragOffset.floatValue = 0f
+                                },
                                 onDragEnd = {
                                     if (tabStepPx > 0f) {
                                         val ratio = totalDrag / tabStepPx
                                         if (abs(ratio) > BitChordDragStrideThreshold) {
                                             val shift = maxOf(1, abs(ratio).roundToInt())
-
-                                            selectIndex(selectedIndex - shift * kotlin.math.sign(ratio).toInt())
+                                            val target = selectedIndex + shift * kotlin.math.sign(ratio).toInt()
+                                            if (target in 0 until itemCount) {
+                                                selectIndex(target)
+                                            }
                                         }
                                     }
                                     totalDrag = 0f
@@ -273,8 +289,8 @@ fun BitChordNavBar(
                                         (dragOffset.floatValue + dragAmount).let { raw ->
                                             val resisted =
                                                 when {
-                                                    selectedIndex == 0 && raw > 0f -> raw * 0.25f
-                                                    selectedIndex == itemCount - 1 && raw < 0f -> raw * 0.25f
+                                                    selectedIndex == 0 && raw < 0f -> raw * 0.25f
+                                                    selectedIndex == itemCount - 1 && raw > 0f -> raw * 0.25f
                                                     else -> raw
                                                 }
                                             resisted.coerceIn(-tabStepPx * 1.5f, tabStepPx * 1.5f)
@@ -318,16 +334,17 @@ private fun BitChordNavBarItem(
     onSelect: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val motionConfig = LocalMotionConfig.current
     val iconScale by
         animateFloatAsState(
-            targetValue = if (selected) 1.08f else 1f,
-            animationSpec = BitChordIconSpring,
+            targetValue = if (selected && motionConfig.pressFeedbackEnabled) 1.08f else 1f,
+            animationSpec = if (!motionConfig.animationsEnabled) snap() else motionConfig.pressSpring(),
             label = "BitChordNavIconScale",
         )
     val tint by
         animateColorAsState(
             targetValue = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-            animationSpec = tween(durationMillis = 200),
+            animationSpec = motionConfig.microTween(200),
             label = "BitChordNavTint",
         )
     Column(

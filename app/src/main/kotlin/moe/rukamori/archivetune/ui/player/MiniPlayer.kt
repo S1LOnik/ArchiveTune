@@ -9,7 +9,8 @@ package moe.rukamori.archivetune.ui.player
 
 import android.os.Build
 import androidx.compose.foundation.background
-import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -18,6 +19,9 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.res.stringResource
+import moe.rukamori.archivetune.R
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
@@ -91,6 +95,7 @@ fun MiniPlayer(
     onArtworkSlotPositioned: ((androidx.compose.ui.geometry.Rect) -> Unit)? = null,
     // [FIX-ZCODE] donor-compatible proximity hook used by MainActivity's floating bars
     miniPlayerProximityProvider: (() -> Float)? = null,
+    onExpand: (() -> Unit)? = null,
 ) {
     val compactFraction = compactFractionState.value
 
@@ -117,6 +122,7 @@ fun MiniPlayer(
 
         compactShowTransportControls = !compactReserveEndControl,
         onArtworkSlotPositioned = onArtworkSlotPositioned,
+        onExpand = onExpand,
     )
 }
 
@@ -130,6 +136,7 @@ private fun NewMiniPlayer(
     compactFraction: Float = 0f,
     compactShowTransportControls: Boolean = false,
     onArtworkSlotPositioned: ((androidx.compose.ui.geometry.Rect) -> Unit)? = null,
+    onExpand: (() -> Unit)? = null,
 ) {
     val playerConnection = LocalPlayerConnection.current ?: return
     val context = LocalContext.current
@@ -152,7 +159,7 @@ private fun NewMiniPlayer(
     val shouldUseArtworkBackground =
         miniPlayerBackgroundStyle == MiniPlayerBackgroundStyle.GRADIENT ||
             miniPlayerBackgroundStyle == MiniPlayerBackgroundStyle.GLOW
-    val darkTheme = isSystemInDarkTheme()
+    val darkTheme = MaterialTheme.colorScheme.surface.luminance() < 0.5f
 
     LaunchedEffect(
         mediaMetadata?.id,
@@ -300,6 +307,7 @@ private fun NewMiniPlayer(
         useLegacyBackground = false,
         compactFraction = compactFraction,
     ) { offsetX ->
+        val expandLabel = stringResource(R.string.player_menu_expand)
         Box(
             modifier =
                 Modifier
@@ -309,7 +317,19 @@ private fun NewMiniPlayer(
                     .graphicsLayer {
                         translationX = offsetX
                     }
-                    .clip(miniPlayerShape),
+                    .clip(miniPlayerShape)
+                    .then(
+                        if (onExpand != null) {
+                            Modifier.clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                                onClickLabel = expandLabel,
+                                onClick = onExpand,
+                            )
+                        } else {
+                            Modifier
+                        },
+                    ),
         ) {
             MiniPlayerBackground(
                 style = effectiveBackgroundStyle,

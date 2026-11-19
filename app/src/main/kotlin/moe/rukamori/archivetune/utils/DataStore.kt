@@ -165,15 +165,16 @@ fun <T> rememberPreference(
     defaultValue: T,
 ): MutableState<T> {
     val context = LocalContext.current
+    val initialValue = remember(key) { PreferenceStore.get(key) ?: defaultValue }
 
     val state =
-        remember {
+        remember(key) {
             context.dataStore.data
                 .map { it[key] ?: defaultValue }
                 .distinctUntilChanged()
-        }.collectAsState(defaultValue)
+        }.collectAsState(initialValue)
 
-    return remember {
+    return remember(key) {
         object : MutableState<T> {
             override var value: T
                 get() = state.value
@@ -196,15 +197,16 @@ inline fun <reified T : Enum<T>> rememberEnumPreference(
     defaultValue: T,
 ): MutableState<T> {
     val context = LocalContext.current
+    val initialValue = remember(key) { PreferenceStore.get(key).toEnum(defaultValue = defaultValue) }
 
     val state =
-        remember {
+        remember(key) {
             context.dataStore.data
                 .map { it[key].toEnum(defaultValue = defaultValue) }
                 .distinctUntilChanged()
-        }.collectAsState(defaultValue)
+        }.collectAsState(initialValue)
 
-    return remember {
+    return remember(key) {
         object : MutableState<T> {
             override var value: T
                 get() = state.value
