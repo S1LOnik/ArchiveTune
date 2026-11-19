@@ -40,17 +40,31 @@ class UniversalFallbackMatrixTest {
     }
 
     @Test
-    fun `latency monitor reports healthy servers below the degraded threshold`() {
-        val monitor = LatencyServerMonitor()
-        // Default warm-up latencies (60/40/70ms) are far below the 800ms threshold.
-        assertTrue(monitor.isSpotifyHealthy())
-        assertTrue(monitor.isYouTubeHealthy())
-        assertTrue(monitor.isSoundCloudHealthy())
+    fun `fallback preserves source preference when Spotify is available`() {
+        assertEquals(
+            listOf(AudioSourceKind.YOUTUBE, AudioSourceKind.SOUNDCLOUD),
+            UniversalFallbackMatrix.fallbackSources(AudioSourceKind.SPOTIFY, true),
+        )
+        assertEquals(
+            listOf(AudioSourceKind.SPOTIFY, AudioSourceKind.SOUNDCLOUD),
+            UniversalFallbackMatrix.fallbackSources(AudioSourceKind.YOUTUBE, true),
+        )
+        assertEquals(
+            listOf(AudioSourceKind.SPOTIFY, AudioSourceKind.YOUTUBE),
+            UniversalFallbackMatrix.fallbackSources(AudioSourceKind.SOUNDCLOUD, true),
+        )
     }
 
     @Test
-    fun `latency degraded threshold is 800 ms`() {
-        assertEquals(800L, LatencyServerMonitor.LATENCY_DEGRADED_THRESHOLD_MS)
+    fun `fallback skips Spotify without an active session`() {
+        assertEquals(
+            listOf(AudioSourceKind.SOUNDCLOUD),
+            UniversalFallbackMatrix.fallbackSources(AudioSourceKind.YOUTUBE, false),
+        )
+        assertEquals(
+            listOf(AudioSourceKind.YOUTUBE),
+            UniversalFallbackMatrix.fallbackSources(AudioSourceKind.SOUNDCLOUD, false),
+        )
     }
 
     @Test

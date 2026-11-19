@@ -23,12 +23,7 @@ import moe.rukamori.archivetune.spotify.SpotifyLibraryRepository
 import moe.rukamori.archivetune.spotify.session.SpotifySessionManager
 import moe.rukamori.archivetune.utils.dataStore
 import moe.rukamori.archivetune.utils.get
-import okhttp3.OkHttpClient
-import okhttp3.Request
 import timber.log.Timber
-import java.io.IOException
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -46,60 +41,6 @@ data class FallbackResult(
 )
 
 @Singleton
-class LatencyServerMonitor @Inject constructor() {
-    private val httpClient = OkHttpClient.Builder()
-        .connectTimeout(1500, TimeUnit.MILLISECONDS)
-        .readTimeout(1500, TimeUnit.MILLISECONDS)
-        .build()
-
-    private val spotifyLatencyMs = AtomicLong(60L)
-    private val youtubeLatencyMs = AtomicLong(40L)
-    private val soundCloudLatencyMs = AtomicLong(70L)
-
-    companion object {
-        private const val TAG = "LatencyServerMonitor"
-        const val LATENCY_DEGRADED_THRESHOLD_MS = 800L
-    }
-
-    fun isSpotifyHealthy(): Boolean = spotifyLatencyMs.get() < LATENCY_DEGRADED_THRESHOLD_MS
-    fun isYouTubeHealthy(): Boolean = youtubeLatencyMs.get() < LATENCY_DEGRADED_THRESHOLD_MS
-    fun isSoundCloudHealthy(): Boolean = soundCloudLatencyMs.get() < LATENCY_DEGRADED_THRESHOLD_MS
-
-    fun getSpotifyLatency(): Long = spotifyLatencyMs.get()
-    fun getYouTubeLatency(): Long = youtubeLatencyMs.get()
-
-    suspend fun checkLatencies() = withContext(Dispatchers.IO) {
-        measurePing("https://api.spotify.com/v1/")?.let { spotifyLatencyMs.set(it) }
-        measurePing("https://music.youtube.com/generate_204")?.let { youtubeLatencyMs.set(it) }
-        measurePing("https://api-v2.soundcloud.com/")?.let { soundCloudLatencyMs.set(it) }
-        Timber.tag(TAG).d(
-            "Latency check: Spotify=%dms, YouTube=%dms, SoundCloud=%dms",
-            spotifyLatencyMs.get(),
-            youtubeLatencyMs.get(),
-            soundCloudLatencyMs.get(),
-        )
-    }
-
-    private fun measurePing(url: String): Long? {
-        val start = System.currentTimeMillis()
-        return try {
-            val request = Request.Builder()
-                .url(url)
-                .head()
-                .build()
-            httpClient.newCall(request).execute().use { response ->
-                val elapsed = System.currentTimeMillis() - start
-                if (response.isSuccessful || response.code in 200..499) elapsed else null
-            }
-        } catch (_: IOException) {
-            System.currentTimeMillis() - start + 1000L
-        } catch (_: Exception) {
-            null
-        }
-    }
-}
-
-@Singleton
 class UniversalFallbackMatrix
     @Inject
     constructor(
@@ -107,10 +48,24 @@ class UniversalFallbackMatrix
         private val database: MusicDatabase,
         private val spotifyLibraryRepository: SpotifyLibraryRepository,
         private val spotifySessionManager: SpotifySessionManager,
-        val latencyMonitor: LatencyServerMonitor,
     ) {
         companion object {
             private const val TAG = "UniversalFallback"
+
+            internal fun fallbackSources(failedSource: AudioSourceKind, spotifyAvailable: Boolean): List<AudioSourceKind> =
+                when (failedSource) {
+                    AudioSourceKind.SPOTIFY -> listOf(AudioSourceKind.YOUTUBE, AudioSourceKind.SOUNDCLOUD)
+                    AudioSourceKind.YOUTUBE -> if (spotifyAvailable) {
+                        listOf(AudioSourceKind.SPOTIFY, AudioSourceKind.SOUNDCLOUD)
+                    } else {
+                        listOf(AudioSourceKind.SOUNDCLOUD)
+                    }
+                    AudioSourceKind.SOUNDCLOUD -> if (spotifyAvailable) {
+                        listOf(AudioSourceKind.SPOTIFY, AudioSourceKind.YOUTUBE)
+                    } else {
+                        listOf(AudioSourceKind.YOUTUBE)
+                    }
+                }
 
             // [FIX-ZCODE] Wave 9: pure source detection so the routing rules are unit-testable.
             fun detectSourceOf(mediaId: String): AudioSourceKind =
@@ -236,31 +191,7 @@ class UniversalFallbackMatrix
             val artistStr = originalMetadata.artists.joinToString(" ") { it.name }.ifBlank { null }
             val query = if (!artistStr.isNullOrBlank()) "$title $artistStr" else title
 
-            val fallbackOrder = when (failedSource) {
-                AudioSourceKind.SPOTIFY -> {
-                    if (latencyMonitor.isYouTubeHealthy()) {
-                        listOf(AudioSourceKind.YOUTUBE, AudioSourceKind.SOUNDCLOUD)
-                    } else {
-                        listOf(AudioSourceKind.SOUNDCLOUD, AudioSourceKind.YOUTUBE)
-                    }
-                }
-                AudioSourceKind.YOUTUBE -> {
-                    if (spotifySessionManager.hasActiveSession() && latencyMonitor.isSpotifyHealthy()) {
-                        listOf(AudioSourceKind.SPOTIFY, AudioSourceKind.SOUNDCLOUD)
-                    } else {
-                        listOf(AudioSourceKind.SOUNDCLOUD, AudioSourceKind.SPOTIFY)
-                    }
-                }
-                AudioSourceKind.SOUNDCLOUD -> {
-                    if (spotifySessionManager.hasActiveSession() && latencyMonitor.isSpotifyHealthy()) {
-                        listOf(AudioSourceKind.SPOTIFY, AudioSourceKind.YOUTUBE)
-                    } else {
-                        listOf(AudioSourceKind.YOUTUBE, AudioSourceKind.SPOTIFY)
-                    }
-                }
-            }
-
-            for (targetSource in fallbackOrder) {
+            for (targetSource in fallbackSources(failedSource, spotifySessionManager.hasActiveSession())) {
                 val result = when (targetSource) {
                     AudioSourceKind.SPOTIFY -> tryResolveSpotify(originalMetadata, query)
                     AudioSourceKind.YOUTUBE -> tryResolveYouTube(originalMetadata, query)
@@ -288,7 +219,7 @@ class UniversalFallbackMatrix
             val currentSource = detectSource(originalMetadata.id)
             if (currentSource == AudioSourceKind.SPOTIFY) return@withContext null
 
-            if (!spotifySessionManager.hasActiveSession() || !latencyMonitor.isSpotifyHealthy()) {
+            if (!spotifySessionManager.hasActiveSession()) {
                 return@withContext null
             }
 

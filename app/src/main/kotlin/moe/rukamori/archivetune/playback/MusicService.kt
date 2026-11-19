@@ -415,7 +415,6 @@ class MusicService :
     private lateinit var connectivityManager: ConnectivityManager
     lateinit var connectivityObserver: NetworkConnectivityObserver
     val waitingForNetworkConnection = MutableStateFlow(false)
-    private val isNetworkConnected = MutableStateFlow(false)
 
     // [FIX-ZCODE] Porting completion (donor 18.0): observable crossfade state for the
     // ported player themes (Flamingo/BitChord "mixing" indicator).
@@ -794,8 +793,7 @@ class MusicService :
     }
 
     private fun isNetworkCurrentlyConnected(): Boolean =
-        isNetworkConnected.value ||
-            (::connectivityObserver.isInitialized && connectivityObserver.isCurrentlyConnected())
+        ::connectivityObserver.isInitialized && connectivityObserver.isCurrentlyConnected()
 
     private fun Throwable.isTransientNetworkFailure(): Boolean =
         isRequestTimeout() || isNetworkConnectionFailure()
@@ -1401,18 +1399,7 @@ class MusicService :
 
         scope.launch {
             connectivityObserver.networkStatus.collect { isConnected ->
-                isNetworkConnected.value = isConnected
-                if (isConnected && waitingForNetworkConnection.value) {
-                    waitingForNetworkConnection.value = false
-                    if (player.currentMediaItem != null && player.playWhenReady &&
-                        player.playbackState == Player.STATE_IDLE
-                    ) {
-                        if (!preparePlaybackFromSnapshot(capturePlaybackRecoverySnapshot())) {
-                            player.prepare()
-                        }
-                        player.play()
-                    }
-                }
+                if (isConnected) resumePlaybackAfterReconnect()
             }
         }
 
@@ -1565,13 +1552,6 @@ class MusicService :
                     cancelCrossfade(resetVolume = true, resetPauseAtEnd = true)
                 }
             }
-
-        scope.launch(Dispatchers.IO) {
-            while (isActive) {
-                runCatching { universalFallbackMatrix.latencyMonitor.checkLatencies() }
-                delay(120_000L)
-            }
-        }
 
         dataStore.data
             .map { it[WakelockKey] ?: false }
@@ -3830,6 +3810,18 @@ class MusicService :
 
     private fun waitOnNetworkError() {
         waitingForNetworkConnection.value = true
+        if (isNetworkCurrentlyConnected()) resumePlaybackAfterReconnect()
+    }
+
+    private fun resumePlaybackAfterReconnect() {
+        if (!waitingForNetworkConnection.value) return
+        waitingForNetworkConnection.value = false
+        if (player.currentMediaItem == null || !player.playWhenReady || player.playbackState != Player.STATE_IDLE) return
+
+        if (!preparePlaybackFromSnapshot(capturePlaybackRecoverySnapshot())) {
+            player.prepare()
+        }
+        player.play()
     }
 
     private fun skipOnError() {
