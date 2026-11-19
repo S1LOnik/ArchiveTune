@@ -724,6 +724,10 @@ class HomeViewModel
 
             try {
                 val aiContentFilterPolicy = loadAiContentFilterPolicy()
+                remoteQuickPicks.update { section ->
+                    section?.copy(items = filterAiContent(section.items, aiContentFilterPolicy))
+                        ?.takeIf(HomePage.Section::hasVisibleContent)
+                }
                 supervisorScope {
                     val hideExplicit = context.dataStore.get(HideExplicitKey, false)
                     val hideVideo = context.dataStore.get(HideVideoKey, false)

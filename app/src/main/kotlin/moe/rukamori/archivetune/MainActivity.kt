@@ -1702,29 +1702,26 @@ class MainActivity : ComponentActivity() {
 
                     var restoredMiniPlayerAnchor by remember(playerConnection) { mutableStateOf(false) }
 
+                    val currentPlayerBottomSheetState = rememberUpdatedState(playerBottomSheetState)
                     LaunchedEffect(playerConnection, savedMiniPlayerAnchor, isYearInMusicScreen) {
                         if (restoredMiniPlayerAnchor) return@LaunchedEffect
                         val connection = playerConnection ?: return@LaunchedEffect
                         connection.queueRestoreCompleted.first { it }
-                        if (!awaitRestorablePlayback(connection)) {
-                            if (!playerBottomSheetState.isDismissed) {
-                                playerBottomSheetState.dismiss()
-                            }
-                        } else {
-                            if (!isYearInMusicScreen) {
-                                when (savedMiniPlayerAnchor) {
-                                    EXPANDED_ANCHOR -> playerBottomSheetState.expandSoft()
-                                    COLLAPSED_ANCHOR -> playerBottomSheetState.collapseSoft()
-                                    DISMISSED_ANCHOR -> playerBottomSheetState.collapseSoft()
-                                    else -> playerBottomSheetState.collapseSoft()
-                                }
+                        val canRestore = awaitRestorablePlayback(connection)
+                        val sheet = currentPlayerBottomSheetState.value
+                        if (!canRestore) {
+                            if (!sheet.isDismissed) sheet.dismiss()
+                        } else if (!isYearInMusicScreen) {
+                            if (savedMiniPlayerAnchor == EXPANDED_ANCHOR) {
+                                sheet.expandSoft()
+                            } else {
+                                sheet.collapseSoft()
                             }
                         }
                         restoredMiniPlayerAnchor = true
                         miniPlayerAnchorPersistenceEnabled = true
                     }
 
-                    val currentPlayerBottomSheetState = rememberUpdatedState(playerBottomSheetState)
                     val currentIsYearInMusicScreen = rememberUpdatedState(isYearInMusicScreen)
 
                     DisposableEffect(playerConnection) {
