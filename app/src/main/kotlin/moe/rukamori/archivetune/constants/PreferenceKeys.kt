@@ -766,6 +766,7 @@ enum class LibraryViewType {
 enum class QuickPicksDisplayMode {
     CARD,
     LIST,
+    GRID,
 }
 
 val QuickPicksDisplayModeKey = stringPreferencesKey("quickPicksDisplayMode")

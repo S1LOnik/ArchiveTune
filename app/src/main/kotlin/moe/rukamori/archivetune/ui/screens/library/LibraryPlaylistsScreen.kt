@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -38,6 +39,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -45,6 +47,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
@@ -146,6 +151,50 @@ fun LibraryPlaylistsScreen(
     val likedSongsCount by database.youtubeLikedSongsCount().collectAsStateWithLifecycle(initialValue = 0)
 
     var showHidden by rememberSaveable { mutableStateOf(false) }
+
+    var showVisibilityManager by rememberSaveable { mutableStateOf(false) }
+    var playlistQuery by rememberSaveable { mutableStateOf("") }
+    if (showVisibilityManager) {
+        AlertDialog(
+            onDismissRequest = { showVisibilityManager = false },
+            title = { Text(stringResource(R.string.manage_playlist_visibility)) },
+            text = {
+                Column {
+                    androidx.compose.material3.OutlinedTextField(
+                        value = playlistQuery,
+                        onValueChange = { playlistQuery = it },
+                        label = { Text(stringResource(R.string.search)) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    LazyColumn(Modifier.heightIn(max = 360.dp)) {
+                        items(
+                            items = playlists.filter { it.playlist.name.contains(playlistQuery.trim(), ignoreCase = true) },
+                            key = { it.id },
+                        ) { playlist ->
+                            val toggle = {
+                                database.query { updatePlaylistVisibility(playlist.id, !playlist.playlist.isHidden) }
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth()
+                                    .then(Modifier.clickable(onClick = toggle))
+                                    .padding(vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Checkbox(checked = !playlist.playlist.isHidden, onCheckedChange = { toggle() })
+                                Text(playlist.playlist.name)
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showVisibilityManager = false }) {
+                    Text(stringResource(android.R.string.ok))
+                }
+            },
+        )
+    }
 
     val visiblePlaylists =
         remember(playlists, selectedTagIds, filteredPlaylistIds, showHidden) {
@@ -317,6 +366,13 @@ fun LibraryPlaylistsScreen(
                                     },
                                 )
                             }
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.manage_playlist_visibility)) },
+                                onClick = {
+                                    showSortMenu = false
+                                    showVisibilityManager = true
+                                },
+                            )
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.hidden_playlists)) },
                                 onClick = {

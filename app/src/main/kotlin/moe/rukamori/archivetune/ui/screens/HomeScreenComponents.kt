@@ -306,32 +306,26 @@ fun QuickPicksSection(
     val distinctQuickPicks = remember(quickPicks) { quickPicks.distinctBy { it.id } }
 
     when (displayMode) {
-        QuickPicksDisplayMode.CARD -> {
+        QuickPicksDisplayMode.CARD, QuickPicksDisplayMode.GRID -> {
             BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
-                val heroHeight =
-                    when {
-                        maxWidth >= 840.dp -> 380.dp
-                        maxWidth >= 600.dp -> 356.dp
-                        else -> 332.dp
-                    }
-                val heroMaxWidth =
-                    (maxWidth - 48.dp)
-                        .coerceAtLeast(232.dp)
-                        .coerceAtMost(440.dp)
+                val grid = displayMode == QuickPicksDisplayMode.GRID
+                val heroHeight = when {
+                    grid -> ((maxWidth - 52.dp) / 3).coerceIn(80.dp, 160.dp)
+                    maxWidth >= 840.dp -> 380.dp
+                    maxWidth >= 600.dp -> 356.dp
+                    else -> 332.dp
+                }
+                val heroMaxWidth = if (grid) heroHeight else (maxWidth - 48.dp).coerceIn(232.dp, 440.dp)
                 val density = LocalDensity.current
                 val requestWidthPx = with(density) { heroMaxWidth.roundToPx().coerceAtLeast(1) }
                 val requestHeightPx = with(density) { heroHeight.roundToPx().coerceAtLeast(1) }
 
-                HorizontalCenteredHeroCarousel(
-                    state = rememberCarouselState { distinctQuickPicks.size },
-                    maxItemWidth = heroMaxWidth,
-                    itemSpacing = 10.dp,
-                    contentPadding = PaddingValues(horizontal = 16.dp),
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .height(heroHeight),
-                ) { index ->
+                QuickPickArtworkLayout(
+                    count = distinctQuickPicks.size,
+                    grid = grid,
+                    width = heroMaxWidth,
+                    height = heroHeight,
+                ) { index, artworkModifier ->
                     val song = distinctQuickPicks[index]
                     val isActive = song.id == mediaMetadata?.id
                     val context = LocalContext.current
@@ -347,16 +341,7 @@ fun QuickPicksSection(
 
                     Box(
                         modifier =
-                            Modifier
-                                .fillMaxSize()
-                                .maskClip(MaterialTheme.shapes.extraLarge)
-                                .maskBorder(
-                                    BorderStroke(
-                                        1.dp,
-                                        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.72f),
-                                    ),
-                                    MaterialTheme.shapes.extraLarge,
-                                ).focusable()
+                            artworkModifier.focusable()
                                 .combinedClickable(
                                     onClick = {
                                         if (isActive) {
@@ -430,18 +415,18 @@ fun QuickPicksSection(
                             modifier =
                                 Modifier
                                     .align(Alignment.BottomStart)
-                                    .padding(20.dp),
+                                    .padding(if (grid) 8.dp else 20.dp),
                         ) {
                             Text(
                                 text = song.song.title,
-                                style = MaterialTheme.typography.titleLargeEmphasized,
+                                style = if (grid) MaterialTheme.typography.labelLarge else MaterialTheme.typography.titleLargeEmphasized,
                                 color = Color.White,
                                 maxLines = 2,
                                 overflow = TextOverflow.Ellipsis,
                             )
                             Text(
                                 text = song.artists.joinToString { it.name },
-                                style = MaterialTheme.typography.bodyLarge,
+                                style = if (grid) MaterialTheme.typography.labelSmall else MaterialTheme.typography.bodyLarge,
                                 color = Color.White.copy(alpha = 0.78f),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
@@ -569,32 +554,26 @@ fun RemoteQuickPicksSection(
         }
 
     when (displayMode) {
-        QuickPicksDisplayMode.CARD -> {
+        QuickPicksDisplayMode.CARD, QuickPicksDisplayMode.GRID -> {
             BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
-                val heroHeight =
-                    when {
-                        maxWidth >= 840.dp -> 380.dp
-                        maxWidth >= 600.dp -> 356.dp
-                        else -> 332.dp
-                    }
-                val heroMaxWidth =
-                    (maxWidth - 48.dp)
-                        .coerceAtLeast(232.dp)
-                        .coerceAtMost(440.dp)
+                val grid = displayMode == QuickPicksDisplayMode.GRID
+                val heroHeight = when {
+                    grid -> ((maxWidth - 52.dp) / 3).coerceIn(80.dp, 160.dp)
+                    maxWidth >= 840.dp -> 380.dp
+                    maxWidth >= 600.dp -> 356.dp
+                    else -> 332.dp
+                }
+                val heroMaxWidth = if (grid) heroHeight else (maxWidth - 48.dp).coerceIn(232.dp, 440.dp)
                 val density = LocalDensity.current
                 val requestWidthPx = with(density) { heroMaxWidth.roundToPx().coerceAtLeast(1) }
                 val requestHeightPx = with(density) { heroHeight.roundToPx().coerceAtLeast(1) }
 
-                HorizontalCenteredHeroCarousel(
-                    state = rememberCarouselState { songs.size },
-                    maxItemWidth = heroMaxWidth,
-                    itemSpacing = 10.dp,
-                    contentPadding = PaddingValues(horizontal = 16.dp),
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .height(heroHeight),
-                ) { index ->
+                QuickPickArtworkLayout(
+                    count = songs.size,
+                    grid = grid,
+                    width = heroMaxWidth,
+                    height = heroHeight,
+                ) { index, artworkModifier ->
                     val song = songs[index]
                     val isActive = song.id == mediaMetadata?.id
                     val context = LocalContext.current
@@ -610,16 +589,7 @@ fun RemoteQuickPicksSection(
 
                     Box(
                         modifier =
-                            Modifier
-                                .fillMaxSize()
-                                .maskClip(MaterialTheme.shapes.extraLarge)
-                                .maskBorder(
-                                    BorderStroke(
-                                        1.dp,
-                                        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.72f),
-                                    ),
-                                    MaterialTheme.shapes.extraLarge,
-                                ).focusable()
+                            artworkModifier.focusable()
                                 .combinedClickable(
                                     onClick = {
                                         if (isActive) {
@@ -692,18 +662,18 @@ fun RemoteQuickPicksSection(
                             modifier =
                                 Modifier
                                     .align(Alignment.BottomStart)
-                                    .padding(20.dp),
+                                    .padding(if (grid) 8.dp else 20.dp),
                         ) {
                             Text(
                                 text = song.title,
-                                style = MaterialTheme.typography.titleLargeEmphasized,
+                                style = if (grid) MaterialTheme.typography.labelLarge else MaterialTheme.typography.titleLargeEmphasized,
                                 color = Color.White,
                                 maxLines = 2,
                                 overflow = TextOverflow.Ellipsis,
                             )
                             Text(
                                 text = song.artists.joinToString { artist -> artist.name },
-                                style = MaterialTheme.typography.bodyLarge,
+                                style = if (grid) MaterialTheme.typography.labelSmall else MaterialTheme.typography.bodyLarge,
                                 color = Color.White.copy(alpha = 0.78f),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
@@ -748,6 +718,7 @@ fun RemoteQuickPicksSection(
                     ) { song ->
                         YouTubeListItem(
                             item = song,
+                            squareThumbnail = true,
                             isActive = song.id == mediaMetadata?.id,
                             isPlaying = isPlaying,
                             isSwipeable = false,
@@ -801,6 +772,39 @@ fun RemoteQuickPicksSection(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun QuickPickArtworkLayout(
+    count: Int,
+    grid: Boolean,
+    width: androidx.compose.ui.unit.Dp,
+    height: androidx.compose.ui.unit.Dp,
+    content: @Composable (Int, Modifier) -> Unit,
+) {
+    val shape = if (grid) MaterialTheme.shapes.large else MaterialTheme.shapes.extraLarge
+    val border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.72f))
+    if (grid) {
+        LazyHorizontalGrid(
+            rows = GridCells.Fixed(2),
+            modifier = Modifier.fillMaxWidth().height(height * 2 + 10.dp),
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            items(count) { index ->
+                Box(Modifier.size(width, height)) { content(index, Modifier.fillMaxSize().clip(shape).border(border, shape)) }
+            }
+        }
+    } else {
+        HorizontalCenteredHeroCarousel(
+            state = rememberCarouselState { count },
+            maxItemWidth = width,
+            itemSpacing = 10.dp,
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            modifier = Modifier.fillMaxWidth().height(height),
+        ) { index -> content(index, Modifier.fillMaxSize().maskClip(shape).maskBorder(border, shape)) }
     }
 }
 

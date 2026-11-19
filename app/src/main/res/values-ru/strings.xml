@@ -726,4 +726,7 @@
     <string name="home_mix_soundcloud_label">Микс · SoundCloud</string>
 <string name="spotify_saved_albums">Альбомы Spotify</string>
     <string name="other_sources">Другие источники</string>
+    <string name="quick_picks_display_mode_grid">Сетка обложек</string>
+    <string name="manage_playlist_visibility">Видимость плейлистов</string>
+    <string name="free_internet_meme_caption">Мы за бесплатный интернет. Пиксели тоже бесплатно.</string>
 </resources>

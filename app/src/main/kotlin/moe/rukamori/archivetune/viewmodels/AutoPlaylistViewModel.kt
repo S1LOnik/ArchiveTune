@@ -177,15 +177,8 @@ class AutoPlaylistViewModel
                         }
 
                         "liked_ytm" -> {
-                            // [FIX-ZCODE] W10: YouTube Music liked only — also exclude the
-                            // legacy "spotify//" id variant and SoundCloud tracks
-                            database.likedSongs(songSortType, descending, hideVideo).map { songs ->
-                                songs
-                                    .filter {
-                                        !it.song.id.startsWith("spotify:") &&
-                                            !it.song.id.startsWith("spotify//") &&
-                                            !it.song.id.startsWith("soundcloud:")
-                                    }.filterExplicit(hideExplicit)
+                            database.likedSongs(songSortType, descending, youtubeMusicOnly = true).map { songs ->
+                                songs.filterExplicit(hideExplicit)
                             }
                         }
 

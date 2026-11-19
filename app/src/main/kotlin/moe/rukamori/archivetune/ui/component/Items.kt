@@ -764,6 +764,7 @@ fun YouTubeListItem(
     swipeContentBackgroundColor: Color? = null,
     showActiveContainer: Boolean = true,
     activeContainerBackdrop: Boolean = false,
+    squareThumbnail: Boolean = false,
     trailingContent: @Composable RowScope.() -> Unit = {},
     badges: @Composable RowScope.() -> Unit = {
         val database = LocalDatabase.current
@@ -815,7 +816,7 @@ fun YouTubeListItem(
             thumbnailContent = {
                 val rowRatio =
                     item.thumbnailSourceRatio
-                        ?.takeIf { it >= 4f / 3f }
+                        ?.takeIf { !squareThumbnail && it >= 4f / 3f }
                         ?.let { 16f / 9f }
                         ?: 1f
                 ItemThumbnail(

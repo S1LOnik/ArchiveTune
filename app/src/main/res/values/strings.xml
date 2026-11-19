@@ -2280,4 +2280,7 @@
     <string name="acoustic_local_only_warning">Only works for downloaded local songs</string>
 <string name="spotify_saved_albums">Spotify albums</string>
     <string name="other_sources">Other sources</string>
+    <string name="quick_picks_display_mode_grid">Cover grid</string>
+    <string name="manage_playlist_visibility">Choose visible playlists</string>
+    <string name="free_internet_meme_caption">We’re for a free internet. The pixels are free too.</string>
 </resources>

@@ -9,7 +9,6 @@
 
 package moe.rukamori.archivetune.ui.component
 
-import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -60,7 +59,7 @@ fun NewActionButton(
         modifier =
             modifier
                 .fillMaxWidth()
-                .heightIn(min = 96.dp),
+                .heightIn(min = 104.dp),
         enabled = enabled,
         shape = ButtonDefaults.squareShape,
         colors =
@@ -89,7 +88,6 @@ fun NewActionButton(
                 textAlign = TextAlign.Center,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.basicMarquee(),
             )
         }
     }

@@ -151,7 +151,7 @@ fun LibraryMixScreen(
                 val name = playlist.playlist.name
                 val matchesName = !name.contains("episode", ignoreCase = true)
                 val matchesTags = selectedTagIds.isEmpty() || playlist.id in filteredPlaylistIds
-                matchesName && matchesTags
+                matchesName && matchesTags && !playlist.playlist.isHidden
             }
         }
     val visibleSpotifyPlaylists =
@@ -315,6 +315,29 @@ fun LibraryMixScreen(
                             onMessage = showMessage,
                             modifier = Modifier.padding(horizontal = 24.dp),
                         )
+                    }
+                }
+
+                if (supportArchiveTuneAvailable) {
+                    item(key = "free_internet_meme") {
+                        Column(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp)
+                                .clip(RoundedCornerShape(20.dp))
+                                .background(MaterialTheme.colorScheme.surfaceContainer),
+                        ) {
+                            androidx.compose.foundation.Image(
+                                painter = painterResource(R.drawable.free_internet_meme),
+                                contentDescription = null,
+                                alignment = Alignment.TopCenter,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxWidth().height(120.dp),
+                            )
+                            Text(
+                                text = stringResource(R.string.free_internet_meme_caption),
+                                style = MaterialTheme.typography.titleSmall,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                            )
+                        }
                     }
                 }
 

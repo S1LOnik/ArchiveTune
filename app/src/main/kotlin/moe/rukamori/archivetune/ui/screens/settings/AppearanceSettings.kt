@@ -1092,6 +1092,7 @@ fun AppearanceSettings(navController: NavController) {
                             when (it) {
                                 QuickPicksDisplayMode.CARD -> stringResource(R.string.quick_picks_display_mode_card)
                                 QuickPicksDisplayMode.LIST -> stringResource(R.string.quick_picks_display_mode_list)
+                                QuickPicksDisplayMode.GRID -> stringResource(R.string.quick_picks_display_mode_grid)
                             }
                         },
                     )

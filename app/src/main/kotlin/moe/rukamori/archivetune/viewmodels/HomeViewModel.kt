@@ -18,7 +18,6 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -733,7 +732,6 @@ class HomeViewModel
 
                     launch { loadSpeedDialItems() }
                     launch { loadMixPages() }
-                    val personalizedQuickPicks = async { loadPersonalizedQuickPicks() }
                     launch {
                         forgottenFavorites.value =
                             database
@@ -775,8 +773,10 @@ class HomeViewModel
                     launch {
                         val page =
                             YouTube.home().getOrElse { throwable ->
+                                if (throwable is CancellationException) throw throwable
                                 reportException(throwable)
                                 loadError.value = R.string.error_unknown
+                                loadPersonalizedQuickPicks()
                                 return@launch
                             }
                         val filteredPage =
@@ -796,19 +796,19 @@ class HomeViewModel
                                         )
                                     }.filter(HomePage.Section::hasVisibleContent),
                             )
-                        val (pageWithoutQuickPicks, remoteQuickPicksFallback) = filteredPage.extractQuickPicks()
-                        if (
-                            quickPicksMode.first() == QuickPicks.QUICK_PICKS &&
-                            !personalizedQuickPicks.await()
-                        ) {
-                            remoteQuickPicksFallback?.takeIf { it.items.isNotEmpty() }?.let { fallback ->
-                                remoteQuickPicks.value = fallback
-                            }
-                        }
+                        val (pageWithoutQuickPicks, musicQuickPicks) = filteredPage.extractQuickPicks()
                         applyRemoteHomePage(
                             page = pageWithoutQuickPicks,
                             replaceCommunitySection = true,
                         )
+                        if (quickPicksMode.first() == QuickPicks.QUICK_PICKS) {
+                            val recommendations = musicQuickPicks?.takeIf { section -> section.items.any { it is SongItem } }
+                            if (recommendations != null) {
+                                remoteQuickPicks.value = recommendations
+                            } else {
+                                loadPersonalizedQuickPicks()
+                            }
+                        }
                     }
                 }
 

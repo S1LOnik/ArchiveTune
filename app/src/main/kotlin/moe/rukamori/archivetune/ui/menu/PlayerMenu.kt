@@ -30,6 +30,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
@@ -466,6 +467,16 @@ fun PlayerMenu(
                 bottom = 8.dp + WindowInsets.systemBars.asPaddingValues().calculateBottomPadding(),
             ),
     ) {
+        item(key = "other_sources") {
+            androidx.compose.material3.FilledTonalButton(
+                onClick = { showOtherSourcesSheet = true },
+                modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+            ) {
+                Icon(painterResource(R.drawable.manage_search), contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.other_sources))
+            }
+        }
         item {
             MenuSurfaceSection(modifier = Modifier.padding(vertical = 6.dp)) {
                 NewActionGrid(
@@ -702,22 +713,6 @@ fun PlayerMenu(
                                     ),
                                 )
                             }
-                            add(
-                                NewAction(
-                                    icon = {
-                                        Icon(
-                                            painter = painterResource(R.drawable.manage_search),
-                                            contentDescription = null,
-                                            modifier = Modifier.size(28.dp),
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        )
-                                    },
-                                    text = stringResource(R.string.other_sources),
-                                    onClick = {
-                                        showOtherSourcesSheet = true
-                                    },
-                                ),
-                            )
                             if (isQueueTrigger != true) {
                                 val aodBgColor = if (aodFeatureEnabled) MaterialTheme.colorScheme.primary else Color.Unspecified
                                 val aodContentColor = if (aodFeatureEnabled) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
