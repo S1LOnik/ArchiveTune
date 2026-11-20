@@ -88,6 +88,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import moe.rukamori.archivetune.R
+import moe.rukamori.archivetune.ui.player.playerTransportIcons
 import moe.rukamori.archivetune.constants.FloatingNavigationBarMaxWidth
 import moe.rukamori.archivetune.constants.HomeFeedStyle
 import moe.rukamori.archivetune.constants.LyricsBackgroundStyle
@@ -610,6 +611,7 @@ private fun StudioHomeAndNavStage(
         // Dedicated non-overlapping bottom dock for Mini-Player + Navigation Bar
         UnifiedNavAndMiniPlayerBarOverlay(
             navigation = snapshot.navigation,
+            playerStyle = snapshot.player.designStyle,
             reducedMotion = snapshot.motion.disableAnimations || snapshot.motion.profile == MotionProfile.REDUCED,
             collapsed = navCollapsed,
             selectedTab = selectedTab,
@@ -651,6 +653,7 @@ private fun DemoCoverTile(
 @Composable
 fun UnifiedNavMiniPlayerPreview(
     navigation: NavigationProfile,
+    playerStyle: PlayerDesignStyle = PlayerDesignStyle.APPLE_MUSIC,
     reducedMotion: Boolean = false,
     onSelectPreset: ((NavMiniPlayerPreset) -> Unit)? = null,
     modifier: Modifier = Modifier,
@@ -782,6 +785,7 @@ fun UnifiedNavMiniPlayerPreview(
 
             UnifiedNavAndMiniPlayerBarOverlay(
                 navigation = navigation,
+                playerStyle = playerStyle,
                 reducedMotion = reducedMotion,
                 collapsed = collapsed,
                 selectedTab = selectedTab,
@@ -800,6 +804,7 @@ fun UnifiedNavMiniPlayerPreview(
 @Composable
 private fun UnifiedNavAndMiniPlayerBarOverlay(
     navigation: NavigationProfile,
+    playerStyle: PlayerDesignStyle,
     reducedMotion: Boolean,
     collapsed: Boolean,
     selectedTab: Int,
@@ -811,6 +816,7 @@ private fun UnifiedNavAndMiniPlayerBarOverlay(
     onMiniPlayerClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val transportIcons = playerTransportIcons(playerStyle)
     val animatedCompactFraction by animateFloatAsState(
         targetValue = if (collapsed) 1f else 0f,
         animationSpec = if (reducedMotion) snap() else spring(dampingRatio = 0.88f, stiffness = 420f),
@@ -1091,10 +1097,7 @@ private fun UnifiedNavAndMiniPlayerBarOverlay(
                         }
                         IconButton(onClick = onTogglePlay, modifier = Modifier.size(28.dp)) {
                             Icon(
-                                painter =
-                                    painterResource(
-                                        if (isPlaying) R.drawable.pause else R.drawable.play,
-                                    ),
+                                painter = if (isPlaying) transportIcons.pause else transportIcons.play,
                                 contentDescription =
                                     stringResource(
                                         if (isPlaying) R.string.widget_pause else R.string.play,
@@ -1106,7 +1109,7 @@ private fun UnifiedNavAndMiniPlayerBarOverlay(
                         if (compactFraction < 0.7f) {
                             IconButton(onClick = onNextTrack, modifier = Modifier.size(28.dp)) {
                                 Icon(
-                                    painter = painterResource(R.drawable.apple_skip_next),
+                                    painter = transportIcons.next,
                                     contentDescription = stringResource(R.string.next),
                                     tint = miniTitleColor,
                                     modifier = Modifier.size(16.dp),
@@ -1287,6 +1290,7 @@ private fun StudioPlayerStage(
 ) {
     var progress by remember { mutableFloatStateOf(0.38f) }
     val style = snapshot.player.designStyle
+    val transportIcons = playerTransportIcons(style)
     val supportsCustomBg = playerStyleSupportsCustomBackground(style)
     val showVolumeBar = playerStyleSupportsVolumeBar(style) && snapshot.player.showVolumeBar
     val artworkColors =
@@ -1739,7 +1743,7 @@ private fun StudioPlayerStage(
                 ) {
                     IconButton(onClick = onNextTrack, modifier = Modifier.size(34.dp)) {
                         Icon(
-                            painter = painterResource(R.drawable.apple_skip_previous),
+                            painter = transportIcons.previous,
                             contentDescription = null,
                             tint = onPlayerContent,
                             modifier = Modifier.size(20.dp),
@@ -1759,7 +1763,7 @@ private fun StudioPlayerStage(
                         color = if (isStyleDarkBackdrop) Color.White else MaterialTheme.colorScheme.primary,
                     ) {
                         Icon(
-                            painter = painterResource(if (isPlaying) R.drawable.pause else R.drawable.play),
+                            painter = if (isPlaying) transportIcons.pause else transportIcons.play,
                             contentDescription = null,
                             tint = if (isStyleDarkBackdrop) Color(0xFF14171D) else MaterialTheme.colorScheme.onPrimary,
                             modifier = Modifier.padding(8.dp).size(20.dp),
@@ -1768,7 +1772,7 @@ private fun StudioPlayerStage(
                     Spacer(modifier = Modifier.width(14.dp))
                     IconButton(onClick = onNextTrack, modifier = Modifier.size(34.dp)) {
                         Icon(
-                            painter = painterResource(R.drawable.apple_skip_next),
+                            painter = transportIcons.next,
                             contentDescription = null,
                             tint = onPlayerContent,
                             modifier = Modifier.size(20.dp),

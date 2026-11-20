@@ -1017,6 +1017,26 @@ fun AppearanceStudioScreen(
                     }
                 }
                 Text(
+                    text = stringResource(R.string.navigation_bar_settings_title),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    NavBarMaterial.entries.forEach { material ->
+                        FilterChip(
+                            selected = draft.navigation.material == material,
+                            onClick = {
+                                haptic(ArchiveTuneHapticKind.SELECTION)
+                                updateDraft(draft.copy(navigation = draft.navigation.copy(material = material)))
+                            },
+                            label = { Text(stringResource(material.labelRes)) },
+                        )
+                    }
+                }
+                Text(
                     text = stringResource(R.string.mini_player_style_title),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1083,20 +1103,6 @@ fun AppearanceStudioScreen(
                     val widthLocked = navBarMaterialLocksWidth(draft.navigation.material)
                     val heightLocked = navBarMaterialLocksHeight(draft.navigation.material)
 
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
-                        NavBarMaterial.entries.forEach { material ->
-                            FilterChip(
-                                selected = draft.navigation.material == material,
-                                onClick = {
-                                    updateDraft(draft.copy(navigation = draft.navigation.copy(material = material)))
-                                },
-                                label = { Text(stringResource(material.labelRes)) },
-                            )
-                        }
-                    }
                     StudioToggleRow(
                         title = stringResource(R.string.navigation_bar_glass_glow),
                         subtitle =

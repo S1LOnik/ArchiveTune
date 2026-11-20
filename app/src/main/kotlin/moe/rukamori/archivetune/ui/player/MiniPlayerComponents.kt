@@ -48,6 +48,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.FastForward
+import androidx.compose.material.icons.rounded.FastRewind
+import androidx.compose.material.icons.rounded.Pause
+import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -64,6 +69,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -91,6 +98,8 @@ import moe.rukamori.archivetune.constants.EnableHapticFeedbackKey
 import moe.rukamori.archivetune.constants.MINI_PLAYER_BAR_HEIGHT_DP
 import moe.rukamori.archivetune.constants.MiniPlayerHeight
 import moe.rukamori.archivetune.constants.MiniPlayerStyle
+import moe.rukamori.archivetune.constants.PlayerDesignStyle
+import moe.rukamori.archivetune.constants.PlayerDesignStyleKey
 import moe.rukamori.archivetune.constants.NavigationBarHorizontalPadding
 import moe.rukamori.archivetune.extensions.togglePlayPause
 import moe.rukamori.archivetune.models.MediaMetadata
@@ -104,6 +113,7 @@ import androidx.compose.ui.semantics.semantics
 import moe.rukamori.archivetune.ui.utils.getNextFallbackUrl
 import moe.rukamori.archivetune.utils.rememberLowDataModeActive
 import moe.rukamori.archivetune.utils.rememberPreference
+import moe.rukamori.archivetune.utils.rememberEnumPreference
 import kotlin.math.absoluteValue
 import kotlin.math.roundToInt
 import androidx.compose.runtime.getValue
@@ -521,9 +531,73 @@ private fun MiniPlayerArtwork(
     }
 }
 
+@Immutable
+internal data class PlayerTransportIcons(
+    val previous: Painter,
+    val play: Painter,
+    val pause: Painter,
+    val next: Painter,
+    val morphPlayPause: Boolean = false,
+)
+
+@Composable
+internal fun playerTransportIcons(style: PlayerDesignStyle): PlayerTransportIcons =
+    when (style) {
+        PlayerDesignStyle.APPLE_MUSIC -> PlayerTransportIcons(
+            painterResource(R.drawable.flamingo_np_rewind),
+            painterResource(R.drawable.flamingo_np_play),
+            painterResource(R.drawable.flamingo_np_pause),
+            painterResource(R.drawable.flamingo_np_fforward),
+        )
+        PlayerDesignStyle.BITCHORD -> PlayerTransportIcons(
+            rememberVectorPainter(Icons.Rounded.FastRewind),
+            rememberVectorPainter(Icons.Rounded.PlayArrow),
+            rememberVectorPainter(Icons.Rounded.Pause),
+            rememberVectorPainter(Icons.Rounded.FastForward),
+        )
+        PlayerDesignStyle.SIMPMUSIC -> PlayerTransportIcons(
+            painterResource(R.drawable.simpmusic_skip_previous),
+            painterResource(R.drawable.simpmusic_play_circle),
+            painterResource(R.drawable.simpmusic_pause_circle),
+            painterResource(R.drawable.simpmusic_skip_next),
+        )
+        PlayerDesignStyle.SPATIALFLOW -> PlayerTransportIcons(
+            painterResource(R.drawable.spatialflow_ic_skip_previous),
+            painterResource(R.drawable.spatialflow_ic_play),
+            painterResource(R.drawable.spatialflow_ic_pause),
+            painterResource(R.drawable.spatialflow_ic_skip_next),
+        )
+        PlayerDesignStyle.V9, PlayerDesignStyle.V10 -> PlayerTransportIcons(
+            painterResource(R.drawable.skip_previous),
+            painterResource(R.drawable.player_play),
+            painterResource(R.drawable.player_pause),
+            painterResource(R.drawable.skip_next),
+            morphPlayPause = true,
+        )
+        PlayerDesignStyle.LOOPER -> PlayerTransportIcons(
+            rememberVectorPainter(Icons.Rounded.FastRewind),
+            painterResource(R.drawable.player_play),
+            painterResource(R.drawable.player_pause),
+            painterResource(R.drawable.player_fast_forward),
+        )
+        PlayerDesignStyle.TIKTOK -> PlayerTransportIcons(
+            painterResource(R.drawable.apple_skip_previous),
+            painterResource(R.drawable.play_applemusic),
+            painterResource(R.drawable.pause_applemusic),
+            painterResource(R.drawable.apple_skip_next),
+            morphPlayPause = true,
+        )
+        else -> PlayerTransportIcons(
+            painterResource(R.drawable.player_skip_previous),
+            painterResource(R.drawable.player_play),
+            painterResource(R.drawable.player_pause),
+            painterResource(R.drawable.player_skip_next),
+        )
+    }
+
 @Composable
 private fun MiniPlayerTransportButton(
-    iconResId: Int,
+    painter: Painter,
     contentDescription: String?,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -590,7 +664,7 @@ private fun MiniPlayerTransportButton(
             )
         } else {
             Icon(
-                painter = painterResource(iconResId),
+                painter = painter,
                 contentDescription = contentDescription,
                 tint = if (enabled) tint else colors.disabledButtonIcon,
                 modifier = Modifier.size(iconSize),
@@ -609,6 +683,7 @@ private fun MiniPlayerTransportControls(
     canSkipNext: Boolean,
     playerConnection: PlayerConnection,
     colors: MiniPlayerContentColors,
+    transportIcons: PlayerTransportIcons,
 ) {
     val onPrevious = remember(playerConnection) { { playerConnection.seekToPrevious() } }
     val onNext = remember(playerConnection) { { playerConnection.seekToNext() } }
@@ -629,7 +704,7 @@ private fun MiniPlayerTransportControls(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         MiniPlayerTransportButton(
-            iconResId = R.drawable.apple_skip_previous,
+            painter = transportIcons.previous,
             contentDescription = stringResource(R.string.widget_previous),
             onClick = onPrevious,
             enabled = canSkipPrevious,
@@ -637,11 +712,11 @@ private fun MiniPlayerTransportControls(
         )
 
         MiniPlayerTransportButton(
-            iconResId =
+            painter =
                 when {
-                    playbackState == Player.STATE_ENDED -> R.drawable.solar_replay_linear
-                    isPlaying -> R.drawable.pause_applemusic
-                    else -> R.drawable.play_applemusic
+                    playbackState == Player.STATE_ENDED -> painterResource(R.drawable.solar_replay_linear)
+                    isPlaying -> transportIcons.pause
+                    else -> transportIcons.play
                 },
             contentDescription =
                 stringResource(
@@ -649,12 +724,12 @@ private fun MiniPlayerTransportControls(
                 ),
             onClick = onPlayPause,
             isPrimary = true,
-            morphingPlayState = if (playbackState == Player.STATE_ENDED) null else isPlaying,
+            morphingPlayState = isPlaying.takeIf { transportIcons.morphPlayPause && playbackState != Player.STATE_ENDED },
             colors = colors,
         )
 
         MiniPlayerTransportButton(
-            iconResId = R.drawable.apple_skip_next,
+            painter = transportIcons.next,
             contentDescription = stringResource(R.string.next),
             onClick = onNext,
             enabled = canSkipNext,
@@ -674,6 +749,8 @@ fun NewMiniPlayerContent(
     compactShowTransportControls: Boolean = false,
     onArtworkSlotPositioned: ((androidx.compose.ui.geometry.Rect) -> Unit)? = null,
 ) {
+    val playerStyle by rememberEnumPreference(PlayerDesignStyleKey, PlayerDesignStyle.APPLE_MUSIC)
+    val transportIcons = playerTransportIcons(playerStyle)
     val safeCompactFraction = compactFraction.coerceIn(0f, 1f)
     if (miniPlayerStyle == MiniPlayerStyle.BAR) {
         MiniPlayerBarContent(
@@ -681,6 +758,7 @@ fun NewMiniPlayerContent(
             durationProvider = durationProvider,
             playerConnection = playerConnection,
             colors = colors,
+            transportIcons = transportIcons,
             compactFraction = safeCompactFraction,
             compactShowTransportControls = compactShowTransportControls,
             onArtworkSlotPositioned = onArtworkSlotPositioned,
@@ -729,6 +807,7 @@ fun NewMiniPlayerContent(
                     canSkipNext = canSkipNext,
                     playerConnection = playerConnection,
                     colors = colors,
+                    transportIcons = transportIcons,
                 )
             }
         }
@@ -739,6 +818,7 @@ fun NewMiniPlayerContent(
                 durationProvider = durationProvider,
                 playerConnection = playerConnection,
                 colors = colors,
+                transportIcons = transportIcons,
                 showTransportControls = compactShowTransportControls,
                 modifier =
                     Modifier
@@ -755,11 +835,12 @@ fun NewMiniPlayerContent(
 }
 
 @Composable
-fun CompactMiniPlayerContent(
+private fun CompactMiniPlayerContent(
     positionProvider: () -> Long,
     durationProvider: () -> Long,
     playerConnection: PlayerConnection,
     colors: MiniPlayerContentColors,
+    transportIcons: PlayerTransportIcons,
     modifier: Modifier = Modifier,
     showTransportControls: Boolean = false,
     onArtworkSlotPositioned: ((androidx.compose.ui.geometry.Rect) -> Unit)? = null,
@@ -806,7 +887,7 @@ fun CompactMiniPlayerContent(
 
         if (showTransportControls) {
             MiniPlayerTransportButton(
-                iconResId = R.drawable.apple_skip_previous,
+                painter = transportIcons.previous,
                 contentDescription = stringResource(R.string.widget_previous),
                 onClick = onPrevious,
                 enabled = canSkipPrevious,
@@ -816,11 +897,11 @@ fun CompactMiniPlayerContent(
         }
 
         MiniPlayerTransportButton(
-            iconResId =
+            painter =
                 when {
-                    playbackState == Player.STATE_ENDED -> R.drawable.solar_replay_linear
-                    isPlaying -> R.drawable.pause_applemusic
-                    else -> R.drawable.play_applemusic
+                    playbackState == Player.STATE_ENDED -> painterResource(R.drawable.solar_replay_linear)
+                    isPlaying -> transportIcons.pause
+                    else -> transportIcons.play
                 },
             contentDescription =
                 stringResource(
@@ -829,12 +910,13 @@ fun CompactMiniPlayerContent(
             onClick = onPlayPause,
             isPrimary = true,
             compact = true,
+            morphingPlayState = isPlaying.takeIf { transportIcons.morphPlayPause && playbackState != Player.STATE_ENDED },
             colors = colors,
         )
 
         if (showTransportControls) {
             MiniPlayerTransportButton(
-                iconResId = R.drawable.apple_skip_next,
+                painter = transportIcons.next,
                 contentDescription = stringResource(R.string.next),
                 onClick = onNext,
                 enabled = canSkipNext,
@@ -851,6 +933,7 @@ private fun MiniPlayerBarContent(
     durationProvider: () -> Long,
     playerConnection: PlayerConnection,
     colors: MiniPlayerContentColors,
+    transportIcons: PlayerTransportIcons,
     compactFraction: Float = 0f,
     compactShowTransportControls: Boolean = false,
     onArtworkSlotPositioned: ((androidx.compose.ui.geometry.Rect) -> Unit)? = null,
@@ -900,11 +983,11 @@ private fun MiniPlayerBarContent(
             } ?: Spacer(Modifier.weight(1f))
 
             MiniPlayerTransportButton(
-                iconResId =
+                painter =
                     when {
-                        playbackState == Player.STATE_ENDED -> R.drawable.solar_replay_linear
-                        isPlaying -> R.drawable.pause_applemusic
-                        else -> R.drawable.play_applemusic
+                        playbackState == Player.STATE_ENDED -> painterResource(R.drawable.solar_replay_linear)
+                        isPlaying -> transportIcons.pause
+                        else -> transportIcons.play
                     },
                 contentDescription =
                     stringResource(
@@ -913,13 +996,13 @@ private fun MiniPlayerBarContent(
                 onClick = onPlayPause,
                 isPrimary = true,
                 compact = true,
-                morphingPlayState = if (playbackState == Player.STATE_ENDED) null else isPlaying,
+                morphingPlayState = isPlaying.takeIf { transportIcons.morphPlayPause && playbackState != Player.STATE_ENDED },
                 colors = colors,
             )
 
             if (compactFraction < 0.5f || compactShowTransportControls) {
                 MiniPlayerTransportButton(
-                    iconResId = R.drawable.apple_skip_next,
+                    painter = transportIcons.next,
                     contentDescription = stringResource(R.string.next),
                     onClick = onNext,
                     enabled = canSkipNext,

@@ -111,6 +111,8 @@ import moe.rukamori.archivetune.ui.component.SwitchPreference
 import moe.rukamori.archivetune.ui.screens.Screens
 import moe.rukamori.archivetune.ui.utils.backToMain
 import moe.rukamori.archivetune.utils.rememberPreference
+import moe.rukamori.archivetune.constants.PlayerDesignStyle
+import moe.rukamori.archivetune.constants.PlayerDesignStyleKey
 import moe.rukamori.archivetune.utils.rememberEnumPreference
 import kotlin.math.roundToInt
 import androidx.compose.foundation.layout.asPaddingValues
@@ -300,6 +302,10 @@ fun NavigationBarSettings(navController: NavController, scrollTo: String? = null
                 item {
                     moe.rukamori.archivetune.ui.screens.settings.studio.UnifiedNavMiniPlayerPreview(
                         navigation = currentNavProfile,
+                        playerStyle = rememberEnumPreference(
+                            PlayerDesignStyleKey,
+                            defaultValue = PlayerDesignStyle.APPLE_MUSIC,
+                        ).value,
                         reducedMotion = !moe.rukamori.archivetune.ui.motion.LocalMotionConfig.current.animationsEnabled,
                         onSelectPreset = { preset ->
                             val nav = preset.navigation
