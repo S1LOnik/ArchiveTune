@@ -2447,4 +2447,46 @@
     <string name="player_landscape_move_down">Move down in queue</string>
     <string name="player_landscape_remove_queue">Remove from queue</string>
     <string name="player_landscape_queue_empty">Queue is empty</string>
+
+    <string name="player_menu_quick_actions">Quick actions</string>
+    <string name="player_menu_customize_actions">Customize</string>
+    <string name="player_menu_customize_hint">Choose up to 4 pinned actions and their order</string>
+    <string name="player_menu_reset_actions">Reset</string>
+    <string name="player_menu_section_audio_sources">Audio &amp; sources</string>
+    <string name="player_menu_section_track_library">Track &amp; library</string>
+    <string name="player_menu_active_source_fmt">Current source: %1$s</string>
+    <string name="player_menu_source_youtube">YouTube Music</string>
+    <string name="player_menu_source_spotify">Spotify</string>
+    <string name="player_menu_source_soundcloud">SoundCloud</string>
+    <string name="player_menu_source_local">Local file</string>
+
+    <string name="other_sources_searching">Searching versions &amp; mixes…</string>
+    <string name="other_sources_empty">No other versions found</string>
+    <string name="other_sources_search_error">Search failed</string>
+    <string name="other_sources_play_error">Playback failed</string>
+    <string name="other_sources_filter_all">All</string>
+    <string name="other_sources_version_original">Original</string>
+    <string name="other_sources_version_live">Live &amp; acoustic</string>
+    <string name="other_sources_version_remix">Remixes</string>
+    <string name="other_sources_version_vip">VIP &amp; extended</string>
+    <string name="other_sources_version_slowed">Slowed &amp; sped up</string>
+    <string name="other_sources_version_other">Other versions</string>
+    <string name="other_sources_provider_failed_fmt">%1$s failed</string>
+    <string name="other_sources_retry">Retry</string>
+    <string name="other_sources_switched_fmt">Switched source to %1$s: %2$s</string>
+
+    <string name="queue_section_now_playing">Now playing</string>
+    <string name="queue_section_up_next">Up next</string>
+    <string name="queue_jump_to_current">Jump to current track</string>
+    <string name="queue_drag_handle_desc">Drag to reorder</string>
+    <string name="queue_item_removed_undo">Removed \"%1$s\"</string>
+
+    <string name="lyrics_rehearsal_title">Lyrics rehearsal</string>
+    <string name="lyrics_rehearsal_play">Play sample</string>
+    <string name="lyrics_rehearsal_pause">Pause sample</string>
+    <string name="lyrics_character_title">Display character</string>
+    <string name="lyrics_character_reading_desc">Calm reading clarity, minimal blur and gentle contrast</string>
+    <string name="lyrics_character_focus_desc">Balanced emphasis on the current line</string>
+    <string name="lyrics_character_stage_desc">Expressive stage scale, deeper fade &amp; stronger blur</string>
+    <string name="lyrics_jump_to_current_line">Jump to current line</string>
 </resources>

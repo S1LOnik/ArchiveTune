@@ -893,4 +893,46 @@
     <string name="player_landscape_move_down">Опустить в очереди</string>
     <string name="player_landscape_remove_queue">Убрать из очереди</string>
     <string name="player_landscape_queue_empty">Очередь пуста</string>
+
+    <string name="player_menu_quick_actions">Быстрые действия</string>
+    <string name="player_menu_customize_actions">Настроить</string>
+    <string name="player_menu_customize_hint">Выберите до 4 закреплённых действий и их порядок</string>
+    <string name="player_menu_reset_actions">Сбросить</string>
+    <string name="player_menu_section_audio_sources">Звук и источники</string>
+    <string name="player_menu_section_track_library">Трек и библиотека</string>
+    <string name="player_menu_active_source_fmt">Активный источник: %1$s</string>
+    <string name="player_menu_source_youtube">YouTube Music</string>
+    <string name="player_menu_source_spotify">Spotify</string>
+    <string name="player_menu_source_soundcloud">SoundCloud</string>
+    <string name="player_menu_source_local">Локальный файл</string>
+
+    <string name="other_sources_searching">Ищем версии и ремиксы…</string>
+    <string name="other_sources_empty">Другие версии трека не найдены</string>
+    <string name="other_sources_search_error">Ошибка поиска</string>
+    <string name="other_sources_play_error">Ошибка воспроизведения</string>
+    <string name="other_sources_filter_all">Все</string>
+    <string name="other_sources_version_original">Оригинал</string>
+    <string name="other_sources_version_live">Live и концерты</string>
+    <string name="other_sources_version_remix">Ремиксы</string>
+    <string name="other_sources_version_vip">VIP и расширенные</string>
+    <string name="other_sources_version_slowed">Slowed и ускоренные</string>
+    <string name="other_sources_version_other">Другие версии</string>
+    <string name="other_sources_provider_failed_fmt">Нет ответа от %1$s</string>
+    <string name="other_sources_retry">Повторить</string>
+    <string name="other_sources_switched_fmt">Источник %1$s: %2$s</string>
+
+    <string name="queue_section_now_playing">Сейчас играет</string>
+    <string name="queue_section_up_next">Далее</string>
+    <string name="queue_jump_to_current">К текущему треку</string>
+    <string name="queue_drag_handle_desc">Перетащить для изменения порядка</string>
+    <string name="queue_item_removed_undo">Удалено: «%1$s»</string>
+
+    <string name="lyrics_rehearsal_title">Репетиция текста</string>
+    <string name="lyrics_rehearsal_play">Запустить</string>
+    <string name="lyrics_rehearsal_pause">Пауза</string>
+    <string name="lyrics_character_title">Характер отображения</string>
+    <string name="lyrics_character_reading_desc">Спокойное чтение, минимум размытия и ровный контраст</string>
+    <string name="lyrics_character_focus_desc">Сбалансированный акцент на текущей строке</string>
+    <string name="lyrics_character_stage_desc">Крупный сценический масштаб, глубокое затухание и размытие</string>
+    <string name="lyrics_jump_to_current_line">К текущей строке</string>
 </resources>

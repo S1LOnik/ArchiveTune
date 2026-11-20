@@ -434,7 +434,17 @@ fun Lyrics(
     val lyricsTextSize by rememberPreference(LyricsTextSizeKey, 26f)
     val lyricsLineSpacing by rememberPreference(LyricsLineSpacingKey, 1.3f)
     val lyricsLineBlur by rememberPreference(LyricsLineBlurKey, true)
-    val animationsDisabled = LocalAnimationsDisabled.current
+    val lyricsDisplayCharacter by rememberEnumPreference(
+        moe.rukamori.archivetune.constants.LyricsDisplayCharacterKey,
+        moe.rukamori.archivetune.constants.LyricsDisplayCharacter.FOCUS,
+    )
+    val animationsDisabled =
+        LocalAnimationsDisabled.current ||
+            !moe.rukamori.archivetune.ui.motion.LocalMotionConfig.current.animationsEnabled
+    val lyricsCharacterStyle =
+        remember(lyricsDisplayCharacter, animationsDisabled) {
+            resolveLyricsCharacterStyle(lyricsDisplayCharacter, !animationsDisabled)
+        }
     val lyricsFontFamily = rememberArchiveTuneLyricsFontFamily()
 
     val verticalLineSpacing =
@@ -887,9 +897,9 @@ fun Lyrics(
                                 isManualScrolling -> {
                                     when {
                                         index == displayedCurrentLineIndex -> 1f
-                                        distance == 1 -> 0.72f
-                                        distance == 2 -> 0.56f
-                                        distance == 3 -> 0.40f
+                                        distance == 1 -> maxOf(0.72f, lyricsCharacterStyle.nearInactiveAlpha)
+                                        distance == 2 -> maxOf(0.56f, lyricsCharacterStyle.midInactiveAlpha)
+                                        distance == 3 -> maxOf(0.40f, lyricsCharacterStyle.farInactiveAlpha)
                                         else -> 0.28f
                                     }
                                 }
@@ -899,54 +909,64 @@ fun Lyrics(
                                 }
 
                                 distance == 1 -> {
-                                    0.52f
+                                    lyricsCharacterStyle.nearInactiveAlpha
                                 }
 
                                 distance == 2 -> {
-                                    0.30f
-                                }
-
-                                distance == 3 -> {
-                                    0.18f
+                                    lyricsCharacterStyle.midInactiveAlpha
                                 }
 
                                 else -> {
-                                    0.10f
+                                    lyricsCharacterStyle.farInactiveAlpha
                                 }
                             }
 
                         val animatedAlpha by animateFloatAsState(
                             targetValue = targetAlpha,
                             animationSpec =
-                                tween(
-                                    durationMillis = 400,
-                                    easing = SmoothDecelerateEasing,
-                                ),
+                                if (animationsDisabled) {
+                                    androidx.compose.animation.core.snap()
+                                } else {
+                                    tween(
+                                        durationMillis = 400,
+                                        easing = SmoothDecelerateEasing,
+                                    )
+                                },
                             label = "lyricAlpha",
                         )
 
-                        val targetScale = 1f
+                        val targetScale =
+                            when {
+                                !isSynced || animationsDisabled -> 1f
+                                index == displayedCurrentLineIndex -> lyricsCharacterStyle.activeScale
+                                else -> lyricsCharacterStyle.inactiveScale
+                            }
 
                         val animatedScale by animateFloatAsState(
                             targetValue = targetScale,
                             animationSpec =
-                                spring(
-                                    dampingRatio = Spring.DampingRatioNoBouncy,
-                                    stiffness = Spring.StiffnessLow,
-                                ),
+                                if (animationsDisabled) {
+                                    androidx.compose.animation.core.snap()
+                                } else {
+                                    spring(
+                                        dampingRatio = Spring.DampingRatioNoBouncy,
+                                        stiffness = Spring.StiffnessLow,
+                                    )
+                                },
                             label = "lyricScale",
                         )
 
                         val targetBlur =
                             when {
+                                animationsDisabled || !lyricsLineBlur -> 0f
                                 !isSynced || index == displayedCurrentLineIndex || (isSelectionModeActive && isSelected) ||
                                     isManualScrolling -> 0f
 
-                                distance == 1 -> 2f
+                                distance == 1 -> 2f * lyricsCharacterStyle.blurMultiplier
 
-                                distance == 2 -> 5f
+                                distance == 2 -> 5f * lyricsCharacterStyle.blurMultiplier
 
-                                else -> 12f
+                                else -> (12f * lyricsCharacterStyle.blurMultiplier).coerceAtMost(14f)
                             }
 
                         val animatedBlur by animateFloatAsState(
@@ -2455,7 +2475,7 @@ fun Lyrics(
                         modifier = Modifier.size(18.dp),
                     )
                     Text(
-                        text = stringResource(R.string.resume_autoscroll),
+                        text = stringResource(R.string.lyrics_jump_to_current_line),
                         color = MaterialTheme.colorScheme.onPrimaryContainer,
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Medium,

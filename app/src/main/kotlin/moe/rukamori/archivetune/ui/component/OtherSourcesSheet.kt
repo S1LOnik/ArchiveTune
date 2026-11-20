@@ -8,8 +8,10 @@
 package moe.rukamori.archivetune.ui.component
 
 import android.widget.Toast
+import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,22 +29,27 @@ import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -72,7 +79,8 @@ import moe.rukamori.archivetune.models.toMediaMetadata
 import moe.rukamori.archivetune.playback.queues.ListQueue
 import moe.rukamori.archivetune.soundcloud.SoundCloudAudioProvider
 import moe.rukamori.archivetune.spotify.Spotify
-import moe.rukamori.archivetune.spotify.models.SpotifyTrack
+import moe.rukamori.archivetune.ui.player.LocalArtworkFallback
+import moe.rukamori.archivetune.utils.makeTimeString
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -86,165 +94,105 @@ fun OtherSourcesSheet(
 
     var isLoading by remember { mutableStateOf(false) }
     var searchResults by remember { mutableStateOf<List<SourceTrack>>(emptyList()) }
+    var failedSources by remember { mutableStateOf<List<TrackSource>>(emptyList()) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var searchTrigger by remember { mutableIntStateOf(0) }
+    var selectedFilter by rememberSaveable { mutableStateOf(SourceVersionFilter.ALL) }
 
-    LaunchedEffect(mediaMetadata?.id) {
-        if (mediaMetadata == null) return@LaunchedEffect
+    // Search executes only while this sheet is open / composed for the current track.
+    LaunchedEffect(mediaMetadata?.id, searchTrigger) {
+        val currentMeta = mediaMetadata ?: return@LaunchedEffect
 
         isLoading = true
         errorMessage = null
+        failedSources = emptyList()
 
         try {
-            withContext(Dispatchers.IO) {
-                val cleanedInfo = cleanTrackInfo(
-                    mediaMetadata.title,
-                    mediaMetadata.artists.firstOrNull()?.name ?: ""
-                )
-                val trackName = cleanedInfo.first
-                val artistName = cleanedInfo.second
-                val query = "$trackName $artistName".trim()
+            val aggregated =
+                withContext(Dispatchers.IO) {
+                    val cleanedInfo =
+                        cleanTrackInfo(
+                            currentMeta.title,
+                            currentMeta.artists.firstOrNull()?.name ?: "",
+                        )
+                    val trackName = cleanedInfo.first
+                    val artistName = cleanedInfo.second
+                    val query = "$trackName $artistName".trim()
 
-                val results = mutableListOf<SourceTrack>()
+                    coroutineScope {
+                        val ytDeferred =
+                            async {
+                                searchYouTubeSources(query, trackName, artistName)
+                            }
+                        val spotifyDeferred =
+                            async {
+                                searchSpotifySources(query, trackName, artistName)
+                            }
+                        val soundCloudDeferred =
+                            async {
+                                searchSoundCloudSources(query, trackName, artistName)
+                            }
 
-                coroutineScope {
-                    // 1. YouTube InnerTube Search
-                    val ytDeferred = async {
-                        try {
-                            YouTube.search(query, YouTube.SearchFilter.FILTER_SONG).getOrNull()?.items
-                                ?.filterIsInstance<SongItem>()
-                                ?.mapNotNull { song ->
-                                    val relevance = calculateRelevance(
-                                        trackName = trackName,
-                                        artistName = artistName,
-                                        resultTitle = song.title,
-                                        resultArtist = song.artists.firstOrNull()?.name ?: ""
-                                    )
-                                    if (relevance > 0.28f) {
-                                        SourceTrack(
-                                            id = "yt:${song.id}",
-                                            title = song.title,
-                                            artist = song.artists.joinToString(", ") { it.name },
-                                            thumbnailUrl = song.thumbnail,
-                                            source = TrackSource.YOUTUBE,
-                                            version = detectVersion(song.title),
-                                            relevance = relevance,
-                                            metadata = song.toMediaMetadata(),
-                                        )
-                                    } else null
-                                } ?: emptyList()
-                        } catch (e: Exception) {
-                            emptyList()
-                        }
+                        aggregateProviderSearchResults(
+                            listOf(
+                                ytDeferred.await(),
+                                spotifyDeferred.await(),
+                                soundCloudDeferred.await(),
+                            ),
+                        )
                     }
-
-                    // 2. Spotify Search
-                    val spotifyDeferred = async {
-                        try {
-                            Spotify.search(query, limit = 20).getOrNull()?.tracks?.items
-                                ?.mapNotNull { track ->
-                                    val relevance = calculateRelevance(
-                                        trackName = trackName,
-                                        artistName = artistName,
-                                        resultTitle = track.name,
-                                        resultArtist = track.artists.firstOrNull()?.name ?: ""
-                                    )
-                                    if (relevance > 0.28f) {
-                                        val meta = MediaMetadata(
-                                            id = "spotify:track:${track.id}",
-                                            title = track.name,
-                                            artists = track.artists.map { MediaMetadata.Artist(id = it.id, name = it.name) },
-                                            duration = if (track.durationMs > 0) (track.durationMs / 1000).toInt() else -1,
-                                            thumbnailUrl = track.album?.images?.firstOrNull()?.url,
-                                            album = track.album?.let { MediaMetadata.Album(id = it.id, title = it.name) },
-                                            spotifyTrackId = track.id,
-                                            explicit = track.explicit,
-                                        )
-                                        SourceTrack(
-                                            id = "sp:${track.id}",
-                                            title = track.name,
-                                            artist = track.artists.joinToString(", ") { it.name },
-                                            thumbnailUrl = track.album?.images?.firstOrNull()?.url,
-                                            source = TrackSource.SPOTIFY,
-                                            version = detectVersion(track.name),
-                                            relevance = relevance,
-                                            metadata = meta,
-                                        )
-                                    } else null
-                                } ?: emptyList()
-                        } catch (e: Exception) {
-                            emptyList()
-                        }
-                    }
-
-                    // 3. SoundCloud Search
-                    val soundCloudDeferred = async {
-                        try {
-                            SoundCloudAudioProvider.searchMetadata(term = query, limit = 20)
-                                .mapNotNull { track ->
-                                    val relevance = calculateRelevance(
-                                        trackName = trackName,
-                                        artistName = artistName,
-                                        resultTitle = track.title,
-                                        resultArtist = track.artist
-                                    )
-                                    if (relevance > 0.25f) {
-                                        SourceTrack(
-                                            id = "sc:${track.trackId}",
-                                            title = track.title,
-                                            artist = track.artist,
-                                            thumbnailUrl = track.artworkUrl,
-                                            source = TrackSource.SOUNDCLOUD,
-                                            version = detectVersion(track.title),
-                                            relevance = relevance,
-                                            metadata = SoundCloudAudioProvider.toMediaMetadata(track),
-                                        )
-                                    } else null
-                                }
-                        } catch (e: Exception) {
-                            emptyList()
-                        }
-                    }
-
-                    results.addAll(ytDeferred.await())
-                    results.addAll(spotifyDeferred.await())
-                    results.addAll(soundCloudDeferred.await())
                 }
 
-                // Sort: version first, then higher relevance
-                searchResults = results.sortedWith(
-                    compareBy<SourceTrack> { it.version.ordinal }
-                        .thenByDescending { it.relevance }
-                )
+            searchResults = aggregated.tracks
+            failedSources = aggregated.failedSources
+            if (aggregated.tracks.isEmpty() && aggregated.failedSources.size == TrackSource.entries.size) {
+                errorMessage = context.getString(R.string.other_sources_search_error)
             }
         } catch (e: Exception) {
-            errorMessage = e.localizedMessage ?: "Ошибка поиска"
+            errorMessage = e.localizedMessage ?: context.getString(R.string.other_sources_search_error)
         } finally {
             isLoading = false
         }
     }
+
+    val filteredResults =
+        remember(searchResults, selectedFilter) {
+            when (selectedFilter) {
+                SourceVersionFilter.ALL -> searchResults
+                SourceVersionFilter.ORIGINAL -> searchResults.filter { it.version == TrackVersion.ORIGINAL }
+                SourceVersionFilter.LIVE -> searchResults.filter { it.version == TrackVersion.LIVE }
+                SourceVersionFilter.REMIX ->
+                    searchResults.filter {
+                        it.version == TrackVersion.REMIX ||
+                            it.version == TrackVersion.VIP ||
+                            it.version == TrackVersion.SLOWED
+                    }
+            }
+        }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-        ) {
-            // Header
-            Row(
-                modifier = Modifier
+            modifier =
+                Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 12.dp),
+                    .padding(horizontal = 16.dp),
+        ) {
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = stringResource(R.string.other_sources),
                         style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
                     )
                     if (mediaMetadata != null) {
                         Text(
@@ -252,7 +200,7 @@ fun OtherSourcesSheet(
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                            overflow = TextOverflow.Ellipsis,
                         )
                     }
                 }
@@ -260,91 +208,151 @@ fun OtherSourcesSheet(
                 IconButton(onClick = onDismiss) {
                     Icon(
                         painter = painterResource(R.drawable.close),
-                        contentDescription = stringResource(android.R.string.cancel)
+                        contentDescription = stringResource(android.R.string.cancel),
                     )
                 }
             }
 
-            // Results Content
+            if (!isLoading && (searchResults.isNotEmpty() || failedSources.isNotEmpty())) {
+                Row(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState())
+                            .padding(bottom = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    SourceVersionFilter.entries.forEach { filter ->
+                        FilterChip(
+                            selected = selectedFilter == filter,
+                            onClick = { selectedFilter = filter },
+                            label = { Text(stringResource(filter.labelRes)) },
+                        )
+                    }
+                }
+            }
+
+            if (failedSources.isNotEmpty() && !isLoading) {
+                Row(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState())
+                            .padding(bottom = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    failedSources.forEach { source ->
+                        Surface(
+                            color = MaterialTheme.colorScheme.errorContainer,
+                            contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                            shape = RoundedCornerShape(8.dp),
+                        ) {
+                            Text(
+                                text = stringResource(R.string.other_sources_provider_failed_fmt, source.displayName),
+                                style = MaterialTheme.typography.labelSmall,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            )
+                        }
+                    }
+                    TextButton(onClick = { searchTrigger++ }) {
+                        Text(stringResource(R.string.other_sources_retry))
+                    }
+                }
+            }
+
             when {
                 isLoading -> {
                     Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(280.dp),
-                        contentAlignment = Alignment.Center
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .height(260.dp),
+                        contentAlignment = Alignment.Center,
                     ) {
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
                         ) {
                             CircularProgressIndicator()
                             Text(
-                                text = "Ищем версии и ремиксы...",
+                                text = stringResource(R.string.other_sources_searching),
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                     }
                 }
 
-                errorMessage != null -> {
+                errorMessage != null && filteredResults.isEmpty() -> {
                     Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(240.dp),
-                        contentAlignment = Alignment.Center
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .height(220.dp),
+                        contentAlignment = Alignment.Center,
                     ) {
-                        Text(
-                            text = errorMessage.orEmpty(),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.error
-                        )
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Text(
+                                text = errorMessage.orEmpty(),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                            TextButton(onClick = { searchTrigger++ }) {
+                                Text(stringResource(R.string.other_sources_retry))
+                            }
+                        }
                     }
                 }
 
-                searchResults.isEmpty() -> {
+                filteredResults.isEmpty() -> {
                     Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(240.dp),
-                        contentAlignment = Alignment.Center
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .height(220.dp),
+                        contentAlignment = Alignment.Center,
                     ) {
                         Text(
-                            text = "Другие версии трека не найдены",
+                            text = stringResource(R.string.other_sources_empty),
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 }
 
                 else -> {
                     LazyColumn(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 520.dp),
-                        contentPadding = PaddingValues(
-                            bottom = WindowInsets.systemBars.asPaddingValues().calculateBottomPadding() + 24.dp
-                        )
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 500.dp),
+                        contentPadding =
+                            PaddingValues(
+                                bottom = WindowInsets.systemBars.asPaddingValues().calculateBottomPadding() + 24.dp,
+                            ),
                     ) {
-                        val grouped = searchResults.groupBy { it.version }
+                        val grouped = filteredResults.groupBy { it.version }
 
                         TrackVersion.entries.forEach { version ->
                             val tracksForVersion = grouped[version] ?: emptyList()
                             if (tracksForVersion.isNotEmpty()) {
                                 item(key = "header_${version.name}") {
                                     Text(
-                                        text = "${version.displayName} (${tracksForVersion.size})",
+                                        text = "${stringResource(version.labelRes)} (${tracksForVersion.size})",
                                         style = MaterialTheme.typography.labelLarge,
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.padding(top = 12.dp, bottom = 6.dp)
+                                        modifier = Modifier.padding(top = 12.dp, bottom = 6.dp),
                                     )
                                 }
 
                                 items(
                                     items = tracksForVersion,
-                                    key = { it.id }
+                                    key = { it.id },
                                 ) { track ->
                                     SourceTrackItem(
                                         track = track,
@@ -355,25 +363,32 @@ fun OtherSourcesSheet(
                                                         playerConnection.playQueue(
                                                             ListQueue(
                                                                 title = meta.title,
-                                                                items = listOf(meta.toMediaItem())
-                                                            )
+                                                                items = listOf(meta.toMediaItem()),
+                                                            ),
                                                         )
-                                                        Toast.makeText(
-                                                            context,
-                                                            "${track.source.displayName}: ${meta.title}",
-                                                            Toast.LENGTH_SHORT
-                                                        ).show()
+                                                        Toast
+                                                            .makeText(
+                                                                context,
+                                                                context.getString(
+                                                                    R.string.other_sources_switched_fmt,
+                                                                    track.source.displayName,
+                                                                    meta.title,
+                                                                ),
+                                                                Toast.LENGTH_SHORT,
+                                                            ).show()
                                                         onDismiss()
                                                     }
                                                 } catch (e: Exception) {
-                                                    Toast.makeText(
-                                                        context,
-                                                        e.localizedMessage ?: "Ошибка воспроизведения",
-                                                        Toast.LENGTH_SHORT
-                                                    ).show()
+                                                    Toast
+                                                        .makeText(
+                                                            context,
+                                                            e.localizedMessage
+                                                                ?: context.getString(R.string.other_sources_play_error),
+                                                            Toast.LENGTH_SHORT,
+                                                        ).show()
                                                 }
                                             }
-                                        }
+                                        },
                                     )
                                 }
                             }
@@ -385,139 +400,321 @@ fun OtherSourcesSheet(
     }
 }
 
+private suspend fun searchYouTubeSources(
+    query: String,
+    trackName: String,
+    artistName: String,
+): ProviderSearchResult =
+    try {
+        val result = YouTube.search(query, YouTube.SearchFilter.FILTER_SONG).getOrThrow()
+        val tracks =
+            result.items
+                .filterIsInstance<SongItem>()
+                .mapNotNull { song ->
+                    val relevance =
+                        calculateRelevance(
+                            trackName = trackName,
+                            artistName = artistName,
+                            resultTitle = song.title,
+                            resultArtist = song.artists.firstOrNull()?.name ?: "",
+                        )
+                    if (relevance > 0.28f) {
+                        val meta = song.toMediaMetadata()
+                        SourceTrack(
+                            id = "yt:${song.id}",
+                            title = song.title,
+                            artist = song.artists.joinToString(", ") { it.name },
+                            durationSeconds = meta.duration.takeIf { it > 0 },
+                            thumbnailUrl = song.thumbnail,
+                            source = TrackSource.YOUTUBE,
+                            version = detectVersion(song.title),
+                            relevance = relevance,
+                            metadata = meta,
+                        )
+                    } else {
+                        null
+                    }
+                }
+        ProviderSearchResult(TrackSource.YOUTUBE, tracks, failed = false)
+    } catch (_: Exception) {
+        ProviderSearchResult(TrackSource.YOUTUBE, emptyList(), failed = true)
+    }
+
+private suspend fun searchSpotifySources(
+    query: String,
+    trackName: String,
+    artistName: String,
+): ProviderSearchResult =
+    try {
+        val result = Spotify.search(query, limit = 20).getOrThrow()
+        val tracks =
+            result.tracks?.items
+                ?.mapNotNull { track ->
+                    val relevance =
+                        calculateRelevance(
+                            trackName = trackName,
+                            artistName = artistName,
+                            resultTitle = track.name,
+                            resultArtist = track.artists.firstOrNull()?.name ?: "",
+                        )
+                    if (relevance > 0.28f) {
+                        val durationSec = if (track.durationMs > 0) (track.durationMs / 1000).toInt() else -1
+                        val meta =
+                            MediaMetadata(
+                                id = "spotify:track:${track.id}",
+                                title = track.name,
+                                artists = track.artists.map { MediaMetadata.Artist(id = it.id, name = it.name) },
+                                duration = durationSec,
+                                thumbnailUrl = track.album?.images?.firstOrNull()?.url,
+                                album = track.album?.let { MediaMetadata.Album(id = it.id, title = it.name) },
+                                spotifyTrackId = track.id,
+                                explicit = track.explicit,
+                            )
+                        SourceTrack(
+                            id = "sp:${track.id}",
+                            title = track.name,
+                            artist = track.artists.joinToString(", ") { it.name },
+                            durationSeconds = durationSec.takeIf { it > 0 },
+                            thumbnailUrl = track.album?.images?.firstOrNull()?.url,
+                            source = TrackSource.SPOTIFY,
+                            version = detectVersion(track.name),
+                            relevance = relevance,
+                            metadata = meta,
+                        )
+                    } else {
+                        null
+                    }
+                }.orEmpty()
+        ProviderSearchResult(TrackSource.SPOTIFY, tracks, failed = false)
+    } catch (_: Exception) {
+        ProviderSearchResult(TrackSource.SPOTIFY, emptyList(), failed = true)
+    }
+
+private suspend fun searchSoundCloudSources(
+    query: String,
+    trackName: String,
+    artistName: String,
+): ProviderSearchResult =
+    try {
+        val tracks =
+            SoundCloudAudioProvider
+                .searchMetadata(term = query, limit = 20)
+                .mapNotNull { track ->
+                    val relevance =
+                        calculateRelevance(
+                            trackName = trackName,
+                            artistName = artistName,
+                            resultTitle = track.title,
+                            resultArtist = track.artist,
+                        )
+                    if (relevance > 0.25f) {
+                        val meta = SoundCloudAudioProvider.toMediaMetadata(track)
+                        SourceTrack(
+                            id = "sc:${track.trackId}",
+                            title = track.title,
+                            artist = track.artist,
+                            durationSeconds = meta.duration.takeIf { it > 0 },
+                            thumbnailUrl = track.artworkUrl,
+                            source = TrackSource.SOUNDCLOUD,
+                            version = detectVersion(track.title),
+                            relevance = relevance,
+                            metadata = meta,
+                        )
+                    } else {
+                        null
+                    }
+                }
+        ProviderSearchResult(TrackSource.SOUNDCLOUD, tracks, failed = false)
+    } catch (_: Exception) {
+        ProviderSearchResult(TrackSource.SOUNDCLOUD, emptyList(), failed = true)
+    }
+
 @Composable
 private fun SourceTrackItem(
     track: SourceTrack,
     onClick: () -> Unit,
 ) {
+    val durationLabel =
+        remember(track.durationSeconds) {
+            track.durationSeconds?.takeIf { it > 0 }?.let { makeTimeString(it.toLong() * 1000L) }
+        }
     Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .clickable(onClick = onClick),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .clickable(onClick = onClick),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-        shape = RoundedCornerShape(12.dp)
+        shape = RoundedCornerShape(12.dp),
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(10.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(10.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            // Thumbnail
             if (!track.thumbnailUrl.isNullOrBlank()) {
                 AsyncImage(
                     model = track.thumbnailUrl,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .size(46.dp)
-                        .clip(RoundedCornerShape(8.dp))
+                    modifier =
+                        Modifier
+                            .size(46.dp)
+                            .clip(RoundedCornerShape(8.dp)),
                 )
             } else {
-                Box(
-                    modifier = Modifier
-                        .size(46.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(MaterialTheme.colorScheme.surfaceContainerHighest),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        painter = painterResource(R.drawable.music_note),
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
+                LocalArtworkFallback(
+                    minIconSize = 18.dp,
+                    maxIconSize = 22.dp,
+                    modifier =
+                        Modifier
+                            .size(46.dp)
+                            .clip(RoundedCornerShape(8.dp)),
+                )
             }
 
-            // Track info
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(2.dp)
+                verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 Text(
                     text = track.title,
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
                 )
+                val subtitle =
+                    if (durationLabel != null) {
+                        "${track.artist} • $durationLabel"
+                    } else {
+                        track.artist
+                    }
                 Text(
-                    text = track.artist,
+                    text = subtitle,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
 
-            // Source badge
             Surface(
                 shape = RoundedCornerShape(6.dp),
                 color = track.source.color,
-                contentColor = Color.White
+                contentColor = Color.White,
             ) {
                 Text(
                     text = track.source.shortName,
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold
-                    ),
-                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
+                    style =
+                        MaterialTheme.typography.labelSmall.copy(
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                        ),
+                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
                 )
             }
         }
     }
 }
 
-private data class SourceTrack(
+private enum class SourceVersionFilter(
+    @param:StringRes val labelRes: Int,
+) {
+    ALL(R.string.other_sources_filter_all),
+    ORIGINAL(R.string.other_sources_version_original),
+    LIVE(R.string.other_sources_version_live),
+    REMIX(R.string.other_sources_version_remix),
+}
+
+internal data class SourceTrack(
     val id: String,
     val title: String,
     val artist: String,
+    val durationSeconds: Int? = null,
     val thumbnailUrl: String?,
     val source: TrackSource,
     val version: TrackVersion,
     val relevance: Float,
-    val metadata: MediaMetadata?
+    val metadata: MediaMetadata?,
 )
 
-private enum class TrackSource(val displayName: String, val shortName: String, val color: Color) {
+internal enum class TrackSource(
+    val displayName: String,
+    val shortName: String,
+    val color: Color,
+) {
     YOUTUBE("YouTube Music", "YT", Color(0xFFE53935)),
     SPOTIFY("Spotify", "Spotify", Color(0xFF1DB954)),
-    SOUNDCLOUD("SoundCloud", "SoundCloud", Color(0xFFFF7700))
+    SOUNDCLOUD("SoundCloud", "SoundCloud", Color(0xFFFF7700)),
 }
 
-private enum class TrackVersion(val displayName: String) {
-    ORIGINAL("Оригинал"),
-    REMIX("Ремиксы"),
-    VIP("VIP / Special Edit"),
-    SLOWED("Slowed & Reverb / Sped Up"),
-    OTHER("Другие версии")
+internal enum class TrackVersion(
+    @param:StringRes val labelRes: Int,
+) {
+    ORIGINAL(R.string.other_sources_version_original),
+    LIVE(R.string.other_sources_version_live),
+    REMIX(R.string.other_sources_version_remix),
+    VIP(R.string.other_sources_version_vip),
+    SLOWED(R.string.other_sources_version_slowed),
+    OTHER(R.string.other_sources_version_other),
 }
 
-private fun cleanTrackInfo(title: String, artist: String): Pair<String, String> {
-    val patterns = listOf(
-        "\\(.*?remix.*?\\)".toRegex(RegexOption.IGNORE_CASE),
-        "\\[.*?remix.*?\\]".toRegex(RegexOption.IGNORE_CASE),
-        "\\(.*?slowed.*?\\)".toRegex(RegexOption.IGNORE_CASE),
-        "\\[.*?slowed.*?\\]".toRegex(RegexOption.IGNORE_CASE),
-        "\\(.*?sped up.*?\\)".toRegex(RegexOption.IGNORE_CASE),
-        "\\[.*?sped up.*?\\]".toRegex(RegexOption.IGNORE_CASE),
-        "\\(.*?speed up.*?\\)".toRegex(RegexOption.IGNORE_CASE),
-        "\\[.*?speed up.*?\\]".toRegex(RegexOption.IGNORE_CASE),
-        "\\(.*?vip.*?\\)".toRegex(RegexOption.IGNORE_CASE),
-        "\\[.*?vip.*?\\]".toRegex(RegexOption.IGNORE_CASE),
-        "\\(.*?feat\\.?.*?\\)".toRegex(RegexOption.IGNORE_CASE),
-        "\\[.*?feat\\.?.*?\\]".toRegex(RegexOption.IGNORE_CASE),
-        "feat\\.?.*".toRegex(RegexOption.IGNORE_CASE),
-        "ft\\.?.*".toRegex(RegexOption.IGNORE_CASE),
-        "-\\s*official.*".toRegex(RegexOption.IGNORE_CASE),
-        "\\(official.*\\)".toRegex(RegexOption.IGNORE_CASE),
-        "\\[official.*\\]".toRegex(RegexOption.IGNORE_CASE)
-    )
+internal data class ProviderSearchResult(
+    val source: TrackSource,
+    val tracks: List<SourceTrack>,
+    val failed: Boolean,
+)
+
+internal data class AggregatedSourcesResult(
+    val tracks: List<SourceTrack>,
+    val failedSources: List<TrackSource>,
+)
+
+internal fun aggregateProviderSearchResults(
+    results: List<ProviderSearchResult>,
+): AggregatedSourcesResult {
+    val failed = results.filter { it.failed }.map { it.source }
+    val sortedTracks =
+        results
+            .flatMap { it.tracks }
+            .sortedWith(
+                compareBy<SourceTrack> { it.version.ordinal }
+                    .thenByDescending { it.relevance },
+            )
+    return AggregatedSourcesResult(tracks = sortedTracks, failedSources = failed)
+}
+
+internal fun cleanTrackInfo(
+    title: String,
+    artist: String,
+): Pair<String, String> {
+    val patterns =
+        listOf(
+            "\\(.*?remix.*?\\)".toRegex(RegexOption.IGNORE_CASE),
+            "\\[.*?remix.*?\\]".toRegex(RegexOption.IGNORE_CASE),
+            "\\(.*?slowed.*?\\)".toRegex(RegexOption.IGNORE_CASE),
+            "\\[.*?slowed.*?\\]".toRegex(RegexOption.IGNORE_CASE),
+            "\\(.*?sped up.*?\\)".toRegex(RegexOption.IGNORE_CASE),
+            "\\[.*?sped up.*?\\]".toRegex(RegexOption.IGNORE_CASE),
+            "\\(.*?speed up.*?\\)".toRegex(RegexOption.IGNORE_CASE),
+            "\\[.*?speed up.*?\\]".toRegex(RegexOption.IGNORE_CASE),
+            "\\(.*?vip.*?\\)".toRegex(RegexOption.IGNORE_CASE),
+            "\\[.*?vip.*?\\]".toRegex(RegexOption.IGNORE_CASE),
+            "\\(.*?live.*?\\)".toRegex(RegexOption.IGNORE_CASE),
+            "\\[.*?live.*?\\]".toRegex(RegexOption.IGNORE_CASE),
+            "\\(.*?feat\\.?.*?\\)".toRegex(RegexOption.IGNORE_CASE),
+            "\\[.*?feat\\.?.*?\\]".toRegex(RegexOption.IGNORE_CASE),
+            "feat\\.?.*".toRegex(RegexOption.IGNORE_CASE),
+            "ft\\.?.*".toRegex(RegexOption.IGNORE_CASE),
+            "-\\s*official.*".toRegex(RegexOption.IGNORE_CASE),
+            "\\(official.*\\)".toRegex(RegexOption.IGNORE_CASE),
+            "\\[official.*\\]".toRegex(RegexOption.IGNORE_CASE),
+        )
 
     var cleanTitle = title
     patterns.forEach { pattern ->
@@ -528,22 +725,29 @@ private fun cleanTrackInfo(title: String, artist: String): Pair<String, String> 
     return Pair(cleanTitle.ifBlank { title }, artist)
 }
 
-private fun detectVersion(title: String): TrackVersion {
+internal fun detectVersion(title: String): TrackVersion {
     val lower = title.lowercase()
     return when {
-        lower.contains("slowed") || lower.contains("sped up") || lower.contains("speed up") || lower.contains("nightcore") -> TrackVersion.SLOWED
-        lower.contains("vip") || lower.contains("club mix") || lower.contains("extended") -> TrackVersion.VIP
-        lower.contains("remix") || lower.contains("rmx") || lower.contains("flip") || lower.contains("bootleg") || lower.contains("edit") -> TrackVersion.REMIX
-        lower.contains("cover") || lower.contains("acoustic") || lower.contains("live") || lower.contains("instrumental") -> TrackVersion.OTHER
+        lower.contains("slowed") || lower.contains("sped up") || lower.contains("speed up") || lower.contains("nightcore") ->
+            TrackVersion.SLOWED
+        lower.contains("vip") || lower.contains("club mix") || lower.contains("extended") ->
+            TrackVersion.VIP
+        lower.contains("remix") || lower.contains("rmx") || lower.contains("flip") || lower.contains("bootleg") || lower.contains("edit") ->
+            TrackVersion.REMIX
+        lower.contains("live") || lower.contains("concert") || lower.contains("unplugged") || lower.contains("session") ||
+            lower.contains("концерт") || lower.contains("лайв") ->
+            TrackVersion.LIVE
+        lower.contains("cover") || lower.contains("instrumental") || lower.contains("karaoke") ->
+            TrackVersion.OTHER
         else -> TrackVersion.ORIGINAL
     }
 }
 
-private fun calculateRelevance(
+internal fun calculateRelevance(
     trackName: String,
     artistName: String,
     resultTitle: String,
-    resultArtist: String
+    resultArtist: String,
 ): Float {
     val trackWords = trackName.lowercase().split(Regex("[\\s,.-]+")).filter { it.length > 2 }
     val artistWords = artistName.lowercase().split(Regex("[\\s,.-]+")).filter { it.length > 2 }

@@ -43,8 +43,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
@@ -298,6 +300,17 @@ fun SpicyLyricsView(
         }
     }
 
+    val motionEnabled = moe.rukamori.archivetune.ui.motion.LocalMotionConfig.current.animationsEnabled
+    val lyricsDisplayCharacter by moe.rukamori.archivetune.utils.rememberEnumPreference(
+        moe.rukamori.archivetune.constants.LyricsDisplayCharacterKey,
+        moe.rukamori.archivetune.constants.LyricsDisplayCharacter.FOCUS,
+    )
+    val charStyle =
+        remember(lyricsDisplayCharacter, motionEnabled) {
+            resolveLyricsCharacterStyle(lyricsDisplayCharacter, motionEnabled)
+        }
+    val scope = rememberCoroutineScope()
+
     BoxWithConstraints(modifier = modifier) {
         val bottomSafePadding = maxHeight - anchorTopPadding + 48.dp
         LazyColumn(
@@ -341,8 +354,31 @@ fun SpicyLyricsView(
                     useBlurEffect = useBlurEffect,
                     showTranslation = showTranslation,
                     showPhonetic = showPhonetic,
+                    characterStyle = charStyle,
+                    animationsEnabled = motionEnabled,
                     onLineClicked = { onLineClicked(line) },
                     onLinePressed = { onLinePressed(line) },
+                )
+            }
+        }
+
+        if (manualScrolling && lyrics.lines.isNotEmpty()) {
+            androidx.compose.material3.FilledTonalButton(
+                onClick = {
+                    manualScrolling = false
+                    val target = activeLineIndex.coerceIn(0, lyrics.lines.lastIndex)
+                    scope.launch {
+                        listState.animateScrollToItem(target, -anchorTopPx)
+                    }
+                },
+                modifier =
+                    Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 16.dp),
+            ) {
+                Text(
+                    text = androidx.compose.ui.res.stringResource(moe.rukamori.archivetune.R.string.lyrics_jump_to_current_line),
+                    style = androidx.compose.material3.MaterialTheme.typography.labelLarge,
                 )
             }
         }
@@ -368,6 +404,8 @@ private fun SpicyLyricsLine(
     useBlurEffect: Boolean,
     showTranslation: Boolean,
     showPhonetic: Boolean,
+    characterStyle: ResolvedLyricsCharacterStyle,
+    animationsEnabled: Boolean,
     onLineClicked: () -> Unit,
     onLinePressed: () -> Unit,
 ) {
@@ -375,29 +413,51 @@ private fun SpicyLyricsLine(
         targetValue =
             when {
                 isActive -> SpicyActiveAlpha
-                userScrolling -> SpicyUserScrollingAlpha
-                else -> SpicyInactiveAlpha
+                userScrolling -> maxOf(SpicyUserScrollingAlpha, characterStyle.nearInactiveAlpha)
+                abs(signedDistance) <= 1 -> characterStyle.nearInactiveAlpha
+                else -> characterStyle.midInactiveAlpha
             },
-        animationSpec = tween(durationMillis = SpicyLineOpacityMs, easing = FastOutSlowInEasing),
+        animationSpec =
+            if (animationsEnabled) {
+                tween(durationMillis = SpicyLineOpacityMs, easing = FastOutSlowInEasing)
+            } else {
+                androidx.compose.animation.core.snap()
+            },
         label = "spicy-line-alpha",
     )
     val lineScale by animateFloatAsState(
-        targetValue = if (isActive) 1f else SpicyInactiveScale,
+        targetValue =
+            if (!animationsEnabled) {
+                1f
+            } else if (isActive) {
+                characterStyle.activeScale
+            } else {
+                characterStyle.inactiveScale
+            },
         animationSpec =
-            tween(
-                durationMillis = if (isActive) SpicyScaleInMs else SpicyScaleOutMs,
-                easing = if (isActive) LinearOutSlowInEasing else EaseInOut,
-            ),
+            if (animationsEnabled) {
+                tween(
+                    durationMillis = if (isActive) SpicyScaleInMs else SpicyScaleOutMs,
+                    easing = if (isActive) LinearOutSlowInEasing else EaseInOut,
+                )
+            } else {
+                androidx.compose.animation.core.snap()
+            },
         label = "spicy-line-scale",
     )
     val blurRadius by animateDpAsState(
         targetValue =
-            if (useBlurEffect && signedDistance != 0) {
-                (spicyBlurEm(signedDistance) * normalTextStyle.fontSize.value).dp
+            if (animationsEnabled && useBlurEffect && signedDistance != 0) {
+                (spicyBlurEm(signedDistance) * normalTextStyle.fontSize.value * characterStyle.blurMultiplier).dp
             } else {
                 0.dp
             },
-        animationSpec = tween(durationMillis = SpicyBlurFadeMs, easing = FastOutSlowInEasing),
+        animationSpec =
+            if (animationsEnabled) {
+                tween(durationMillis = SpicyBlurFadeMs, easing = FastOutSlowInEasing)
+            } else {
+                androidx.compose.animation.core.snap()
+            },
         label = "spicy-line-blur",
     )
     val rightAligned = (line as? KaraokeLine)?.alignment == KaraokeAlignment.End

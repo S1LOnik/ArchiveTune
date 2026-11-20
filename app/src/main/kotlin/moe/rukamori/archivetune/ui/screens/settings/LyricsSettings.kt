@@ -9,8 +9,19 @@
 
 package moe.rukamori.archivetune.ui.screens.settings
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -83,7 +94,13 @@ import moe.rukamori.archivetune.constants.EnableSimpMusicLyricsKey
 import moe.rukamori.archivetune.constants.EnableUnisonLyricsKey
 import moe.rukamori.archivetune.constants.EnableYouLyPlusLyricsKey
 import moe.rukamori.archivetune.constants.LyricsClickKey
+import moe.rukamori.archivetune.constants.LyricsDisplayCharacter
+import moe.rukamori.archivetune.constants.LyricsDisplayCharacterKey
 import moe.rukamori.archivetune.constants.LyricsLineBlurKey
+import moe.rukamori.archivetune.ui.component.resolveLyricsCharacterStyle
+import moe.rukamori.archivetune.ui.motion.ArchiveTuneHapticKind
+import moe.rukamori.archivetune.ui.motion.LocalMotionConfig
+import moe.rukamori.archivetune.ui.motion.rememberArchiveTuneHapticTrigger
 import moe.rukamori.archivetune.constants.LyricsLineSpacingKey
 import moe.rukamori.archivetune.constants.LyricsMode
 import moe.rukamori.archivetune.constants.LyricsModeKey
@@ -166,6 +183,8 @@ fun LyricsSettings(
     val (lyricsTextSize, onLyricsTextSizeChange) = rememberPreference(LyricsTextSizeKey, defaultValue = 26f)
     val (lyricsLineSpacing, onLyricsLineSpacingChange) = rememberPreference(LyricsLineSpacingKey, defaultValue = 1.3f)
     val (lyricsMode, onLyricsModeChange) = rememberEnumPreference(LyricsModeKey, defaultValue = LyricsMode.ENHANCED)
+    val (lyricsDisplayCharacter, onLyricsDisplayCharacterChange) =
+        rememberEnumPreference(LyricsDisplayCharacterKey, defaultValue = LyricsDisplayCharacter.FOCUS)
     val (enableLrclib, onEnableLrclibChange) = rememberPreference(key = EnableLrcLibKey, defaultValue = true)
     val (enableKugou, onEnableKugouChange) = rememberPreference(key = EnableKugouKey, defaultValue = true)
     val (enableBetterLyrics, onEnableBetterLyricsChange) = rememberPreference(key = EnableBetterLyricsKey, defaultValue = true)
@@ -262,6 +281,13 @@ fun LyricsSettings(
             .verticalScroll(scrollState)
             .padding(bottom = SettingsDimensions.ScreenBottomPadding),
     ) {
+        LyricsRehearsalPreviewCard(
+            character = lyricsDisplayCharacter,
+            textSizeSp = lyricsTextSize,
+            lineSpacing = lyricsLineSpacing,
+            lineBlur = lyricsLineBlur,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+        )
         var showLyricsTextSizeDialog by rememberSaveable { mutableStateOf(false) }
 
         if (showLyricsTextSizeDialog) {
@@ -409,6 +435,30 @@ fun LyricsSettings(
                                 LyricsMode.V2 -> stringResource(R.string.lyrics_mode_v2)
                                 LyricsMode.ENHANCED -> stringResource(R.string.lyrics_mode_enhanced)
                                 LyricsMode.SPOTIFY -> stringResource(R.string.lyrics_mode_spotify)
+                            }
+                        },
+                    )
+                }
+            }
+
+            item {
+                Box(modifier = preferencePositions.modifierFor("lyrics_display_character")) {
+                    EnumListPreference(
+                        title = { Text(stringResource(R.string.lyrics_character_title)) },
+                        description =
+                            when (lyricsDisplayCharacter) {
+                                LyricsDisplayCharacter.READING -> stringResource(R.string.lyrics_character_reading_desc)
+                                LyricsDisplayCharacter.FOCUS -> stringResource(R.string.lyrics_character_focus_desc)
+                                LyricsDisplayCharacter.STAGE -> stringResource(R.string.lyrics_character_stage_desc)
+                            },
+                        icon = { Icon(painterResource(R.drawable.lyrics), null) },
+                        selectedValue = lyricsDisplayCharacter,
+                        onValueSelected = onLyricsDisplayCharacterChange,
+                        valueText = {
+                            when (it) {
+                                LyricsDisplayCharacter.READING -> stringResource(R.string.lyrics_character_reading)
+                                LyricsDisplayCharacter.FOCUS -> stringResource(R.string.lyrics_character_focus)
+                                LyricsDisplayCharacter.STAGE -> stringResource(R.string.lyrics_character_stage)
                             }
                         },
                     )
@@ -1108,6 +1158,156 @@ private fun PaxsenixStatusBar(successRate: Float) {
                 color = statusColor,
                 fontWeight = FontWeight.SemiBold,
             )
+        }
+    }
+}
+
+@Composable
+private fun LyricsRehearsalPreviewCard(
+    character: LyricsDisplayCharacter,
+    textSizeSp: Float,
+    lineSpacing: Float,
+    lineBlur: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val motionConfig = LocalMotionConfig.current
+    val triggerHaptic = rememberArchiveTuneHapticTrigger()
+    var isPlaying by rememberSaveable { mutableStateOf(true) }
+    var activeLineIndex by rememberSaveable { mutableStateOf(0) }
+
+    val sampleLines =
+        remember {
+            listOf(
+                Pair("Длинная русская строка для проверки переносов и ширины", "A long Russian line to check wrapping & width"),
+                Pair("Feel the rhythm settle in", "Почувствуй, как выстраивается ритм"),
+                Pair("Чистый контраст даже без анимаций", "Crisp contrast even when motion is off"),
+            )
+        }
+
+    LaunchedEffect(isPlaying) {
+        if (!isPlaying) return@LaunchedEffect
+        while (isActive) {
+            delay(1_800L)
+            activeLineIndex = (activeLineIndex + 1) % sampleLines.size
+        }
+    }
+
+    val charStyle =
+        remember(character, motionConfig.animationsEnabled) {
+            resolveLyricsCharacterStyle(character, motionConfig.animationsEnabled)
+        }
+    val previewFontSp = (textSizeSp * 0.68f).coerceIn(13f, 22f)
+
+    Card(
+        shape = RoundedCornerShape(22.dp),
+        colors =
+            CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            ),
+        modifier = modifier.fillMaxWidth(),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = stringResource(R.string.lyrics_rehearsal_title),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                androidx.compose.material3.FilledTonalIconButton(
+                    onClick = {
+                        triggerHaptic(ArchiveTuneHapticKind.PLAY_PAUSE)
+                        isPlaying = !isPlaying
+                    },
+                    modifier = Modifier.size(34.dp),
+                ) {
+                    Icon(
+                        painter = painterResource(if (isPlaying) R.drawable.pause else R.drawable.play),
+                        contentDescription =
+                            stringResource(
+                                if (isPlaying) R.string.lyrics_rehearsal_pause else R.string.lyrics_rehearsal_play,
+                            ),
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+            }
+
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainerLowest)
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(((previewFontSp * (lineSpacing - 1f)).coerceIn(2f, 14f)).dp),
+            ) {
+                sampleLines.forEachIndexed { index, (mainLine, translation) ->
+                    val isActive = index == activeLineIndex
+                    val distance = kotlin.math.abs(index - activeLineIndex)
+                    val targetAlpha =
+                        when {
+                            isActive -> 1f
+                            distance == 1 -> charStyle.nearInactiveAlpha
+                            else -> charStyle.midInactiveAlpha
+                        }
+                    val targetScale = if (isActive) charStyle.activeScale else charStyle.inactiveScale
+                    val targetBlur =
+                        if (!isActive && lineBlur && motionConfig.animationsEnabled) {
+                            (distance * 1.6f * charStyle.blurMultiplier).coerceAtMost(6f)
+                        } else {
+                            0f
+                        }
+
+                    val alpha by animateFloatAsState(
+                        targetValue = targetAlpha,
+                        animationSpec = if (motionConfig.animationsEnabled) tween(260) else snap(),
+                        label = "rehearsalAlpha",
+                    )
+                    val scale by animateFloatAsState(
+                        targetValue = targetScale,
+                        animationSpec = if (motionConfig.animationsEnabled) tween(260) else snap(),
+                        label = "rehearsalScale",
+                    )
+
+                    Column(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    triggerHaptic(ArchiveTuneHapticKind.SELECTION)
+                                    activeLineIndex = index
+                                }
+                                .graphicsLayer {
+                                    scaleX = scale
+                                    scaleY = scale
+                                }
+                                .then(if (targetBlur > 0.2f) Modifier.blur(targetBlur.dp) else Modifier)
+                                .alpha(alpha),
+                    ) {
+                        Text(
+                            text = mainLine,
+                            fontSize = previewFontSp.sp,
+                            lineHeight = (previewFontSp * lineSpacing.coerceIn(1.05f, 1.8f)).sp,
+                            fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
+                            color = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                        )
+                        Text(
+                            text = translation,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
         }
     }
 }

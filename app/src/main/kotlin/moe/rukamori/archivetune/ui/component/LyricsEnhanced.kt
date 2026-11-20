@@ -73,6 +73,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.snapshotFlow
@@ -112,6 +113,7 @@ import com.mocharealm.accompanist.lyrics.core.model.synced.SyncedLine
 import com.mocharealm.accompanist.lyrics.ui.composable.lyrics.KaraokeLyricsView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
@@ -237,7 +239,9 @@ fun LyricsEnhanced(
     val playerConnection = LocalPlayerConnection.current ?: return
     val player = playerConnection.player
     val context = LocalContext.current
-    val animationsDisabled = LocalAnimationsDisabled.current
+    val animationsDisabled =
+        LocalAnimationsDisabled.current ||
+            !moe.rukamori.archivetune.ui.motion.LocalMotionConfig.current.animationsEnabled
 
     val mediaMetadata by playerConnection.mediaMetadata.collectAsStateWithLifecycle()
     val playbackParameters by playerConnection.playbackParameters.collectAsStateWithLifecycle()
@@ -248,7 +252,7 @@ fun LyricsEnhanced(
 
     val (enhancedLyricsStyle) = rememberEnumPreference(EnhancedLyricsStyleKey, defaultValue = EnhancedLyricsStyle.ACCOMPANIST)
 
-    val (lyricsLineBlurPreference) = rememberPreference(LyricsLineBlurKey, defaultValue = false)
+    val (lyricsLineBlurPreference) = rememberPreference(LyricsLineBlurKey, defaultValue = true)
     val (romanizeChinese) = rememberPreference(LyricsRomanizeChineseKey, defaultValue = true)
     val (romanizeHindi) = rememberPreference(LyricsRomanizeHindiKey, defaultValue = true)
     val (romanizeJapanese) = rememberPreference(LyricsRomanizeJapaneseKey, defaultValue = true)
@@ -1158,6 +1162,28 @@ fun LyricsEnhanced(
                                     modifier = Modifier.fillMaxSize(),
                                 )
                             }
+                        }
+                    }
+
+                    if (isManualScrolling && isSynced && !singleActiveLine) {
+                        val jumpScope = rememberCoroutineScope()
+                        androidx.compose.material3.FilledTonalButton(
+                            onClick = {
+                                isManualScrolling = false
+                                val targetIndex = currentLineIndexState.intValue.coerceAtLeast(0)
+                                jumpScope.launch {
+                                    listState.animateScrollToItem(targetIndex)
+                                }
+                            },
+                            modifier =
+                                Modifier
+                                    .align(Alignment.BottomCenter)
+                                    .padding(bottom = 16.dp),
+                        ) {
+                            Text(
+                                text = stringResource(R.string.lyrics_jump_to_current_line),
+                                style = MaterialTheme.typography.labelLarge,
+                            )
                         }
                     }
                 }

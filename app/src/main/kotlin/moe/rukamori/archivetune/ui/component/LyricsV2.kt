@@ -226,12 +226,22 @@ fun LyricsV2(
     val (lyricsScroll) = rememberPreference(LyricsScrollKey, defaultValue = true)
     val (lyricsTextSize) = rememberPreference(LyricsTextSizeKey, defaultValue = 26f)
     val (lyricsLineSpacing) = rememberPreference(LyricsLineSpacingKey, defaultValue = 1.3f)
-    val (lyricsLineBlurPreference) = rememberPreference(LyricsLineBlurKey, defaultValue = false)
+    val (lyricsLineBlurPreference) = rememberPreference(LyricsLineBlurKey, defaultValue = true)
     val (bounceFactorPreference) = rememberPreference(LyricsV2BounceFactorKey, defaultValue = 1f)
     val (glowFactorPreference) = rememberPreference(LyricsV2GlowFactorKey, defaultValue = 1f)
     val (fillTransitionWidth) = rememberPreference(LyricsV2FillTransitionWidthKey, defaultValue = 8f)
     val (lrcBounceEnabledPreference) = rememberPreference(LyricsV2LrcBounceEnabledKey, defaultValue = true)
-    val v2AnimationsDisabled = LocalAnimationsDisabled.current
+    val v2AnimationsDisabled =
+        LocalAnimationsDisabled.current ||
+            !moe.rukamori.archivetune.ui.motion.LocalMotionConfig.current.animationsEnabled
+    val lyricsDisplayCharacter by rememberEnumPreference(
+        moe.rukamori.archivetune.constants.LyricsDisplayCharacterKey,
+        moe.rukamori.archivetune.constants.LyricsDisplayCharacter.FOCUS,
+    )
+    val lyricsCharacterStyle =
+        remember(lyricsDisplayCharacter, v2AnimationsDisabled) {
+            resolveLyricsCharacterStyle(lyricsDisplayCharacter, !v2AnimationsDisabled)
+        }
     val bounceFactor = if (v2AnimationsDisabled) 0f else bounceFactorPreference
     val glowFactor = if (v2AnimationsDisabled) 0f else glowFactorPreference
     val lrcBounceEnabled = lrcBounceEnabledPreference && !v2AnimationsDisabled
@@ -678,71 +688,72 @@ fun LyricsV2(
                 val distanceFromActive = if (isSynced) abs(index - currentLineIndex) else 0
                 val lineAlpha =
                     when {
-                        !isSynced -> {
-                            0.92f
-                        }
-
-                        isActive -> {
-                            1f
-                        }
-
+                        !isSynced -> 1f
+                        isActive -> 1f
                         isManualScrolling -> {
                             when {
-                                distanceFromActive == 1 -> 0.72f
-                                distanceFromActive == 2 -> 0.56f
-                                distanceFromActive == 3 -> 0.40f
+                                distanceFromActive == 1 -> maxOf(0.72f, lyricsCharacterStyle.nearInactiveAlpha)
+                                distanceFromActive == 2 -> maxOf(0.56f, lyricsCharacterStyle.midInactiveAlpha)
+                                distanceFromActive == 3 -> maxOf(0.40f, lyricsCharacterStyle.farInactiveAlpha)
                                 else -> 0.28f
                             }
                         }
 
-                        distanceFromActive == 1 -> {
-                            0.52f
-                        }
-
-                        distanceFromActive == 2 -> {
-                            0.30f
-                        }
-
-                        distanceFromActive == 3 -> {
-                            0.18f
-                        }
-
-                        else -> {
-                            0.10f
-                        }
+                        distanceFromActive == 1 -> lyricsCharacterStyle.nearInactiveAlpha
+                        distanceFromActive == 2 -> lyricsCharacterStyle.midInactiveAlpha
+                        else -> lyricsCharacterStyle.farInactiveAlpha
                     }
                 val targetBlur =
                     when {
+                        v2AnimationsDisabled -> 0f
                         !isSynced || isActive || (isSelectionModeActive && isSelected) || isManualScrolling -> 0f
-                        distanceFromActive == 1 -> 2f
-                        distanceFromActive == 2 -> 5f
-                        else -> 12f
+                        distanceFromActive == 1 -> 2f * lyricsCharacterStyle.blurMultiplier
+                        distanceFromActive == 2 -> 5f * lyricsCharacterStyle.blurMultiplier
+                        else -> (12f * lyricsCharacterStyle.blurMultiplier).coerceAtMost(14f)
                     }
                 val animatedBlur by androidx.compose.animation.core.animateFloatAsState(
                     targetValue = targetBlur,
                     animationSpec =
-                        androidx.compose.animation.core.tween(
-                            durationMillis = 300,
-                            easing = androidx.compose.animation.core.FastOutSlowInEasing,
-                        ),
+                        if (v2AnimationsDisabled) {
+                            androidx.compose.animation.core.snap()
+                        } else {
+                            androidx.compose.animation.core.tween(
+                                durationMillis = 300,
+                                easing = androidx.compose.animation.core.FastOutSlowInEasing,
+                            )
+                        },
                     label = "v2LyricBlur",
                 )
+                val targetScale =
+                    when {
+                        !isSynced || v2AnimationsDisabled -> 1f
+                        isActive -> lyricsCharacterStyle.activeScale
+                        else -> lyricsCharacterStyle.inactiveScale
+                    }
                 val animatedLineScale by androidx.compose.animation.core.animateFloatAsState(
-                    targetValue = if (isActive) 1f else 0.95f,
+                    targetValue = targetScale,
                     animationSpec =
-                        androidx.compose.animation.core.tween(
-                            durationMillis = 166,
-                            easing = androidx.compose.animation.core.FastOutSlowInEasing,
-                        ),
+                        if (v2AnimationsDisabled) {
+                            androidx.compose.animation.core.snap()
+                        } else {
+                            androidx.compose.animation.core.tween(
+                                durationMillis = 166,
+                                easing = androidx.compose.animation.core.FastOutSlowInEasing,
+                            )
+                        },
                     label = "v2LineScale",
                 )
                 val animatedLineAlpha by androidx.compose.animation.core.animateFloatAsState(
                     targetValue = lineAlpha,
                     animationSpec =
-                        androidx.compose.animation.core.tween(
-                            durationMillis = if (isActive) 330 else 500,
-                            easing = androidx.compose.animation.core.FastOutSlowInEasing,
-                        ),
+                        if (v2AnimationsDisabled) {
+                            androidx.compose.animation.core.snap()
+                        } else {
+                            androidx.compose.animation.core.tween(
+                                durationMillis = if (isActive) 330 else 500,
+                                easing = androidx.compose.animation.core.FastOutSlowInEasing,
+                            )
+                        },
                     label = "v2LineAlpha",
                 )
                 val spotifyRise = remember { Animatable(0f) }
@@ -1010,7 +1021,7 @@ fun LyricsV2(
                 shapes = ButtonDefaults.shapes(),
             ) {
                 Text(
-                    text = "Resume",
+                    text = stringResource(R.string.lyrics_jump_to_current_line),
                     style = MaterialTheme.typography.labelLarge,
                 )
             }

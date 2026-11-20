@@ -21,6 +21,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -54,10 +55,18 @@ import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.Surface
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberSwipeToDismissBoxState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Immutable
@@ -731,17 +740,35 @@ fun Queue(
             }
         }
 
+        val currentQueueListIndex =
+            remember(mutableQueueWindows, currentPlayingUid) {
+                if (currentPlayingUid == null) -1 else mutableQueueWindows.indexOfFirst { it.uid == currentPlayingUid }
+            }
+        val isCurrentOffscreen by remember(currentQueueListIndex, mutableQueueWindows.size) {
+            derivedStateOf {
+                if (currentQueueListIndex !in mutableQueueWindows.indices) {
+                    false
+                } else {
+                    val targetLazyIndex = currentQueueListIndex + headerItems
+                    val visible = lazyListState.layoutInfo.visibleItemsInfo.map { it.index }
+                    visible.isNotEmpty() && targetLazyIndex !in visible
+                }
+            }
+        }
+
         LaunchedEffect(
             state.isCollapsed,
             scrollToCurrentRequested,
             currentPlayingUid,
             reorderableState.isAnyItemDragging,
+            lazyListState.isScrollInProgress,
         ) {
             if (
                 !state.isCollapsed &&
                 scrollToCurrentRequested &&
                 currentPlayingUid != null &&
-                !reorderableState.isAnyItemDragging
+                !reorderableState.isAnyItemDragging &&
+                !lazyListState.isScrollInProgress
             ) {
                 val indexInMutableList = mutableQueueWindows.indexOfFirst { it.uid == currentPlayingUid }
                 if (indexInMutableList != -1) {
@@ -863,6 +890,11 @@ fun Queue(
                         )
                     }
 
+                    val moveUpLabel = context.getString(R.string.player_landscape_move_up)
+                    val moveDownLabel = context.getString(R.string.player_landscape_move_down)
+                    val removeQueueLabel = context.getString(R.string.player_landscape_remove_queue)
+                    val dragHandleDesc = context.getString(R.string.queue_drag_handle_desc)
+
                     itemsIndexed(
                         items = mutableQueueWindows,
                         key = { _, item -> item.queueItemKey },
@@ -874,6 +906,8 @@ fun Queue(
                         ) {
                             val currentItem by rememberUpdatedState(window)
                             val isActive = window.uid == currentPlayingUid
+                            val showUpNextHeader =
+                                currentQueueListIndex >= 0 && index == currentQueueListIndex + 1
                             val dismissBoxState =
                                 rememberSwipeToDismissBoxState(
                                     positionalThreshold = { totalDistance -> totalDistance },
@@ -896,120 +930,171 @@ fun Queue(
                             }
 
                             val content: @Composable () -> Unit = {
-                                Row(
-                                    horizontalArrangement = Arrangement.Center,
-                                    modifier = Modifier.fillMaxWidth(),
-                                ) {
-                                    val shouldLoadImages by remember {
-                                        derivedStateOf {
-                                            state.value > state.collapsedBound + 80.dp
-                                        }
+                                Column(modifier = Modifier.fillMaxWidth()) {
+                                    if (isActive) {
+                                        Text(
+                                            text = stringResource(R.string.queue_section_now_playing),
+                                            style = MaterialTheme.typography.labelMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+                                        )
+                                    } else if (showUpNextHeader) {
+                                        Text(
+                                            text = stringResource(R.string.queue_section_up_next),
+                                            style = MaterialTheme.typography.labelMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = onBackgroundColor.copy(alpha = 0.72f),
+                                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp),
+                                        )
                                     }
 
-                                    val trackMetadata = window.mediaItem.metadata ?: return@Row
-                                    val onPlayNextFromQueue =
-                                        remember(
-                                            window.uid,
-                                            window.firstPeriodIndex,
-                                            currentPlayingUid,
-                                            nextPlayingUid,
-                                        ) {
-                                            if (window.uid != currentPlayingUid && window.uid != nextPlayingUid) {
-                                                {
-                                                    playerConnection.moveQueueItemToNext(window.firstPeriodIndex)
-                                                }
-                                            } else {
-                                                null
-                                            }
-                                        }
-                                    MediaMetadataListItem(
-                                        mediaMetadata = trackMetadata,
-                                        isSelected = selection && trackMetadata in selectedSongs,
-                                        isActive = isActive,
-                                        isPlaying = isPlaying && isActive,
-                                        shouldLoadImage = shouldLoadImages,
-                                        trailingContent = {
-                                            IconButton(
-                                                onClick = {
-                                                    menuState.showImmersive {
-                                                        PlayerMenu(
-                                                            mediaMetadata = trackMetadata,
-                                                            navController = navController,
-                                                            playerBottomSheetState = playerBottomSheetState,
-                                                            isQueueTrigger = true,
-                                                            onPlayNextFromQueue = onPlayNextFromQueue,
-                                                            onRemoveFromQueue = {
-                                                                onRemoveWithUndo(window)
-                                                            },
-                                                            onShowDetailsDialog = {
-                                                                window.mediaItem.mediaId.let {
-                                                                    bottomSheetPageState.show {
-                                                                        ShowMediaInfo(it)
-                                                                    }
-                                                                }
-                                                            },
-                                                            onDismiss = menuState::dismiss,
-                                                        )
-                                                    }
-                                                },
-                                            ) {
-                                                Icon(
-                                                    painter = painterResource(R.drawable.more_vert),
-                                                    contentDescription = null,
-                                                )
-                                            }
-                                            if (!locked) {
-                                                IconButton(
-                                                    onClick = { },
-                                                    modifier = Modifier.draggableHandle(),
-                                                ) {
-                                                    Icon(
-                                                        painter = painterResource(R.drawable.drag_handle),
-                                                        contentDescription = null,
-                                                    )
-                                                }
-                                            }
-                                        },
+                                    Row(
+                                        horizontalArrangement = Arrangement.Center,
                                         modifier =
                                             Modifier
                                                 .fillMaxWidth()
-                                                .background(backgroundColor)
-                                                .combinedClickable(
+                                                .semantics {
+                                                    customActions =
+                                                        buildList {
+                                                            if (!locked && index > 0) {
+                                                                add(
+                                                                    CustomAccessibilityAction(moveUpLabel) {
+                                                                        playerConnection.player.moveMediaItem(index, index - 1)
+                                                                        true
+                                                                    },
+                                                                )
+                                                            }
+                                                            if (!locked && index < mutableQueueWindows.lastIndex) {
+                                                                add(
+                                                                    CustomAccessibilityAction(moveDownLabel) {
+                                                                        playerConnection.player.moveMediaItem(index, index + 1)
+                                                                        true
+                                                                    },
+                                                                )
+                                                            }
+                                                            if (!locked) {
+                                                                add(
+                                                                    CustomAccessibilityAction(removeQueueLabel) {
+                                                                        onRemoveWithUndo(currentItem)
+                                                                        true
+                                                                    },
+                                                                )
+                                                            }
+                                                        }
+                                                },
+                                    ) {
+                                        val shouldLoadImages by remember {
+                                            derivedStateOf {
+                                                state.value > state.collapsedBound + 80.dp
+                                            }
+                                        }
+
+                                        val trackMetadata = window.mediaItem.metadata ?: return@Row
+                                        val onPlayNextFromQueue =
+                                            remember(
+                                                window.uid,
+                                                window.firstPeriodIndex,
+                                                currentPlayingUid,
+                                                nextPlayingUid,
+                                            ) {
+                                                if (window.uid != currentPlayingUid && window.uid != nextPlayingUid) {
+                                                    {
+                                                        playerConnection.moveQueueItemToNext(window.firstPeriodIndex)
+                                                    }
+                                                } else {
+                                                    null
+                                                }
+                                            }
+                                        MediaMetadataListItem(
+                                            mediaMetadata = trackMetadata,
+                                            isSelected = selection && trackMetadata in selectedSongs,
+                                            isActive = isActive,
+                                            isPlaying = isPlaying && isActive,
+                                            shouldLoadImage = shouldLoadImages,
+                                            trailingContent = {
+                                                IconButton(
                                                     onClick = {
-                                                        if (selection) {
-                                                            if (trackMetadata in selectedSongs) {
-                                                                selectedSongs.remove(trackMetadata)
-                                                                selectedItems.remove(currentItem)
-                                                                if (selectedSongs.isEmpty()) {
-                                                                    selection = false
+                                                        menuState.showImmersive {
+                                                            PlayerMenu(
+                                                                mediaMetadata = trackMetadata,
+                                                                navController = navController,
+                                                                playerBottomSheetState = playerBottomSheetState,
+                                                                isQueueTrigger = true,
+                                                                onPlayNextFromQueue = onPlayNextFromQueue,
+                                                                onRemoveFromQueue = {
+                                                                    onRemoveWithUndo(window)
+                                                                },
+                                                                onShowDetailsDialog = {
+                                                                    window.mediaItem.mediaId.let {
+                                                                        bottomSheetPageState.show {
+                                                                            ShowMediaInfo(it)
+                                                                        }
+                                                                    }
+                                                                },
+                                                                onDismiss = menuState::dismiss,
+                                                            )
+                                                        }
+                                                    },
+                                                ) {
+                                                    Icon(
+                                                        painter = painterResource(R.drawable.more_vert),
+                                                        contentDescription = stringResource(R.string.more_options),
+                                                    )
+                                                }
+                                                if (!locked) {
+                                                    IconButton(
+                                                        onClick = { },
+                                                        modifier = Modifier.draggableHandle(),
+                                                    ) {
+                                                        Icon(
+                                                            painter = painterResource(R.drawable.drag_handle),
+                                                            contentDescription = dragHandleDesc,
+                                                        )
+                                                    }
+                                                }
+                                            },
+                                            modifier =
+                                                Modifier
+                                                    .fillMaxWidth()
+                                                    .background(backgroundColor)
+                                                    .combinedClickable(
+                                                        onClick = {
+                                                            if (selection) {
+                                                                if (trackMetadata in selectedSongs) {
+                                                                    selectedSongs.remove(trackMetadata)
+                                                                    selectedItems.remove(currentItem)
+                                                                    if (selectedSongs.isEmpty()) {
+                                                                        selection = false
+                                                                    }
+                                                                } else {
+                                                                    selectedSongs.add(trackMetadata)
+                                                                    selectedItems.add(currentItem)
                                                                 }
                                                             } else {
-                                                                selectedSongs.add(trackMetadata)
-                                                                selectedItems.add(currentItem)
+                                                                if (index == currentWindowIndex) {
+                                                                    playerConnection.player.togglePlayPause()
+                                                                } else {
+                                                                    playerConnection.player.seekToDefaultPosition(
+                                                                        window.firstPeriodIndex,
+                                                                    )
+                                                                    playerConnection.player.playWhenReady = true
+                                                                }
                                                             }
-                                                        } else {
-                                                            if (index == currentWindowIndex) {
-                                                                playerConnection.player.togglePlayPause()
-                                                            } else {
-                                                                playerConnection.player.seekToDefaultPosition(
-                                                                    window.firstPeriodIndex,
-                                                                )
-                                                                playerConnection.player.playWhenReady = true
+                                                        },
+                                                        onLongClick = {
+                                                            if (enableHapticFeedback) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                            if (!selection) {
+                                                                selection = true
                                                             }
-                                                        }
-                                                    },
-                                                    onLongClick = {
-                                                        if (enableHapticFeedback) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                                        if (!selection) {
-                                                            selection = true
-                                                        }
-                                                        selectedSongs.clear()
-                                                        selectedItems.clear()
-                                                        selectedSongs.add(trackMetadata)
-                                                        selectedItems.add(currentItem)
-                                                    },
-                                                ),
-                                    )
+                                                            selectedSongs.clear()
+                                                            selectedItems.clear()
+                                                            selectedSongs.add(trackMetadata)
+                                                            selectedItems.add(currentItem)
+                                                        },
+                                                    ),
+                                        )
+                                    }
                                 }
                             }
 
@@ -1029,6 +1114,47 @@ fun Queue(
             }
 
             Box(modifier = Modifier.fillMaxSize()) {
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = isCurrentOffscreen && !selection && !state.isCollapsed,
+                    enter = fadeIn(),
+                    exit = fadeOut(),
+                    modifier =
+                        Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(
+                                bottom =
+                                    ListItemHeight + 12.dp +
+                                        WindowInsets.systemBars
+                                            .asPaddingValues()
+                                            .calculateBottomPadding(),
+                            ),
+                ) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                        shape = CircleShape,
+                        shadowElevation = 6.dp,
+                        modifier =
+                            Modifier
+                                .clip(CircleShape)
+                                .clickable {
+                                    if (currentQueueListIndex in mutableQueueWindows.indices) {
+                                        coroutineScope.launch {
+                                            lazyListState.animateScrollToItem(currentQueueListIndex + headerItems)
+                                        }
+                                    }
+                                },
+                    ) {
+                        Text(
+                            text = stringResource(R.string.queue_jump_to_current),
+                            style = MaterialTheme.typography.labelLarge,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        )
+                    }
+                }
+
                 SnackbarHost(
                     hostState = snackbarHostState,
                     modifier =
