@@ -36,16 +36,26 @@ class ObserveHomePresentationPreferencesUseCase
     ) {
         operator fun invoke(): Flow<HomePresentationPreferences> =
             combine(
-                repository.showCategoryChips,
-                repository.quickPicksDisplayMode,
-                repository.quickPicksMode,
-                repository.showTonalBackdrop,
-            ) { showCategoryChips, quickPicksDisplayMode, quickPicksMode, showTonalBackdrop ->
+                combine(
+                    repository.showCategoryChips,
+                    repository.quickPicksDisplayMode,
+                    repository.quickPicksMode,
+                    repository.showTonalBackdrop,
+                ) { showCategoryChips, quickPicksDisplayMode, quickPicksMode, showTonalBackdrop ->
+                    Triple(showCategoryChips to quickPicksDisplayMode, quickPicksMode, showTonalBackdrop)
+                },
+                combine(
+                    repository.homeSectionOrder,
+                    repository.homeHiddenSections,
+                ) { order, hidden -> order to hidden },
+            ) { base, custom ->
                 HomePresentationPreferences(
-                    showCategoryChips = showCategoryChips,
-                    quickPicksDisplayMode = quickPicksDisplayMode,
-                    quickPicksMode = quickPicksMode,
-                    showTonalBackdrop = showTonalBackdrop,
+                    showCategoryChips = base.first.first,
+                    quickPicksDisplayMode = base.first.second,
+                    quickPicksMode = base.second,
+                    showTonalBackdrop = base.third,
+                    homeSectionOrder = custom.first,
+                    homeHiddenSections = custom.second,
                 )
             }
     }
@@ -56,6 +66,8 @@ data class HomePresentationPreferences(
     val quickPicksDisplayMode: QuickPicksDisplayMode,
     val quickPicksMode: QuickPicks,
     val showTonalBackdrop: Boolean,
+    val homeSectionOrder: String = "",
+    val homeHiddenSections: Set<String> = emptySet(),
 )
 
 data class PreparedCommunityHomePage(

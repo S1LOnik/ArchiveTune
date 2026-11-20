@@ -120,6 +120,8 @@ private data class HomeLocalContent(
     val forgottenFavorites: List<Song>,
     val keepListening: List<LocalItem>,
     val mixPages: List<HomeMixPage>,
+    val downloadedSongs: List<Song> = emptyList(),
+    val pinnedPlaylists: List<Playlist> = emptyList(),
 )
 
 private data class HomeRemoteContent(
@@ -143,6 +145,8 @@ private data class HomeContent(
                 local.speedDialItems.isNotEmpty() ||
                 local.forgottenFavorites.isNotEmpty() ||
                 local.keepListening.isNotEmpty() ||
+                local.downloadedSongs.isNotEmpty() ||
+                local.pinnedPlaylists.isNotEmpty() ||
                 remote.remoteQuickPicks?.items?.isNotEmpty() == true ||
                 remote.communitySection?.featuredCards?.isNotEmpty() == true ||
                 remote.similarRecommendations.isNotEmpty() ||
@@ -196,6 +200,16 @@ private data class HomeStateInputs(
                 isRefreshing = isRefreshing,
                 isLoadingMore = isLoadingMore,
                 mixPages = ImmutableList.copyOf(content.local.mixPages),
+                downloadedSongs = ImmutableList.copyOf(content.local.downloadedSongs),
+                pinnedPlaylists = ImmutableList.copyOf(content.local.pinnedPlaylists),
+                homeSectionOrder =
+                    ImmutableList.copyOf(
+                        preferences.homeSectionOrder
+                            .split(',')
+                            .map(String::trim)
+                            .filter(String::isNotEmpty),
+                    ),
+                homeHiddenSections = preferences.homeHiddenSections,
             ),
         )
     }
@@ -235,6 +249,20 @@ class HomeViewModel
         private val forgottenFavorites = MutableStateFlow<List<Song>?>(null)
         private val keepListening = MutableStateFlow<List<LocalItem>?>(null)
         private val mixPages = MutableStateFlow<List<HomeMixPage>>(emptyList())
+        private val downloadedSongs = MutableStateFlow<List<Song>>(emptyList())
+        private val pinnedPlaylists = MutableStateFlow<List<Playlist>>(emptyList())
+
+        init {
+            viewModelScope.launch(Dispatchers.IO) {
+                database
+                    .playlistsByCustomOrderAsc()
+                    .map { list -> list.filterNot { it.playlist.isHidden }.take(12) }
+                    .catch { throwable -> reportException(throwable) }
+                    .collect { playlists ->
+                        pinnedPlaylists.value = playlists
+                    }
+            }
+        }
         private val similarRecommendations = MutableStateFlow<List<SimilarRecommendation>?>(null)
         private val accountPlaylists = MutableStateFlow<List<PlaylistItem>?>(null)
         private val homePage = MutableStateFlow<HomePage?>(null)
@@ -269,18 +297,28 @@ class HomeViewModel
 
         private val localContent =
             combine(
-                quickPicks,
-                speedDialItems,
-                forgottenFavorites,
-                keepListening,
-                mixPages,
-            ) { quickPicks, speedDialItems, forgottenFavorites, keepListening, mixPages ->
-                HomeLocalContent(
-                    quickPicks = quickPicks.orEmpty(),
-                    speedDialItems = speedDialItems,
-                    forgottenFavorites = forgottenFavorites.orEmpty(),
-                    keepListening = keepListening.orEmpty(),
-                    mixPages = mixPages,
+                combine(
+                    quickPicks,
+                    speedDialItems,
+                    forgottenFavorites,
+                    keepListening,
+                    mixPages,
+                ) { quickPicks, speedDialItems, forgottenFavorites, keepListening, mixPages ->
+                    HomeLocalContent(
+                        quickPicks = quickPicks.orEmpty(),
+                        speedDialItems = speedDialItems,
+                        forgottenFavorites = forgottenFavorites.orEmpty(),
+                        keepListening = keepListening.orEmpty(),
+                        mixPages = mixPages,
+                    )
+                },
+                combine(downloadedSongs, pinnedPlaylists) { downloaded, pinned ->
+                    downloaded to pinned
+                },
+            ) { base, offline ->
+                base.copy(
+                    downloadedSongs = offline.first,
+                    pinnedPlaylists = offline.second,
                 )
             }
 
@@ -734,8 +772,39 @@ class HomeViewModel
                     val blockedArtistIds = database.getBlockedArtistIds().toSet()
                     val fromTimeStamp = System.currentTimeMillis() - 86400000 * 7 * 2
 
-                    launch { loadSpeedDialItems() }
-                    launch { loadMixPages() }
+                    val localFastJob =
+                        launch {
+                            downloadedSongs.value =
+                                database
+                                    .downloadedSongsList()
+                                    .filter { song ->
+                                        !song.song.isPodcast && song.artists.none { it.blockedAt != null }
+                                    }.take(20)
+                            if (quickPicksMode.first() == QuickPicks.QUICK_PICKS && quickPicks.value.isNullOrEmpty()) {
+                                val offlineFallback =
+                                    downloadedSongs.value.ifEmpty {
+                                        database
+                                            .recentSongs(limit = 24)
+                                            .first()
+                                            .filter { song -> !song.song.isPodcast && song.artists.none { it.blockedAt != null } }
+                                            .take(20)
+                                    }
+                                if (offlineFallback.isNotEmpty()) {
+                                    quickPicks.value = offlineFallback
+                                }
+                            }
+                            if (downloadedSongs.value.isNotEmpty() ||
+                                pinnedPlaylists.value.isNotEmpty() ||
+                                quickPicks.value?.isNotEmpty() == true
+                            ) {
+                                isInitialLoadComplete.value = true
+                            }
+                        }
+                    launch {
+                        localFastJob.join()
+                        loadSpeedDialItems()
+                        loadMixPages()
+                    }
                     launch {
                         forgottenFavorites.value =
                             database

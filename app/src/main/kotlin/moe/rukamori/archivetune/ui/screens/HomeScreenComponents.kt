@@ -301,10 +301,147 @@ fun HomeSectionHeader(
     }
 }
 
+private data class UnifiedQuickPickTile(
+    val id: String,
+    val title: String,
+    val subtitle: String,
+    val thumbnailUrl: String?,
+    val isActive: Boolean,
+    val onClick: () -> Unit,
+    val onLongClick: () -> Unit,
+)
+
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun UnifiedQuickPicksArtworkSection(
+    tiles: List<UnifiedQuickPickTile>,
+    displayMode: QuickPicksDisplayMode,
+    isPlaying: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
+        val rows =
+            when (displayMode) {
+                QuickPicksDisplayMode.COVER_STRIP -> 1
+                QuickPicksDisplayMode.GRID -> 2
+                QuickPicksDisplayMode.MOSAIC -> 3
+                else -> 0
+            }
+        val grid = rows > 0
+        val heroHeight =
+            when {
+                rows == 1 -> ((maxWidth - 42.dp) / 2).coerceIn(110.dp, 188.dp)
+                rows == 3 -> ((maxWidth - 62.dp) / 4).coerceIn(76.dp, 124.dp)
+                grid -> ((maxWidth - 52.dp) / 3).coerceIn(80.dp, 160.dp)
+                maxWidth >= 840.dp -> 380.dp
+                maxWidth >= 600.dp -> 356.dp
+                else -> 332.dp
+            }
+        val heroMaxWidth = if (grid) heroHeight else (maxWidth - 48.dp).coerceIn(232.dp, 440.dp)
+        val density = LocalDensity.current
+        val requestWidthPx = with(density) { heroMaxWidth.roundToPx().coerceAtLeast(1) }
+        val requestHeightPx = with(density) { heroHeight.roundToPx().coerceAtLeast(1) }
+        val context = LocalContext.current
+
+        QuickPickArtworkLayout(
+            count = tiles.size,
+            rows = rows,
+            width = heroMaxWidth,
+            height = heroHeight,
+        ) { index, artworkModifier ->
+            val tile = tiles[index]
+            val imageRequest =
+                remember(tile.thumbnailUrl, requestWidthPx, requestHeightPx) {
+                    ImageRequest
+                        .Builder(context)
+                        .data(tile.thumbnailUrl)
+                        .size(Size(requestWidthPx, requestHeightPx))
+                        .crossfade(true)
+                        .build()
+                }
+
+            Box(
+                modifier =
+                    artworkModifier
+                        .focusable()
+                        .combinedClickable(
+                            onClick = tile.onClick,
+                            onLongClick = tile.onLongClick,
+                        ),
+            ) {
+                AsyncImage(
+                    model = imageRequest,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+
+                Box(
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .background(
+                                Brush.verticalGradient(
+                                    0f to Color.Transparent,
+                                    0.48f to Color.Black.copy(alpha = 0.08f),
+                                    1f to Color.Black.copy(alpha = 0.84f),
+                                ),
+                            ),
+                )
+
+                if (tile.isActive && isPlaying) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                        shape = CircleShape,
+                        tonalElevation = 2.dp,
+                        modifier =
+                            Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(14.dp)
+                                .size(36.dp),
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                painter = painterResource(R.drawable.volume_up),
+                                contentDescription = null,
+                                modifier = Modifier.size(19.dp),
+                            )
+                        }
+                    }
+                }
+
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                    modifier =
+                        Modifier
+                            .align(Alignment.BottomStart)
+                            .padding(if (grid) 8.dp else 20.dp),
+                ) {
+                    Text(
+                        text = tile.title,
+                        style = if (grid) MaterialTheme.typography.labelLarge else MaterialTheme.typography.titleLargeEmphasized,
+                        color = Color.White,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        text = tile.subtitle,
+                        style = if (grid) MaterialTheme.typography.labelSmall else MaterialTheme.typography.bodyLarge,
+                        color = Color.White.copy(alpha = 0.78f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+    }
+}
+
 @OptIn(
+    ExperimentalFoundationApi::class,
     ExperimentalMaterial3Api::class,
     ExperimentalMaterial3ExpressiveApi::class,
-    ExperimentalFoundationApi::class,
 )
 @Composable
 fun QuickPicksSection(
@@ -323,142 +460,46 @@ fun QuickPicksSection(
     when (displayMode) {
         QuickPicksDisplayMode.CARD, QuickPicksDisplayMode.GRID,
         QuickPicksDisplayMode.COVER_STRIP, QuickPicksDisplayMode.MOSAIC -> {
-            BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
-                val rows = when (displayMode) {
-                    QuickPicksDisplayMode.COVER_STRIP -> 1
-                    QuickPicksDisplayMode.GRID -> 2
-                    QuickPicksDisplayMode.MOSAIC -> 3
-                    else -> 0
-                }
-                val grid = rows > 0
-                val heroHeight = when {
-                    rows == 1 -> ((maxWidth - 42.dp) / 2).coerceIn(110.dp, 188.dp)
-                    rows == 3 -> ((maxWidth - 62.dp) / 4).coerceIn(76.dp, 124.dp)
-                    grid -> ((maxWidth - 52.dp) / 3).coerceIn(80.dp, 160.dp)
-                    maxWidth >= 840.dp -> 380.dp
-                    maxWidth >= 600.dp -> 356.dp
-                    else -> 332.dp
-                }
-                val heroMaxWidth = if (grid) heroHeight else (maxWidth - 48.dp).coerceIn(232.dp, 440.dp)
-                val density = LocalDensity.current
-                val requestWidthPx = with(density) { heroMaxWidth.roundToPx().coerceAtLeast(1) }
-                val requestHeightPx = with(density) { heroHeight.roundToPx().coerceAtLeast(1) }
-
-                QuickPickArtworkLayout(
-                    count = distinctQuickPicks.size,
-                    rows = rows,
-                    width = heroMaxWidth,
-                    height = heroHeight,
-                ) { index, artworkModifier ->
-                    val song = distinctQuickPicks[index]
+            val tiles =
+                distinctQuickPicks.map { song ->
                     val isActive = song.id == mediaMetadata?.id
-                    val context = LocalContext.current
-                    val imageRequest =
-                        remember(song.song.thumbnailUrl, requestWidthPx, requestHeightPx) {
-                            ImageRequest
-                                .Builder(context)
-                                .data(song.song.thumbnailUrl)
-                                .size(Size(requestWidthPx, requestHeightPx))
-                                .crossfade(true)
-                                .build()
-                        }
-
-                    Box(
-                        modifier =
-                            artworkModifier.focusable()
-                                .combinedClickable(
-                                    onClick = {
-                                        if (isActive) {
-                                            playerConnection.player.togglePlayPause()
-                                        } else {
-                                            playerConnection.playQueue(
-                                                if (song.song.isLocal) {
-                                                    ListQueue(items = listOf(song.toMediaItem()))
-                                                } else {
-                                                    YouTubeQueue.radio(song.toMediaMetadata())
-                                                },
-                                            )
-                                        }
+                    UnifiedQuickPickTile(
+                        id = song.id,
+                        title = song.song.title,
+                        subtitle = song.artists.joinToString { it.name },
+                        thumbnailUrl = song.song.thumbnailUrl,
+                        isActive = isActive,
+                        onClick = {
+                            if (isActive) {
+                                playerConnection.player.togglePlayPause()
+                            } else {
+                                playerConnection.playQueue(
+                                    if (song.song.isLocal) {
+                                        ListQueue(items = listOf(song.toMediaItem()))
+                                    } else {
+                                        YouTubeQueue.radio(song.toMediaMetadata())
                                     },
-                                    onLongClick = {
-                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                        menuState.show {
-                                            SongMenu(
-                                                originalSong = song,
-                                                navController = navController,
-                                                onDismiss = menuState::dismiss,
-                                            )
-                                        }
-                                    },
-                                ),
-                    ) {
-                        AsyncImage(
-                            model = imageRequest,
-                            contentDescription = null,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize(),
-                        )
-
-                        Box(
-                            modifier =
-                                Modifier
-                                    .fillMaxSize()
-                                    .background(
-                                        Brush.verticalGradient(
-                                            0f to Color.Transparent,
-                                            0.48f to Color.Black.copy(alpha = 0.08f),
-                                            1f to Color.Black.copy(alpha = 0.84f),
-                                        ),
-                                    ),
-                        )
-
-                        if (isActive && isPlaying) {
-                            Surface(
-                                color = MaterialTheme.colorScheme.primary,
-                                contentColor = MaterialTheme.colorScheme.onPrimary,
-                                shape = CircleShape,
-                                tonalElevation = 2.dp,
-                                modifier =
-                                    Modifier
-                                        .align(Alignment.TopEnd)
-                                        .padding(14.dp)
-                                        .size(36.dp),
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Icon(
-                                        painter = painterResource(R.drawable.volume_up),
-                                        contentDescription = null,
-                                        modifier = Modifier.size(19.dp),
-                                    )
-                                }
+                                )
                             }
-                        }
-
-                        Column(
-                            verticalArrangement = Arrangement.spacedBy(2.dp),
-                            modifier =
-                                Modifier
-                                    .align(Alignment.BottomStart)
-                                    .padding(if (grid) 8.dp else 20.dp),
-                        ) {
-                            Text(
-                                text = song.song.title,
-                                style = if (grid) MaterialTheme.typography.labelLarge else MaterialTheme.typography.titleLargeEmphasized,
-                                color = Color.White,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            Text(
-                                text = song.artists.joinToString { it.name },
-                                style = if (grid) MaterialTheme.typography.labelSmall else MaterialTheme.typography.bodyLarge,
-                                color = Color.White.copy(alpha = 0.78f),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                    }
+                        },
+                        onLongClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            menuState.show {
+                                SongMenu(
+                                    originalSong = song,
+                                    navController = navController,
+                                    onDismiss = menuState::dismiss,
+                                )
+                            }
+                        },
+                    )
                 }
-            }
+            UnifiedQuickPicksArtworkSection(
+                tiles = tiles,
+                displayMode = displayMode,
+                isPlaying = isPlaying,
+                modifier = modifier,
+            )
         }
 
         QuickPicksDisplayMode.LIST -> {
@@ -580,141 +621,45 @@ fun RemoteQuickPicksSection(
     when (displayMode) {
         QuickPicksDisplayMode.CARD, QuickPicksDisplayMode.GRID,
         QuickPicksDisplayMode.COVER_STRIP, QuickPicksDisplayMode.MOSAIC -> {
-            BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
-                val rows = when (displayMode) {
-                    QuickPicksDisplayMode.COVER_STRIP -> 1
-                    QuickPicksDisplayMode.GRID -> 2
-                    QuickPicksDisplayMode.MOSAIC -> 3
-                    else -> 0
-                }
-                val grid = rows > 0
-                val heroHeight = when {
-                    rows == 1 -> ((maxWidth - 42.dp) / 2).coerceIn(110.dp, 188.dp)
-                    rows == 3 -> ((maxWidth - 62.dp) / 4).coerceIn(76.dp, 124.dp)
-                    grid -> ((maxWidth - 52.dp) / 3).coerceIn(80.dp, 160.dp)
-                    maxWidth >= 840.dp -> 380.dp
-                    maxWidth >= 600.dp -> 356.dp
-                    else -> 332.dp
-                }
-                val heroMaxWidth = if (grid) heroHeight else (maxWidth - 48.dp).coerceIn(232.dp, 440.dp)
-                val density = LocalDensity.current
-                val requestWidthPx = with(density) { heroMaxWidth.roundToPx().coerceAtLeast(1) }
-                val requestHeightPx = with(density) { heroHeight.roundToPx().coerceAtLeast(1) }
-
-                QuickPickArtworkLayout(
-                    count = songs.size,
-                    rows = rows,
-                    width = heroMaxWidth,
-                    height = heroHeight,
-                ) { index, artworkModifier ->
-                    val song = songs[index]
+            val tiles =
+                songs.map { song ->
                     val isActive = song.id == mediaMetadata?.id
-                    val context = LocalContext.current
-                    val imageRequest =
-                        remember(song.thumbnail, requestWidthPx, requestHeightPx) {
-                            ImageRequest
-                                .Builder(context)
-                                .data(song.thumbnail)
-                                .size(Size(requestWidthPx, requestHeightPx))
-                                .crossfade(true)
-                                .build()
-                        }
-
-                    Box(
-                        modifier =
-                            artworkModifier.focusable()
-                                .combinedClickable(
-                                    onClick = {
-                                        if (isActive) {
-                                            playerConnection.player.togglePlayPause()
-                                        } else {
-                                            playerConnection.playQueue(
-                                                YouTubeQueue(
-                                                    endpoint = song.endpoint ?: WatchEndpoint(videoId = song.id),
-                                                    preloadItem = song.toMediaMetadata(),
-                                                ),
-                                            )
-                                        }
-                                    },
-                                    onLongClick = {
-                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                        menuState.show {
-                                            YouTubeSongMenu(
-                                                song = song,
-                                                navController = navController,
-                                                onDismiss = menuState::dismiss,
-                                            )
-                                        }
-                                    },
-                                ),
-                    ) {
-                        AsyncImage(
-                            model = imageRequest,
-                            contentDescription = null,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize(),
-                        )
-
-                        Box(
-                            modifier =
-                                Modifier
-                                    .fillMaxSize()
-                                    .background(
-                                        Brush.verticalGradient(
-                                            0f to Color.Transparent,
-                                            0.48f to Color.Black.copy(alpha = 0.08f),
-                                            1f to Color.Black.copy(alpha = 0.84f),
-                                        ),
+                    UnifiedQuickPickTile(
+                        id = song.id,
+                        title = song.title,
+                        subtitle = song.artists.joinToString { artist -> artist.name },
+                        thumbnailUrl = song.thumbnail,
+                        isActive = isActive,
+                        onClick = {
+                            if (isActive) {
+                                playerConnection.player.togglePlayPause()
+                            } else {
+                                playerConnection.playQueue(
+                                    YouTubeQueue(
+                                        endpoint = song.endpoint ?: WatchEndpoint(videoId = song.id),
+                                        preloadItem = song.toMediaMetadata(),
                                     ),
-                        )
-
-                        if (isActive && isPlaying) {
-                            Surface(
-                                color = MaterialTheme.colorScheme.primary,
-                                contentColor = MaterialTheme.colorScheme.onPrimary,
-                                shape = CircleShape,
-                                tonalElevation = 2.dp,
-                                modifier =
-                                    Modifier
-                                        .align(Alignment.TopEnd)
-                                        .padding(14.dp)
-                                        .size(36.dp),
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Icon(
-                                        painter = painterResource(R.drawable.volume_up),
-                                        contentDescription = null,
-                                        modifier = Modifier.size(19.dp),
-                                    )
-                                }
+                                )
                             }
-                        }
-
-                        Column(
-                            verticalArrangement = Arrangement.spacedBy(2.dp),
-                            modifier =
-                                Modifier
-                                    .align(Alignment.BottomStart)
-                                    .padding(if (grid) 8.dp else 20.dp),
-                        ) {
-                            Text(
-                                text = song.title,
-                                style = if (grid) MaterialTheme.typography.labelLarge else MaterialTheme.typography.titleLargeEmphasized,
-                                color = Color.White,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            Text(
-                                text = song.artists.joinToString { artist -> artist.name },
-                                style = if (grid) MaterialTheme.typography.labelSmall else MaterialTheme.typography.bodyLarge,
-                                color = Color.White.copy(alpha = 0.78f),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                    }
+                        },
+                        onLongClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            menuState.show {
+                                YouTubeSongMenu(
+                                    song = song,
+                                    navController = navController,
+                                    onDismiss = menuState::dismiss,
+                                )
+                            }
+                        },
+                    )
                 }
-            }
+            UnifiedQuickPicksArtworkSection(
+                tiles = tiles,
+                displayMode = displayMode,
+                isPlaying = isPlaying,
+                modifier = modifier,
+            )
         }
 
         QuickPicksDisplayMode.LIST -> {

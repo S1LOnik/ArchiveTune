@@ -13,6 +13,7 @@ import com.google.common.collect.ImmutableList
 import moe.rukamori.archivetune.constants.QuickPicks
 import moe.rukamori.archivetune.constants.QuickPicksDisplayMode
 import moe.rukamori.archivetune.db.entities.LocalItem
+import moe.rukamori.archivetune.db.entities.Playlist
 import moe.rukamori.archivetune.db.entities.Song
 import moe.rukamori.archivetune.innertube.models.PlaylistItem
 import moe.rukamori.archivetune.innertube.pages.HomePage
@@ -56,6 +57,10 @@ data class HomeUiState(
     val isRefreshing: Boolean,
     val isLoadingMore: Boolean,
     val mixPages: ImmutableList<HomeMixPage> = ImmutableList.of(),
+    val downloadedSongs: ImmutableList<Song> = ImmutableList.of(),
+    val pinnedPlaylists: ImmutableList<Playlist> = ImmutableList.of(),
+    val homeSectionOrder: ImmutableList<String> = ImmutableList.of(),
+    val homeHiddenSections: Set<String> = emptySet(),
 )
 
 // [FIX-ZCODE] Wave 6 (owner request): home "mixes" section between quick picks and daily

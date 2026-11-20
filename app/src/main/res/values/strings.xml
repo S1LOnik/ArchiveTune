@@ -2418,4 +2418,20 @@
     <string name="nav_material_bitchord">BitChord</string>
     <string name="studio_no_labels">no labels</string>
     <string name="studio_with_labels">with labels</string>
+
+    <string name="home_customize_button">Customize Home</string>
+    <string name="home_customize_title">Customize Home</string>
+    <string name="home_customize_layouts">Home layout</string>
+    <string name="home_customize_sections">Sections &amp; order</string>
+    <string name="home_customize_reset_order">Reset order</string>
+    <string name="home_move_up">Move up</string>
+    <string name="home_move_down">Move down</string>
+    <string name="home_continue_title">Continue</string>
+    <string name="home_continue_resume">Resume listening</string>
+    <string name="home_listen_again">Listen again</string>
+    <string name="home_section_pinned_playlists">Pinned playlists</string>
+    <string name="home_section_similar_recommendations">Similar recommendations</string>
+    <string name="home_section_more_recommendations">More recommendations</string>
+    <string name="home_offline_saved_badge">Available offline</string>
+    <string name="home_quick_tracks_title">For this moment</string>
 </resources>

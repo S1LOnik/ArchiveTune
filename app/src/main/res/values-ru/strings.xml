@@ -864,4 +864,20 @@
     <string name="nav_material_bitchord">BitChord</string>
     <string name="studio_no_labels">без подписей</string>
     <string name="studio_with_labels">с подписями</string>
+
+    <string name="home_customize_button">Настроить главную</string>
+    <string name="home_customize_title">Настроить главную</string>
+    <string name="home_customize_layouts">Композиция главной</string>
+    <string name="home_customize_sections">Разделы и порядок</string>
+    <string name="home_customize_reset_order">Сбросить порядок</string>
+    <string name="home_move_up">Выше</string>
+    <string name="home_move_down">Ниже</string>
+    <string name="home_continue_title">Продолжить</string>
+    <string name="home_continue_resume">Вернуться к треку</string>
+    <string name="home_listen_again">Снова послушать</string>
+    <string name="home_section_pinned_playlists">Закреплённые плейлисты</string>
+    <string name="home_section_similar_recommendations">Похожие рекомендации</string>
+    <string name="home_section_more_recommendations">Ещё рекомендации</string>
+    <string name="home_offline_saved_badge">Доступно оффлайн</string>
+    <string name="home_quick_tracks_title">Личный подбор</string>
 </resources>

@@ -16,6 +16,8 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import moe.rukamori.archivetune.constants.DisableBlurKey
+import moe.rukamori.archivetune.constants.HomeHiddenSectionsKey
+import moe.rukamori.archivetune.constants.HomeSectionOrderKey
 import moe.rukamori.archivetune.constants.QuickPicks
 import moe.rukamori.archivetune.constants.QuickPicksKey
 import moe.rukamori.archivetune.constants.QuickPicksDisplayMode
@@ -59,6 +61,16 @@ class HomeRepository
         val showTonalBackdrop: Flow<Boolean> =
             context.dataStore.data
                 .map { preferences -> preferences[DisableBlurKey] != true }
+                .distinctUntilChanged()
+
+        val homeSectionOrder: Flow<String> =
+            context.dataStore.data
+                .map { preferences -> preferences[HomeSectionOrderKey].orEmpty() }
+                .distinctUntilChanged()
+
+        val homeHiddenSections: Flow<Set<String>> =
+            context.dataStore.data
+                .map { preferences -> preferences[HomeHiddenSectionsKey].orEmpty() }
                 .distinctUntilChanged()
 
         suspend fun loadQuickPickSeeds(limit: Int): List<QuickPickSeed> {
