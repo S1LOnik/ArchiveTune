@@ -549,17 +549,22 @@ fun LazyListScope.renderNowLayout(
     sectionSpacer: LazyListScope.(String) -> Unit,
 ) {
     // Above-the-fold compact block: Continue + Pinned Playlists + 4 personal quick tracks
+    val offlineCandidate =
+        HomeLayoutPolicy.selectOfflineContinueSong(
+            downloaded = uiState.downloadedSongs,
+            keepListening = uiState.keepListening,
+            quickPicks = uiState.quickPicks,
+            forgottenFavorites = uiState.forgottenFavorites,
+        )
+    val continueSongId =
+        if (HomeSectionId.CONTINUE_LISTEN in orderedVisibleSections) {
+            mediaMetadata?.id ?: offlineCandidate?.id
+        } else {
+            null
+        }
+
     if (HomeSectionId.CONTINUE_LISTEN in orderedVisibleSections) {
         item(key = "now_continue_card", contentType = "now_continue") {
-            val offlineCandidate =
-                remember(uiState.downloadedSongs, uiState.keepListening, uiState.quickPicks, uiState.forgottenFavorites) {
-                    HomeLayoutPolicy.selectOfflineContinueSong(
-                        downloaded = uiState.downloadedSongs,
-                        keepListening = uiState.keepListening,
-                        quickPicks = uiState.quickPicks,
-                        forgottenFavorites = uiState.forgottenFavorites,
-                    )
-                }
             NowContinueCard(
                 activeMetadata = mediaMetadata,
                 fallbackSong = offlineCandidate,
@@ -585,11 +590,20 @@ fun LazyListScope.renderNowLayout(
     }
 
     if (HomeSectionId.QUICK_PICKS in orderedVisibleSections) {
+        val rawRemoteSongs =
+            uiState.remoteQuickPicks?.items?.filterIsInstance<SongItem>().orEmpty()
         val remoteSongs =
-            uiState.remoteQuickPicks?.items?.filterIsInstance<SongItem>().orEmpty().take(4)
-        val localSongs =
+            rawRemoteSongs
+                .filterNot { it.id == continueSongId }
+                .ifEmpty { rawRemoteSongs }
+                .take(4)
+        val rawLocalSongs =
             (uiState.quickPicks.ifEmpty { uiState.downloadedSongs }.ifEmpty { uiState.forgottenFavorites })
                 .distinctBy { it.id }
+        val localSongs =
+            rawLocalSongs
+                .filterNot { it.id == continueSongId }
+                .ifEmpty { rawLocalSongs }
                 .take(4)
         if (remoteSongs.isNotEmpty() || localSongs.isNotEmpty()) {
             item(key = "now_quick_tracks_header", contentType = "section_header") {
@@ -715,8 +729,20 @@ fun LazyListScope.renderCoversLayout(
     }
 
     if (HomeSectionId.QUICK_PICKS in orderedVisibleSections) {
-        val remoteSongs = uiState.remoteQuickPicks?.items?.filterIsInstance<SongItem>().orEmpty().take(8)
-        val localSongs = uiState.quickPicks.ifEmpty { uiState.downloadedSongs }.distinctBy { it.id }.take(8)
+        val mosaicSongIds = coversMosaicDisplayedSongIds(uiState)
+        val remoteSongs =
+            uiState.remoteQuickPicks
+                ?.items
+                ?.filterIsInstance<SongItem>()
+                .orEmpty()
+                .filterNot { it.id in mosaicSongIds }
+                .take(8)
+        val localSongs =
+            uiState.quickPicks
+                .ifEmpty { uiState.downloadedSongs }
+                .distinctBy { it.id }
+                .filterNot { it.id in mosaicSongIds }
+                .take(8)
         if (remoteSongs.isNotEmpty() || localSongs.isNotEmpty()) {
             sectionSpacer("covers_track_list")
             item(key = "covers_track_list_header", contentType = "section_header") {
@@ -1092,6 +1118,37 @@ private fun NowRemoteTrackRow(
                     },
                 ),
     )
+}
+
+internal fun coversMosaicDisplayedSongIds(uiState: HomeUiState): Set<String> {
+    val entries =
+        buildList<Pair<String, String?>> {
+            uiState.speedDialItems.forEach { item ->
+                when (item) {
+                    is Album -> add("album_${item.id}" to null)
+                    is Playlist -> add("playlist_${item.id}" to null)
+                    is Artist -> add("artist_${item.id}" to null)
+                    is Song -> add("song_${item.id}" to item.id)
+                }
+            }
+            uiState.remoteQuickPicks?.items.orEmpty().forEach { item ->
+                when (item) {
+                    is SongItem -> add("yt_song_${item.id}" to item.id)
+                    is AlbumItem -> add("yt_album_${item.id}" to null)
+                    is PlaylistItem -> add("yt_playlist_${item.id}" to null)
+                    is ArtistItem -> add("yt_artist_${item.id}" to null)
+                    else -> Unit
+                }
+            }
+            uiState.pinnedPlaylists.forEach { playlist ->
+                add("local_pl_${playlist.id}" to null)
+            }
+            (uiState.quickPicks + uiState.downloadedSongs).forEach { song ->
+                add("song_${song.id}" to song.id)
+            }
+        }.distinctBy { it.first }
+            .take(10)
+    return entries.mapNotNullTo( LinkedHashSet() ) { it.second }
 }
 
 @Composable

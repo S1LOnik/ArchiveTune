@@ -54,12 +54,14 @@ fun NewActionButton(
     val containerColor = if (backgroundColor.isSpecified) backgroundColor else MaterialTheme.colorScheme.surfaceContainerHigh
     val actionContentColor = if (contentColor.isSpecified) contentColor else MaterialTheme.colorScheme.onSurfaceVariant
 
+    val isMultiWord = text.trim().contains(' ')
+
     FilledTonalButton(
         onClick = onClick,
         modifier =
             modifier
                 .fillMaxWidth()
-                .heightIn(min = 104.dp),
+                .heightIn(min = 96.dp),
         enabled = enabled,
         shape = ButtonDefaults.squareShape,
         colors =
@@ -67,7 +69,7 @@ fun NewActionButton(
                 containerColor = containerColor,
                 contentColor = actionContentColor,
             ),
-        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 14.dp),
+        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 12.dp),
     ) {
         Column(
             modifier = Modifier.fillMaxWidth(),
@@ -75,7 +77,7 @@ fun NewActionButton(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Box(
-                modifier = Modifier.size(28.dp),
+                modifier = Modifier.size(26.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 icon()
@@ -83,10 +85,11 @@ fun NewActionButton(
 
             Text(
                 text = text,
-                style = MaterialTheme.typography.labelLarge,
+                style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.SemiBold,
                 textAlign = TextAlign.Center,
-                maxLines = 2,
+                maxLines = if (isMultiWord) 2 else 1,
+                softWrap = isMultiWord,
                 overflow = TextOverflow.Ellipsis,
             )
         }
@@ -156,15 +159,16 @@ fun NewActionGrid(
 
     val columnCount = columns.coerceAtLeast(1)
     val rows = actions.chunked(columnCount)
+    val cellSpacing = if (columnCount >= 4) 8.dp else 12.dp
 
     Column(
         modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(cellSpacing),
     ) {
         rows.forEach { row ->
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(cellSpacing),
             ) {
                 row.forEach { action ->
                     NewActionButton(

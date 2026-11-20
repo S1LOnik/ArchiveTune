@@ -924,14 +924,15 @@ fun LibraryPlaylistsScreen(
                     FilledTonalButton(
                         enabled = hidePlan.changedIds.isNotEmpty(),
                         onClick = { applyVisibilityBatch(selectedSet, true) },
+                        contentPadding = PaddingValues(horizontal = 10.dp),
                         modifier = Modifier.weight(1f),
                     ) {
                         Text(
                             text =
                                 if (hidePlan.changedIds.isNotEmpty()) {
-                                    "${stringResource(R.string.playlist_hide_selected)} (${hidePlan.changedIds.size})"
+                                    "${stringResource(R.string.playlist_action_hide)} (${hidePlan.changedIds.size})"
                                 } else {
-                                    stringResource(R.string.playlist_hide_selected)
+                                    stringResource(R.string.playlist_action_hide)
                                 },
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -940,14 +941,15 @@ fun LibraryPlaylistsScreen(
                     Button(
                         enabled = showPlan.changedIds.isNotEmpty(),
                         onClick = { applyVisibilityBatch(selectedSet, false) },
+                        contentPadding = PaddingValues(horizontal = 10.dp),
                         modifier = Modifier.weight(1f),
                     ) {
                         Text(
                             text =
                                 if (showPlan.changedIds.isNotEmpty()) {
-                                    "${stringResource(R.string.playlist_show_selected)} (${showPlan.changedIds.size})"
+                                    "${stringResource(R.string.playlist_action_show)} (${showPlan.changedIds.size})"
                                 } else {
-                                    stringResource(R.string.playlist_show_selected)
+                                    stringResource(R.string.playlist_action_show)
                                 },
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,

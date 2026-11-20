@@ -119,14 +119,10 @@ fun MiniPlayer(
             compactHorizontalPadding
         }
     val compactModifier =
-        if (miniPlayerStyle == MiniPlayerStyle.BAR) {
-            modifier
-        } else {
-            modifier.padding(
-                start = lerp(0.dp, compactStartInset, compactFraction),
-                end = lerp(0.dp, compactEndInset, compactFraction),
-            )
-        }
+        modifier.padding(
+            start = lerp(0.dp, compactStartInset, compactFraction),
+            end = lerp(0.dp, compactEndInset, compactFraction),
+        )
     NewMiniPlayer(
         positionProvider = positionProvider,
         durationProvider = durationProvider,
@@ -338,7 +334,14 @@ private fun NewMiniPlayer(
     val miniPlayerShape =
         remember(isPairedWithNavigation, compactFraction, miniPlayerStyle) {
             if (miniPlayerStyle == MiniPlayerStyle.BAR) {
-                RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)
+                val topCorner = lerp(12.dp, 26.dp, compactFraction)
+                val bottomCorner = lerp(0.dp, 26.dp, compactFraction)
+                RoundedCornerShape(
+                    topStart = topCorner,
+                    topEnd = topCorner,
+                    bottomStart = bottomCorner,
+                    bottomEnd = bottomCorner,
+                )
             } else if (compactFraction > 0.5f) {
                 RoundedCornerShape(percent = 50)
             } else if (isPairedWithNavigation) {

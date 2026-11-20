@@ -96,7 +96,11 @@ import moe.rukamori.archivetune.extensions.togglePlayPause
 import moe.rukamori.archivetune.models.MediaMetadata
 import moe.rukamori.archivetune.playback.PlayerConnection
 import moe.rukamori.archivetune.ui.motion.ArchiveTuneHapticKind
+import moe.rukamori.archivetune.ui.motion.LocalMotionConfig
 import moe.rukamori.archivetune.ui.motion.rememberArchiveTuneHapticTrigger
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import moe.rukamori.archivetune.ui.utils.getNextFallbackUrl
 import moe.rukamori.archivetune.utils.rememberLowDataModeActive
 import moe.rukamori.archivetune.utils.rememberPreference
@@ -314,7 +318,9 @@ fun SwipeableMiniPlayerBox(
 fun RowScope.MiniPlayerInfo(
     mediaMetadata: MediaMetadata,
     colors: MiniPlayerContentColors,
+    isPlaying: Boolean = false,
 ) {
+    val shouldMarquee = isPlaying && LocalMotionConfig.current.animationsEnabled
     PlayerTextBackdrop(
         textColor = colors.title,
         modifier =
@@ -349,7 +355,16 @@ fun RowScope.MiniPlayerInfo(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         onTextLayout = { titleLayout.value = it },
-                        modifier = Modifier.fillMaxWidth().basicMarquee(iterations = Int.MAX_VALUE),
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .then(
+                                    if (shouldMarquee) {
+                                        Modifier.basicMarquee(iterations = Int.MAX_VALUE)
+                                    } else {
+                                        Modifier
+                                    },
+                                ),
                     )
                 }
             }
@@ -378,7 +393,16 @@ fun RowScope.MiniPlayerInfo(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         onTextLayout = { artistLayout.value = it },
-                        modifier = Modifier.fillMaxWidth().basicMarquee(iterations = Int.MAX_VALUE),
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .then(
+                                    if (shouldMarquee) {
+                                        Modifier.basicMarquee(iterations = Int.MAX_VALUE)
+                                    } else {
+                                        Modifier
+                                    },
+                                ),
                     )
                 }
             }
@@ -537,10 +561,20 @@ private fun MiniPlayerTransportButton(
             modifier
                 .size(if (compact) 38.dp else 44.dp)
                 .clip(CircleShape)
+                .then(
+                    if (!contentDescription.isNullOrBlank()) {
+                        Modifier.semantics {
+                            this.contentDescription = contentDescription
+                        }
+                    } else {
+                        Modifier
+                    },
+                )
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
                     enabled = enabled,
+                    role = Role.Button,
                     onClick = handleClick,
                 ),
     ) {
@@ -549,6 +583,7 @@ private fun MiniPlayerTransportButton(
                 isPlaying = morphingPlayState,
                 tint = if (enabled) tint else colors.disabledButtonIcon,
                 size = iconSize,
+                contentDescription = contentDescription,
             )
         } else {
             Icon(
@@ -642,6 +677,8 @@ fun NewMiniPlayerContent(
             durationProvider = durationProvider,
             playerConnection = playerConnection,
             colors = colors,
+            compactFraction = compactFraction,
+            compactShowTransportControls = compactShowTransportControls,
             onArtworkSlotPositioned = onArtworkSlotPositioned,
         )
         return
@@ -677,6 +714,7 @@ fun NewMiniPlayerContent(
                     MiniPlayerInfo(
                         mediaMetadata = it,
                         colors = colors,
+                        isPlaying = isPlaying,
                     )
                 } ?: Spacer(Modifier.weight(1f))
 
@@ -758,6 +796,7 @@ fun CompactMiniPlayerContent(
             MiniPlayerInfo(
                 mediaMetadata = it,
                 colors = colors,
+                isPlaying = isPlaying,
             )
         } ?: Spacer(Modifier.weight(1f))
 
@@ -808,6 +847,8 @@ private fun MiniPlayerBarContent(
     durationProvider: () -> Long,
     playerConnection: PlayerConnection,
     colors: MiniPlayerContentColors,
+    compactFraction: Float = 0f,
+    compactShowTransportControls: Boolean = false,
     onArtworkSlotPositioned: ((androidx.compose.ui.geometry.Rect) -> Unit)? = null,
 ) {
     val isPlaying by playerConnection.isPlaying.collectAsStateWithLifecycle()
@@ -850,6 +891,7 @@ private fun MiniPlayerBarContent(
                 MiniPlayerInfo(
                     mediaMetadata = it,
                     colors = colors,
+                    isPlaying = isPlaying,
                 )
             } ?: Spacer(Modifier.weight(1f))
 
@@ -871,14 +913,16 @@ private fun MiniPlayerBarContent(
                 colors = colors,
             )
 
-            MiniPlayerTransportButton(
-                iconResId = R.drawable.apple_skip_next,
-                contentDescription = stringResource(R.string.next),
-                onClick = onNext,
-                enabled = canSkipNext,
-                compact = true,
-                colors = colors,
-            )
+            if (compactFraction < 0.5f || compactShowTransportControls) {
+                MiniPlayerTransportButton(
+                    iconResId = R.drawable.apple_skip_next,
+                    contentDescription = stringResource(R.string.next),
+                    onClick = onNext,
+                    enabled = canSkipNext,
+                    compact = true,
+                    colors = colors,
+                )
+            }
         }
 
         // Isolated progress bar: reads position/duration only in draw phase so parent Row never recomposes per tick.

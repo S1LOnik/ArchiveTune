@@ -19,6 +19,10 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Fill
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import moe.rukamori.archivetune.ui.motion.LocalMotionConfig
@@ -36,6 +40,7 @@ fun MorphingPlayPauseIcon(
     tint: Color,
     modifier: Modifier = Modifier,
     size: Dp = 48.dp,
+    contentDescription: String? = null,
 ) {
     val motionConfig = LocalMotionConfig.current
     // 0f = play (triangle), 1f = pause (two bars)
@@ -49,7 +54,21 @@ fun MorphingPlayPauseIcon(
     )
     val morph = if (motionConfig.animationsEnabled) animatedMorph else if (isPlaying) 1f else 0f
 
-    Canvas(modifier = modifier.size(size)) {
+    Canvas(
+        modifier =
+            modifier
+                .size(size)
+                .then(
+                    if (!contentDescription.isNullOrBlank()) {
+                        Modifier.semantics {
+                            this.contentDescription = contentDescription
+                            this.role = Role.Image
+                        }
+                    } else {
+                        Modifier
+                    },
+                ),
+    ) {
         val w = this.size.width
         val h = this.size.height
         val cx = w / 2f

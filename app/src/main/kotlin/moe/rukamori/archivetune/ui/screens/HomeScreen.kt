@@ -354,9 +354,29 @@ private fun HomeContent(
             )
         }
 
+        var userPullRefreshing by rememberSaveable { mutableStateOf(false) }
+        LaunchedEffect(uiState.isRefreshing) {
+            if (!uiState.isRefreshing) {
+                userPullRefreshing = false
+            }
+        }
+        val showPullToRefreshIndicator =
+            uiState.isRefreshing &&
+                (
+                    userPullRefreshing ||
+                        (
+                            uiState.keepListening.isEmpty() &&
+                                uiState.quickPicks.isEmpty() &&
+                                uiState.remoteQuickPicks == null
+                            )
+                    )
+
         ExpressivePullToRefreshBox(
-            isRefreshing = uiState.isRefreshing,
-            onRefresh = { onAction(HomeAction.Refresh) },
+            isRefreshing = showPullToRefreshIndicator,
+            onRefresh = {
+                userPullRefreshing = true
+                onAction(HomeAction.Refresh)
+            },
             modifier = Modifier.fillMaxSize(),
         ) {
             BoxWithConstraints(modifier = Modifier.fillMaxSize()) {

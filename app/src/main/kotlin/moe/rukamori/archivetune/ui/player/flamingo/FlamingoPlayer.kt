@@ -1454,12 +1454,21 @@ fun FlamingoPlayerContent(
                                                                     .weight(1f)
                                                                     .padding(end = 15.dp),
                                                             ) {
+                                                                val shouldMarqueeTitle =
+                                                                    !state.isCollapsed &&
+                                                                        isPlayingStatusLambda.value &&
+                                                                        moe.rukamori.archivetune.ui.motion.LocalMotionConfig.current.animationsEnabled
                                                                 Text(
                                                                     text = metadata.title,
                                                                     fontSize = 19.5.sp,
                                                                     maxLines = 1,
                                                                     fontWeight = FontWeight.Medium,
-                                                                    modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE),
+                                                                    modifier =
+                                                                        if (shouldMarqueeTitle) {
+                                                                            Modifier.basicMarquee(iterations = Int.MAX_VALUE)
+                                                                        } else {
+                                                                            Modifier
+                                                                        },
                                                                 )
                                                                 Text(
                                                                     text = metadata.artistNames(),
@@ -2717,12 +2726,22 @@ private fun FlamingoLandscapeTitleBlock(
                 .weight(1f)
                 .padding(end = 12.dp),
         ) {
+            val isPlaying by playerConnection.isPlaying.collectAsStateWithLifecycle()
+            val shouldMarqueeLandscape =
+                !state.isCollapsed &&
+                    isPlaying &&
+                    moe.rukamori.archivetune.ui.motion.LocalMotionConfig.current.animationsEnabled
             Text(
                 text = mediaMetadata.title,
                 fontSize = 19.5.sp,
                 maxLines = 1,
                 fontWeight = FontWeight.Medium,
-                modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE),
+                modifier =
+                    if (shouldMarqueeLandscape) {
+                        Modifier.basicMarquee(iterations = Int.MAX_VALUE)
+                    } else {
+                        Modifier
+                    },
             )
             Text(
                 text = mediaMetadata.artistNames(),
@@ -3806,13 +3825,23 @@ private fun FlamingoPlayingBar(
                 .weight(1f)
                 .padding(start = 12.dp, end = 15.dp),
         ) {
+            val isPlaying by playerConnection.isPlaying.collectAsStateWithLifecycle()
+            val shouldMarqueeHeader =
+                !state.isCollapsed &&
+                    isPlaying &&
+                    moe.rukamori.archivetune.ui.motion.LocalMotionConfig.current.animationsEnabled
             Text(
                 text = mediaMetadata.title,
                 fontSize = 16.5.sp,
                 maxLines = 1,
                 fontWeight = FontWeight.Medium,
                 lineHeight = 16.5.sp,
-                modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE),
+                modifier =
+                    if (shouldMarqueeHeader) {
+                        Modifier.basicMarquee(iterations = Int.MAX_VALUE)
+                    } else {
+                        Modifier
+                    },
             )
             Text(
                 text = mediaMetadata.artistNames(),

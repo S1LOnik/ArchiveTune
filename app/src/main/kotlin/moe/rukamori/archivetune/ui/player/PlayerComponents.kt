@@ -230,6 +230,12 @@ internal fun PlayerTitleText(
     val shouldFade =
         titleViewportWidth.value > 0 &&
             (titleLayout.value?.size?.width ?: 0) > titleViewportWidth.value
+    val isPlaying =
+        moe.rukamori.archivetune.LocalPlayerConnection.current
+            ?.isPlaying
+            ?.collectAsStateWithLifecycle()
+            ?.value == true
+    val shouldMarquee = isPlaying && moe.rukamori.archivetune.ui.motion.LocalMotionConfig.current.animationsEnabled
     Box(
         modifier =
             (if (shouldFade) modifier.viewportEdgeFade(fadeWidth) else modifier)
@@ -247,7 +253,16 @@ internal fun PlayerTitleText(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             onTextLayout = { titleLayout.value = it },
-            modifier = Modifier.fillMaxWidth().basicMarquee(iterations = Int.MAX_VALUE),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .then(
+                        if (shouldMarquee) {
+                            Modifier.basicMarquee(iterations = Int.MAX_VALUE)
+                        } else {
+                            Modifier
+                        },
+                    ),
         )
     }
 }

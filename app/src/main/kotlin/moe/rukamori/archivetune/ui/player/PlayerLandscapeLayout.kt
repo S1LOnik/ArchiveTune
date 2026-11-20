@@ -300,6 +300,9 @@ fun PlayerLandscapeLayout(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
+                                val shouldMarquee =
+                                    isPlaying &&
+                                        moe.rukamori.archivetune.ui.motion.LocalMotionConfig.current.animationsEnabled
                                 Text(
                                     text = mediaMetadata.title,
                                     style = MaterialTheme.typography.titleMedium,
@@ -310,7 +313,13 @@ fun PlayerLandscapeLayout(
                                     modifier =
                                         Modifier
                                             .clickable(onClick = titleActions.onTitleClick)
-                                            .basicMarquee(iterations = 2),
+                                            .then(
+                                                if (shouldMarquee) {
+                                                    Modifier.basicMarquee(iterations = 2)
+                                                } else {
+                                                    Modifier
+                                                },
+                                            ),
                                 )
                                 Text(
                                     text = mediaMetadata.artists.joinToString { it.name },
@@ -433,6 +442,10 @@ fun PlayerLandscapeLayout(
                                         isPlaying = isPlaying,
                                         tint = MaterialTheme.colorScheme.onPrimary,
                                         size = 28.dp,
+                                        contentDescription =
+                                            stringResource(
+                                                if (isPlaying) R.string.widget_pause else R.string.play,
+                                            ),
                                     )
                                 }
                             }
@@ -713,7 +726,7 @@ private fun LandscapeQueuePane(
         ) {
             itemsIndexed(
                 items = queueWindows,
-                key = { _, w -> w.uid },
+                key = { _, w -> (w.uid.hashCode().toLong() shl 32) xor (w.firstPeriodIndex.toLong() and 0xFFFFFFFFL) },
             ) { index, window ->
                 val meta = window.mediaItem.metadata
                 val isCurrent = index == currentWindowIndex

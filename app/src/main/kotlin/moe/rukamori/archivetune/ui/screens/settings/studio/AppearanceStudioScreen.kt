@@ -800,6 +800,7 @@ fun AppearanceStudioScreen(
                     ) {
                         OutlinedButton(
                             onClick = { exportLauncher.launch("archivetune-style.json") },
+                            contentPadding = PaddingValues(horizontal = 10.dp),
                             shapes = ButtonDefaults.shapes(),
                             modifier = Modifier.weight(1f),
                         ) {
@@ -811,6 +812,7 @@ fun AppearanceStudioScreen(
                         }
                         OutlinedButton(
                             onClick = { importLauncher.launch(arrayOf("application/json", "text/plain", "*/*")) },
+                            contentPadding = PaddingValues(horizontal = 10.dp),
                             shapes = ButtonDefaults.shapes(),
                             modifier = Modifier.weight(1f),
                         ) {

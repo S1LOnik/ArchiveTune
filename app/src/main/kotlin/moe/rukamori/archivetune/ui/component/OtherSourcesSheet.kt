@@ -170,16 +170,35 @@ fun OtherSourcesSheet(
             }
         }
 
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-    ) {
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
+    val baseColorScheme = MaterialTheme.colorScheme
+    val opaqueColorScheme =
+        remember(baseColorScheme) {
+            val opaqueSurface = baseColorScheme.surface.copy(alpha = 1f)
+            val opaqueSurfaceVariant = baseColorScheme.surfaceVariant.copy(alpha = 1f)
+            baseColorScheme.copy(
+                surface = opaqueSurface,
+                surfaceVariant = opaqueSurfaceVariant,
+                surfaceContainerLowest = opaqueSurface,
+                surfaceContainerLow = androidx.compose.ui.graphics.lerp(opaqueSurface, opaqueSurfaceVariant, 0.25f),
+                surfaceContainer = androidx.compose.ui.graphics.lerp(opaqueSurface, opaqueSurfaceVariant, 0.40f),
+                surfaceContainerHigh = androidx.compose.ui.graphics.lerp(opaqueSurface, opaqueSurfaceVariant, 0.55f),
+                surfaceContainerHighest = androidx.compose.ui.graphics.lerp(opaqueSurface, opaqueSurfaceVariant, 0.75f),
+            )
+        }
+
+    MaterialTheme(colorScheme = opaqueColorScheme) {
+        ModalBottomSheet(
+            onDismissRequest = onDismiss,
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = opaqueColorScheme.surface,
+            contentColor = opaqueColorScheme.onSurface,
         ) {
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+            ) {
             Row(
                 modifier =
                     Modifier
@@ -398,6 +417,7 @@ fun OtherSourcesSheet(
             }
         }
     }
+    }
 }
 
 private suspend fun searchYouTubeSources(
@@ -545,7 +565,7 @@ private fun SourceTrackItem(
                 .padding(vertical = 4.dp)
                 .clip(RoundedCornerShape(12.dp))
                 .clickable(onClick = onClick),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
         shape = RoundedCornerShape(12.dp),
     ) {
         Row(

@@ -1184,8 +1184,13 @@ private fun LyricsRehearsalPreviewCard(
             )
         }
 
-    LaunchedEffect(isPlaying) {
-        if (!isPlaying) return@LaunchedEffect
+    val rehearsalMotionActive =
+        moe.rukamori.archivetune.ui.motion.rememberDecorativeMotionActive(
+            isPlaying = isPlaying,
+            isVisible = true,
+        )
+    LaunchedEffect(rehearsalMotionActive) {
+        if (!rehearsalMotionActive) return@LaunchedEffect
         while (isActive) {
             delay(1_800L)
             activeLineIndex = (activeLineIndex + 1) % sampleLines.size

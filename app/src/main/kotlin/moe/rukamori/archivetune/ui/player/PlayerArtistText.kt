@@ -27,7 +27,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import moe.rukamori.archivetune.LocalPlayerConnection
 import moe.rukamori.archivetune.models.MediaMetadata
+import moe.rukamori.archivetune.ui.motion.LocalMotionConfig
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 
@@ -43,6 +46,8 @@ fun ClickableArtists(
     artistThreshold: Int = 24,
     fadeWidth: Dp = 24.dp,
 ) {
+    val isPlaying = LocalPlayerConnection.current?.isPlaying?.collectAsStateWithLifecycle()?.value == true
+    val shouldMarquee = isPlaying && LocalMotionConfig.current.animationsEnabled
     val annotatedString =
         remember(artists) {
             buildAnnotatedString {
@@ -77,7 +82,15 @@ fun ClickableArtists(
             overflow = TextOverflow.Ellipsis,
             onTextLayout = { layoutState.value = it },
             modifier =
-                Modifier.fillMaxWidth().basicMarquee(iterations = Int.MAX_VALUE)
+                Modifier
+                    .fillMaxWidth()
+                    .then(
+                        if (shouldMarquee) {
+                            Modifier.basicMarquee(iterations = Int.MAX_VALUE)
+                        } else {
+                            Modifier
+                        },
+                    )
                     .pointerInput(annotatedString) {
                     detectTapGestures(
                         onTap = { offset ->

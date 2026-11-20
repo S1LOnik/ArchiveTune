@@ -1397,10 +1397,28 @@ fun TempoPitchDialog(onDismiss: () -> Unit) {
             )
     }
 
-    AlertDialog(
-        properties = DialogProperties(usePlatformDefaultWidth = false),
-        onDismissRequest = onDismiss,
-        title = {
+    val baseScheme = MaterialTheme.colorScheme
+    val opaqueDialogScheme =
+        remember(baseScheme) {
+            val opaqueSurface = baseScheme.surface.copy(alpha = 1f)
+            val opaqueSurfaceVariant = baseScheme.surfaceVariant.copy(alpha = 1f)
+            baseScheme.copy(
+                surface = opaqueSurface,
+                surfaceVariant = opaqueSurfaceVariant,
+                surfaceContainerLowest = opaqueSurface,
+                surfaceContainerLow = androidx.compose.ui.graphics.lerp(opaqueSurface, opaqueSurfaceVariant, 0.25f),
+                surfaceContainer = androidx.compose.ui.graphics.lerp(opaqueSurface, opaqueSurfaceVariant, 0.40f),
+                surfaceContainerHigh = androidx.compose.ui.graphics.lerp(opaqueSurface, opaqueSurfaceVariant, 0.55f),
+                surfaceContainerHighest = androidx.compose.ui.graphics.lerp(opaqueSurface, opaqueSurfaceVariant, 0.75f),
+            )
+        }
+
+    MaterialTheme(colorScheme = opaqueDialogScheme) {
+        AlertDialog(
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+            onDismissRequest = onDismiss,
+            containerColor = opaqueDialogScheme.surfaceContainerHigh,
+            title = {
             Text(stringResource(R.string.tempo_and_pitch))
         },
         dismissButton = {
@@ -1694,6 +1712,7 @@ fun TempoPitchDialog(onDismiss: () -> Unit) {
             }
         },
     )
+    }
 }
 
 private enum class PitchMode {

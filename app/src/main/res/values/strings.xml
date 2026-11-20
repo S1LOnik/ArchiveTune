@@ -2362,8 +2362,8 @@
     <string name="player_menu_pinned_actions_title">Player menu quick actions</string>
     <string name="lyrics_line_blur_desc">Soften surrounding lines while reading synced lyrics</string>
 
-    <string name="studio_subtitle_saved">Saved style · ready to apply</string>
-    <string name="studio_subtitle_unsaved">Draft · unsaved changes</string>
+    <string name="studio_subtitle_saved">Saved style</string>
+    <string name="studio_subtitle_unsaved">Draft · unsaved changes · ready to apply</string>
     <string name="studio_hold_to_compare">Hold to compare</string>
     <string name="studio_comparing_saved">Showing saved style</string>
     <string name="studio_apply">Apply</string>
@@ -2384,8 +2384,8 @@
     <string name="studio_fine_tuning">Fine tuning</string>
     <string name="studio_open_full_settings">Open section settings</string>
     <string name="studio_starter_presets">Starter presets</string>
-    <string name="studio_export_profile">Export style (.json)</string>
-    <string name="studio_import_profile">Import style (.json)</string>
+    <string name="studio_export_profile">Export JSON</string>
+    <string name="studio_import_profile">Import JSON</string>
     <string name="studio_import_preview_title">Import style preview</string>
     <string name="studio_import_affected_sections">Sections changed vs current setup:</string>
     <string name="studio_import_no_changes">Matches your current appearance setup</string>
@@ -2493,10 +2493,42 @@
     <string name="playlists_selected_count">%1$d selected</string>
     <string name="playlists_hidden_count">Hidden %1$d playlists</string>
     <string name="playlists_shown_count">Shown %1$d playlists</string>
+    <string name="playlist_action_hide">Hide</string>
+    <string name="playlist_action_show">Show</string>
     <string name="playlist_search_placeholder">Search playlists</string>
     <string name="add_to_ai_filter">Add to AI filter</string>
     <string name="remove_from_ai_filter">Remove from AI filter</string>
     <string name="manage_ai_filter_list">Manage AI filter list</string>
     <string name="ai_filter_artist_added">Added to AI filter</string>
     <string name="ai_filter_artist_removed">Removed from AI filter</string>
+
+    <string name="studio_demo_chip_focus">Focus</string>
+    <string name="studio_demo_chip_energy">Energy</string>
+    <string name="studio_demo_chip_chill">Chill</string>
+    <string name="studio_demo_track_1_title">Midnight Beacon</string>
+    <string name="studio_demo_track_1_album">Quiet Ether · 2026</string>
+    <string name="studio_demo_track_1_source">FLAC · Local</string>
+    <string name="studio_demo_track_2_title">Morning Glass</string>
+    <string name="studio_demo_track_2_album">Daylight Sketches</string>
+    <string name="studio_demo_track_2_source">Hi-Res · Stream</string>
+    <string name="studio_demo_card_1_title">Morning focus</string>
+    <string name="studio_demo_card_1_subtitle">6 tracks · offline</string>
+    <string name="studio_demo_card_2_title">Night drive</string>
+    <string name="studio_demo_card_2_subtitle">Synthwave &amp; electronic</string>
+    <string name="studio_demo_card_3_title">Fresh finds</string>
+    <string name="studio_demo_card_3_subtitle">Personal mix</string>
+    <string name="studio_demo_card_4_title">Vinyl &amp; jazz</string>
+    <string name="studio_demo_card_4_subtitle">From your library</string>
+    <string name="studio_demo_card_5_title">After the rain</string>
+    <string name="studio_demo_card_5_subtitle">Calm instrumentals</string>
+    <string name="studio_demo_card_6_title">On repeat</string>
+    <string name="studio_demo_card_6_subtitle">Listening history</string>
+    <string name="studio_demo_lyric_1_primary">The wind keeps a quiet beat by the edge of the night shore</string>
+    <string name="studio_demo_lyric_1_secondary">Ветер держит тихий ритм на краю ночного берега</string>
+    <string name="studio_demo_lyric_2_primary">Between warm lamp glow and an open straight road, a familiar chord plays</string>
+    <string name="studio_demo_lyric_2_secondary">Между тёплым светом лампы и пустой прямой дорогой слышен знакомый аккорд</string>
+    <string name="studio_demo_lyric_3_primary">Hold the signal clear</string>
+    <string name="studio_demo_lyric_4_primary">Let every detail stay vivid even at the softest volume</string>
+    <string name="studio_demo_lyric_4_secondary">Пусть каждая деталь остаётся живой даже на самой малой громкости</string>
+    <string name="studio_demo_lyric_5_primary">Fade slowly into morning light</string>
 </resources>

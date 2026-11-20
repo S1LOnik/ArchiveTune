@@ -72,6 +72,24 @@ import kotlinx.coroutines.delay
 import moe.rukamori.archivetune.R
 
 @Composable
+private fun rememberOpaqueDialogColorScheme() =
+    MaterialTheme.colorScheme.let { baseScheme ->
+        remember(baseScheme) {
+            val opaqueSurface = baseScheme.surface.copy(alpha = 1f)
+            val opaqueSurfaceVariant = baseScheme.surfaceVariant.copy(alpha = 1f)
+            baseScheme.copy(
+                surface = opaqueSurface,
+                surfaceVariant = opaqueSurfaceVariant,
+                surfaceContainerLowest = opaqueSurface,
+                surfaceContainerLow = androidx.compose.ui.graphics.lerp(opaqueSurface, opaqueSurfaceVariant, 0.25f),
+                surfaceContainer = androidx.compose.ui.graphics.lerp(opaqueSurface, opaqueSurfaceVariant, 0.40f),
+                surfaceContainerHigh = androidx.compose.ui.graphics.lerp(opaqueSurface, opaqueSurfaceVariant, 0.55f),
+                surfaceContainerHighest = androidx.compose.ui.graphics.lerp(opaqueSurface, opaqueSurfaceVariant, 0.75f),
+            )
+        }
+    }
+
+@Composable
 fun DefaultDialog(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
@@ -83,25 +101,27 @@ fun DefaultDialog(
     constrainContentHeight: Boolean = false,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
-    ) {
-        BoxWithConstraints(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(24.dp)
-                    .imePadding()
-                    .navigationBarsPadding(),
-            contentAlignment = Alignment.Center,
+    val opaqueColorScheme = rememberOpaqueDialogColorScheme()
+    MaterialTheme(colorScheme = opaqueColorScheme) {
+        Dialog(
+            onDismissRequest = onDismiss,
+            properties = DialogProperties(usePlatformDefaultWidth = false),
         ) {
-            Surface(
-                modifier = Modifier.heightIn(max = maxHeight),
-                shape = AlertDialogDefaults.shape,
-                color = AlertDialogDefaults.containerColor,
-                tonalElevation = AlertDialogDefaults.TonalElevation,
+            BoxWithConstraints(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .padding(24.dp)
+                        .imePadding()
+                        .navigationBarsPadding(),
+                contentAlignment = Alignment.Center,
             ) {
+                Surface(
+                    modifier = Modifier.heightIn(max = maxHeight),
+                    shape = AlertDialogDefaults.shape,
+                    color = opaqueColorScheme.surfaceContainerHigh,
+                    tonalElevation = AlertDialogDefaults.TonalElevation,
+                ) {
                 Column(
                     modifier = modifier.padding(24.dp),
                 ) {
@@ -167,6 +187,7 @@ fun DefaultDialog(
             }
         }
     }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -180,76 +201,79 @@ fun ActionPromptDialog(
     onCancel: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit = {},
 ) {
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
-    ) {
-        BoxWithConstraints(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(24.dp)
-                    .imePadding()
-                    .navigationBarsPadding(),
-            contentAlignment = Alignment.Center,
+    val opaqueColorScheme = rememberOpaqueDialogColorScheme()
+    MaterialTheme(colorScheme = opaqueColorScheme) {
+        Dialog(
+            onDismissRequest = onDismiss,
+            properties = DialogProperties(usePlatformDefaultWidth = false),
         ) {
-            Surface(
-                modifier = Modifier.heightIn(max = maxHeight),
-                shape = AlertDialogDefaults.shape,
-                color = AlertDialogDefaults.containerColor,
-                tonalElevation = AlertDialogDefaults.TonalElevation,
+            BoxWithConstraints(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .padding(24.dp)
+                        .imePadding()
+                        .navigationBarsPadding(),
+                contentAlignment = Alignment.Center,
             ) {
-                Column(
-                    modifier = Modifier.padding(24.dp),
+                Surface(
+                    modifier = Modifier.heightIn(max = maxHeight),
+                    shape = AlertDialogDefaults.shape,
+                    color = opaqueColorScheme.surfaceContainerHigh,
+                    tonalElevation = AlertDialogDefaults.TonalElevation,
                 ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
-                        // title
-                        if (titleBar != null) {
-                            Row {
-                                titleBar()
+                    Column(
+                        modifier = Modifier.padding(24.dp),
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            // title
+                            if (titleBar != null) {
+                                Row {
+                                    titleBar()
+                                }
+                            } else if (title != null) {
+                                Text(
+                                    text = title,
+                                    overflow = TextOverflow.Ellipsis,
+                                    maxLines = 1,
+                                    style = MaterialTheme.typography.headlineSmall,
+                                )
+                                Spacer(Modifier.height(16.dp))
                             }
-                        } else if (title != null) {
-                            Text(
-                                text = title,
-                                overflow = TextOverflow.Ellipsis,
-                                maxLines = 1,
-                                style = MaterialTheme.typography.headlineSmall,
-                            )
-                            Spacer(Modifier.height(16.dp))
+
+                            content() // body
                         }
 
-                        content() // body
-                    }
-
-                    Row(
-                        horizontalArrangement = Arrangement.End,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        if (onReset != null) {
-                            Row(modifier = Modifier.weight(1f)) {
-                                TextButton(
-                                    onClick = { onReset() },
-                                    shapes = ButtonDefaults.shapes(),
-                                ) {
-                                    Text(stringResource(R.string.reset))
+                        Row(
+                            horizontalArrangement = Arrangement.End,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            if (onReset != null) {
+                                Row(modifier = Modifier.weight(1f)) {
+                                    TextButton(
+                                        onClick = { onReset() },
+                                        shapes = ButtonDefaults.shapes(),
+                                    ) {
+                                        Text(stringResource(R.string.reset))
+                                    }
                                 }
                             }
-                        }
 
-                        if (onCancel != null) {
+                            if (onCancel != null) {
+                                TextButton(
+                                    onClick = { onCancel() },
+                                    shapes = ButtonDefaults.shapes(),
+                                ) {
+                                    Text(stringResource(android.R.string.cancel))
+                                }
+                            }
+
                             TextButton(
-                                onClick = { onCancel() },
+                                onClick = { onConfirm() },
                                 shapes = ButtonDefaults.shapes(),
                             ) {
-                                Text(stringResource(android.R.string.cancel))
+                                Text(stringResource(android.R.string.ok))
                             }
-                        }
-
-                        TextButton(
-                            onClick = { onConfirm() },
-                            shapes = ButtonDefaults.shapes(),
-                        ) {
-                            Text(stringResource(android.R.string.ok))
                         }
                     }
                 }
@@ -264,30 +288,33 @@ fun ListDialog(
     modifier: Modifier = Modifier,
     content: LazyListScope.() -> Unit,
 ) {
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
-    ) {
-        BoxWithConstraints(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(24.dp)
-                    .imePadding()
-                    .navigationBarsPadding(),
-            contentAlignment = Alignment.Center,
+    val opaqueColorScheme = rememberOpaqueDialogColorScheme()
+    MaterialTheme(colorScheme = opaqueColorScheme) {
+        Dialog(
+            onDismissRequest = onDismiss,
+            properties = DialogProperties(usePlatformDefaultWidth = false),
         ) {
-            Surface(
-                modifier = Modifier.heightIn(max = maxHeight),
-                shape = AlertDialogDefaults.shape,
-                color = AlertDialogDefaults.containerColor,
-                tonalElevation = AlertDialogDefaults.TonalElevation,
+            BoxWithConstraints(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .padding(24.dp)
+                        .imePadding()
+                        .navigationBarsPadding(),
+                contentAlignment = Alignment.Center,
             ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = modifier.padding(vertical = 24.dp),
+                Surface(
+                    modifier = Modifier.heightIn(max = maxHeight),
+                    shape = AlertDialogDefaults.shape,
+                    color = opaqueColorScheme.surfaceContainerHigh,
+                    tonalElevation = AlertDialogDefaults.TonalElevation,
                 ) {
-                    LazyColumn(content = content)
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = modifier.padding(vertical = 24.dp),
+                    ) {
+                        LazyColumn(content = content)
+                    }
                 }
             }
         }
