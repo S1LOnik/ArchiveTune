@@ -92,7 +92,7 @@ private const val ARTIST_LIBRARY_SONG_COUNT =
     "(SELECT COUNT(*) FROM ($DIRECT_ARTIST_LIBRARY_SONGS UNION $LOCAL_ALBUM_ARTIST_SONGS))"
 
 private const val YOUTUBE_MUSIC_LIKES =
-    "isLocal = 0 AND (:includeVideos = 1 OR isMusicVideo = 0) AND (:includePodcasts = 1 OR isPodcast = 0) " +
+    "isLocal = 0 " +
         "AND id NOT LIKE 'spotify:%' AND id NOT LIKE 'spotify//%' AND id NOT LIKE 'soundcloud:%'"
 
 @Dao
@@ -234,12 +234,10 @@ interface DatabaseDao {
         descending: Boolean,
         filterVideo: Boolean = false,
         youtubeMusicOnly: Boolean = false,
-        includeVideos: Boolean = false,
-        includePodcasts: Boolean = false,
     ) = when (sortType) {
         SongSortType.CREATE_DATE -> {
             if (filterVideo || youtubeMusicOnly) {
-                likedSongsByCreateDateAscNoVideo(youtubeMusicOnly, includeVideos, includePodcasts)
+                likedSongsByCreateDateAscNoVideo(youtubeMusicOnly)
             } else {
                 likedSongsByCreateDateAsc()
             }
@@ -248,7 +246,7 @@ interface DatabaseDao {
         SongSortType.NAME -> {
             (
                 if (filterVideo || youtubeMusicOnly) {
-                    likedSongsByNameAscNoVideo(youtubeMusicOnly, includeVideos, includePodcasts)
+                    likedSongsByNameAscNoVideo(youtubeMusicOnly)
                 } else {
                     likedSongsByNameAsc()
                 }
@@ -262,7 +260,7 @@ interface DatabaseDao {
         SongSortType.ARTIST -> {
             (
                 if (filterVideo || youtubeMusicOnly) {
-                    likedSongsByRowIdAscNoVideo(youtubeMusicOnly, includeVideos, includePodcasts)
+                    likedSongsByRowIdAscNoVideo(youtubeMusicOnly)
                 } else {
                     likedSongsByRowIdAsc()
                 }
@@ -273,7 +271,7 @@ interface DatabaseDao {
 
         SongSortType.PLAY_TIME -> {
             if (filterVideo || youtubeMusicOnly) {
-                likedSongsByPlayTimeAscNoVideo(youtubeMusicOnly, includeVideos, includePodcasts)
+                likedSongsByPlayTimeAscNoVideo(youtubeMusicOnly)
             } else {
                 likedSongsByPlayTimeAsc()
             }
@@ -295,8 +293,6 @@ interface DatabaseDao {
     )
     fun likedSongsByRowIdAscNoVideo(
         youtubeMusicOnly: Boolean,
-        includeVideos: Boolean,
-        includePodcasts: Boolean,
     ): Flow<List<Song>>
 
     @Transaction
@@ -312,8 +308,6 @@ interface DatabaseDao {
     )
     fun likedSongsByCreateDateAscNoVideo(
         youtubeMusicOnly: Boolean,
-        includeVideos: Boolean,
-        includePodcasts: Boolean,
     ): Flow<List<Song>>
 
     @Transaction
@@ -329,8 +323,6 @@ interface DatabaseDao {
     )
     fun likedSongsByNameAscNoVideo(
         youtubeMusicOnly: Boolean,
-        includeVideos: Boolean,
-        includePodcasts: Boolean,
     ): Flow<List<Song>>
 
     @Transaction
@@ -346,8 +338,6 @@ interface DatabaseDao {
     )
     fun likedSongsByPlayTimeAscNoVideo(
         youtubeMusicOnly: Boolean,
-        includeVideos: Boolean,
-        includePodcasts: Boolean,
     ): Flow<List<Song>>
 
     @Transaction
@@ -355,7 +345,7 @@ interface DatabaseDao {
     fun likedSongsCount(): Flow<Int>
 
     @Query("SELECT COUNT(1) FROM song WHERE liked AND ($YOUTUBE_MUSIC_LIKES)")
-    fun youtubeLikedSongsCount(includeVideos: Boolean, includePodcasts: Boolean): Flow<Int>
+    fun youtubeLikedSongsCount(): Flow<Int>
 
     @Transaction
     @Query("SELECT song.* FROM song JOIN song_album_map ON song.id = song_album_map.songId WHERE song_album_map.albumId = COALESCE((SELECT targetId FROM local_music_alias WHERE sourceId = :albumId AND kind = 'album'), :albumId) ORDER BY COALESCE(song.discNumber, 1), COALESCE(song.trackNumber, song_album_map.`index` + 1), song.isLocal DESC, song.id")

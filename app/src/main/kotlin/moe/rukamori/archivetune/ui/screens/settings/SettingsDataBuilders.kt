@@ -138,8 +138,6 @@ import moe.rukamori.archivetune.constants.TidalAccountFirstKey
 import moe.rukamori.archivetune.constants.ListenTogetherSyncVolumeKey
 import moe.rukamori.archivetune.constants.AiContentFilterEnabledKey
 import moe.rukamori.archivetune.constants.ShowCastInPlayerMenuKey
-import moe.rukamori.archivetune.constants.YouTubeLikesIncludePodcastsKey
-import moe.rukamori.archivetune.constants.YouTubeLikesIncludeVideosKey
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import moe.rukamori.archivetune.utils.isLowRamDevice
@@ -771,7 +769,6 @@ fun buildSettingsGroups(
                 SettingsChild("Playlist recommendation source", "you_might_like_source", listOf("recommendation source", "you might like", "playlist recommendation", "suggestions source")),
                 SettingsChild(context.getString(R.string.ai_music_filter_enable), "ai_content_filter", listOf("ai content filter", "ai filter", "ai generated", "filter ai music", "ии", "фильтр ии", "ии-исполнители", "исполнители", "авторы", "нейросеть")) { SearchResultSwitch(AiContentFilterEnabledKey, false) },
                 SettingsChild(context.getString(R.string.ai_music_authors), "ai_music_authors", listOf("ai music authors", "ai artists", "ai authors", "block artist", "ии", "ии-исполнители", "авторы ии музыки", "исполнители")),
-                SettingsChild(context.getString(R.string.youtube_likes_filter), "youtube_likes", listOf("youtube likes", "liked videos", "liked podcasts", "понравившееся", "клипы", "подкасты")),
             ),
         )
     val languagePacks =

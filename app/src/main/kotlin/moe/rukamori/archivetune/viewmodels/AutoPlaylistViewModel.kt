@@ -29,8 +29,6 @@ import moe.rukamori.archivetune.constants.AutoPlaylistSongSortDescendingKey
 import moe.rukamori.archivetune.constants.AutoPlaylistSongSortType
 import moe.rukamori.archivetune.constants.AutoPlaylistSongSortTypeKey
 import moe.rukamori.archivetune.constants.HideExplicitKey
-import moe.rukamori.archivetune.constants.YouTubeLikesIncludeVideosKey
-import moe.rukamori.archivetune.constants.YouTubeLikesIncludePodcastsKey
 import moe.rukamori.archivetune.constants.HideVideoKey
 import moe.rukamori.archivetune.constants.SongSortType
 import moe.rukamori.archivetune.db.MusicDatabase
@@ -166,15 +164,10 @@ class AutoPlaylistViewModel
                                 ?: true
                         ),
                         it[HideExplicitKey] ?: false,
-                        Triple(
-                            it[HideVideoKey] ?: false,
-                            it[YouTubeLikesIncludeVideosKey] ?: false,
-                            it[YouTubeLikesIncludePodcastsKey] ?: false,
-                        ),
+                        it[HideVideoKey] ?: false,
                     )
                 }.distinctUntilChanged()
-                .flatMapLatest { (sortDesc, hideExplicit, videoAndPodcastFilters) ->
-                    val (hideVideo, includeVideos, includePodcasts) = videoAndPodcastFilters
+                .flatMapLatest { (sortDesc, hideExplicit, hideVideo) ->
                     val (sortType, descending) = sortDesc
                     val songSortType = sortType.toSongSortType()
                     when (playlist) {
@@ -188,8 +181,6 @@ class AutoPlaylistViewModel
                                 songSortType,
                                 descending,
                                 youtubeMusicOnly = true,
-                                includeVideos = includeVideos,
-                                includePodcasts = includePodcasts,
                             ).map { songs ->
                                 songs.filterExplicit(hideExplicit)
                             }

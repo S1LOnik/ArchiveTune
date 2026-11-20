@@ -187,7 +187,6 @@ fun ContentSettings(
         }
 
         AiContentFilterPreferences(preferencePositions)
-        YouTubeLikesPreferences(preferencePositions)
 
         PreferenceGroup(title = stringResource(R.string.app_language)) {
             item {
@@ -345,34 +344,6 @@ private fun AiContentFilterPreferences(preferencePositions: PreferencePositions)
                     }
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun YouTubeLikesPreferences(preferencePositions: PreferencePositions) {
-    val (videos, setVideos) = rememberPreference(YouTubeLikesIncludeVideosKey, false)
-    val (podcasts, setPodcasts) = rememberPreference(YouTubeLikesIncludePodcastsKey, false)
-    PreferenceGroup(title = stringResource(R.string.youtube_likes_filter)) {
-        item {
-            androidx.compose.foundation.layout.Box(
-                modifier = preferencePositions.modifierFor("youtube_likes"),
-            ) {
-                SwitchPreference(
-                    title = { Text(stringResource(R.string.youtube_likes_include_videos)) },
-                    icon = { Icon(painterResource(R.drawable.slow_motion_video), null) },
-                    checked = videos,
-                    onCheckedChange = setVideos,
-                )
-            }
-        }
-        item {
-            SwitchPreference(
-                title = { Text(stringResource(R.string.youtube_likes_include_podcasts)) },
-                icon = { Icon(painterResource(R.drawable.mic), null) },
-                checked = podcasts,
-                onCheckedChange = setPodcasts,
-            )
         }
     }
 }

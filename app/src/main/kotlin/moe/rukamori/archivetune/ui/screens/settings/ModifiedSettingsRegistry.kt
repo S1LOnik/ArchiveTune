@@ -90,8 +90,6 @@ import moe.rukamori.archivetune.constants.SliderStyle
 import moe.rukamori.archivetune.constants.SliderStyleKey
 import moe.rukamori.archivetune.constants.SukisuLiquidGlassNavBarKey
 import moe.rukamori.archivetune.constants.ThumbnailCornerRadiusKey
-import moe.rukamori.archivetune.constants.YouTubeLikesIncludePodcastsKey
-import moe.rukamori.archivetune.constants.YouTubeLikesIncludeVideosKey
 import moe.rukamori.archivetune.utils.isLowRamDevice
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -785,18 +783,6 @@ object ModifiedSettingsRegistry {
                 titleRes = R.string.ai_music_filter_enable,
                 categoryRes = R.string.ai_content_filter,
                 route = "settings/content?scrollTo=ai_content_filter",
-            ) { false },
-            booleanSpec(
-                key = YouTubeLikesIncludeVideosKey,
-                titleRes = R.string.youtube_likes_include_videos,
-                categoryRes = R.string.youtube_likes_filter,
-                route = "settings/content?scrollTo=youtube_likes",
-            ) { false },
-            booleanSpec(
-                key = YouTubeLikesIncludePodcastsKey,
-                titleRes = R.string.youtube_likes_include_podcasts,
-                categoryRes = R.string.youtube_likes_filter,
-                route = "settings/content?scrollTo=youtube_likes",
             ) { false },
         )
 

@@ -2288,9 +2288,6 @@
     <string name="ai_music_authors">AI music authors</string>
     <string name="ai_music_authors_count">Authors in your list: %1$d</string>
     <string name="ai_music_authors_help">Add one exact artist name, channel ID, or YouTube channel link per line.</string>
-    <string name="youtube_likes_filter">YouTube Music liked tracks</string>
-    <string name="youtube_likes_include_videos">Include music videos</string>
-    <string name="youtube_likes_include_podcasts">Include podcasts</string>
     <string name="playlist_select_matches">Select all results</string>
     <string name="playlist_clear_matches">Clear results selection</string>
     <string name="playlist_hidden_locally">Hidden on this device</string>

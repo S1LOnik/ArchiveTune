@@ -73,8 +73,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.ui.semantics.Role
-import moe.rukamori.archivetune.constants.YouTubeLikesIncludePodcastsKey
-import moe.rukamori.archivetune.constants.YouTubeLikesIncludeVideosKey
 import moe.rukamori.archivetune.ui.motion.ArchiveTuneHapticKind
 import moe.rukamori.archivetune.ui.motion.rememberArchiveTuneHapticTrigger
 import androidx.compose.runtime.Composable
@@ -169,10 +167,8 @@ fun LibraryPlaylistsScreen(
         .playlistIdsByTags(
             if (selectedTagIds.isEmpty()) emptyList() else selectedTagIds.toList(),
         ).collectAsStateWithLifecycle(initialValue = emptyList())
-    val (includeVideos) = rememberPreference(YouTubeLikesIncludeVideosKey, false)
-    val (includePodcasts) = rememberPreference(YouTubeLikesIncludePodcastsKey, false)
-    val likedSongsCount by remember(database, includeVideos, includePodcasts) {
-        database.youtubeLikedSongsCount(includeVideos, includePodcasts)
+    val likedSongsCount by remember(database) {
+        database.youtubeLikedSongsCount()
     }.collectAsStateWithLifecycle(initialValue = 0)
 
     var showHidden by rememberSaveable { mutableStateOf(false) }

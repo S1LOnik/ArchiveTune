@@ -734,9 +734,6 @@
     <string name="ai_music_authors">Авторы ИИ-музыки</string>
     <string name="ai_music_authors_count">Авторов в вашем списке: %1$d</string>
     <string name="ai_music_authors_help">Укажите по одному точному имени исполнителя, ID или ссылке на канал YouTube в каждой строке.</string>
-    <string name="youtube_likes_filter">Понравившееся в YouTube Music</string>
-    <string name="youtube_likes_include_videos">Показывать музыкальные видео</string>
-    <string name="youtube_likes_include_podcasts">Показывать подкасты</string>
     <string name="playlist_select_matches">Выбрать все результаты</string>
     <string name="playlist_clear_matches">Снять выделение результатов</string>
     <string name="playlist_hidden_locally">Скрыт на этом устройстве</string>
