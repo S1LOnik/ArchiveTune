@@ -389,6 +389,8 @@ fun AppearanceSettings(
             )
         }
     val lyricsBackground = configuredLyricsBackground.resolveFor(playerBackground)
+    val isPlayerBackgroundCustomizationEnabled =
+        moe.rukamori.archivetune.ui.screens.settings.studio.playerStyleSupportsCustomBackground(playerDesignStyle)
     val isPlayerStyleCustomizationEnabled =
         when (playerDesignStyle) {
             PlayerDesignStyle.V7,
@@ -400,9 +402,7 @@ fun AppearanceSettings(
             else -> true
         }
     val isVolumeBarSupported =
-        playerDesignStyle == PlayerDesignStyle.V7 ||
-            playerDesignStyle == PlayerDesignStyle.V8 ||
-            playerDesignStyle == PlayerDesignStyle.BITCHORD
+        moe.rukamori.archivetune.ui.screens.settings.studio.playerStyleSupportsVolumeBar(playerDesignStyle)
     val isSystemInDarkTheme = isSystemInDarkTheme()
     val useDarkTheme =
         remember(darkMode, isSystemInDarkTheme) {
@@ -433,12 +433,6 @@ fun AppearanceSettings(
     }
     var showTagsManagementDialog by rememberSaveable {
         mutableStateOf(false)
-    }
-
-    LaunchedEffect(isPlayerStyleCustomizationEnabled, playerBackground) {
-        if (!isPlayerStyleCustomizationEnabled && playerBackground != PlayerBackgroundStyle.DEFAULT) {
-            onPlayerBackgroundChange(PlayerBackgroundStyle.DEFAULT)
-        }
     }
 
     LaunchedEffect(isPlayerStyleCustomizationEnabled) {
@@ -586,6 +580,7 @@ fun AppearanceSettings(
 
                 item(visible = !dynamicTheme) {
                     SwitchPreference(
+                        modifier = preferencePositions.modifierFor("random_theme_on_startup"),
                         title = { Text(stringResource(R.string.random_theme_on_startup)) },
                         description = stringResource(R.string.random_theme_on_startup_desc),
                         icon = { Icon(painterResource(R.drawable.shuffle), null) },
@@ -596,6 +591,7 @@ fun AppearanceSettings(
 
                 item(visible = !dynamicTheme || Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
                     PreferenceEntry(
+                        modifier = preferencePositions.modifierFor("color_palette", "palette_picker"),
                         title = { Text(stringResource(R.string.color_palette)) },
                         description = stringResource(R.string.customize_theme_colors),
                         icon = { Icon(painterResource(R.drawable.format_paint), null) },
@@ -605,6 +601,7 @@ fun AppearanceSettings(
 
                 item {
                     PreferenceEntry(
+                        modifier = preferencePositions.modifierFor("app_icon"),
                         title = { Text(stringResource(R.string.app_icon)) },
                         description = stringResource(R.string.app_icon_description),
                         icon = { Icon(painterResource(R.drawable.app_icon_small), null) },
@@ -634,6 +631,7 @@ fun AppearanceSettings(
 
                 item(visible = useDarkTheme) {
                     SwitchPreference(
+                        modifier = preferencePositions.modifierFor("pure_black"),
                         title = { Text(stringResource(R.string.pure_black)) },
                         icon = { Icon(painterResource(R.drawable.contrast), null) },
                         checked = pureBlack,
@@ -643,6 +641,7 @@ fun AppearanceSettings(
 
                 item {
                     SwitchPreference(
+                        modifier = preferencePositions.modifierFor("disable_blur"),
                         title = { Text(stringResource(R.string.disable_blur)) },
                         description = stringResource(R.string.disable_blur_desc),
                         icon = { Icon(painterResource(R.drawable.blur_off), null) },
@@ -667,6 +666,7 @@ fun AppearanceSettings(
 
                 item {
                     SwitchPreference(
+                        modifier = preferencePositions.modifierFor("force_high_refresh_rate"),
                         title = { Text(stringResource(R.string.force_high_refresh_rate)) },
                         description =
                             stringResource(
@@ -684,7 +684,7 @@ fun AppearanceSettings(
                     // UI Scale v16.0-alpha1 - Source: ArchiveTune v18.0 AppearanceSettings.kt:599-625
                     val (uiScale, onUiScaleChange) = rememberPreference(UiScaleFactorKey, defaultValue = 1.0f)
 
-                    Column {
+                    Column(modifier = preferencePositions.modifierFor("ui_scale")) {
                         PreferenceEntry(
                             title = { Text(stringResource(R.string.ui_scale)) },
                             description = stringResource(R.string.ui_scale_desc),
@@ -712,7 +712,7 @@ fun AppearanceSettings(
                 }
 
                 item {
-                    Column {
+                    Column(modifier = preferencePositions.modifierFor("back_animation_style")) {
                         EnumListPreference(
                             title = { Text(stringResource(R.string.back_animation_style)) },
                             icon = { Icon(painterResource(R.drawable.arrow_back), null) },
@@ -730,6 +730,7 @@ fun AppearanceSettings(
 
                 item {
                     PreferenceEntry(
+                        modifier = preferencePositions.modifierFor("blur_intensity"),
                         title = { Text(stringResource(R.string.blur_intensity)) },
                         description = stringResource(R.string.blur_intensity_value, blurRadius.roundToInt()),
                         icon = { Icon(painterResource(R.drawable.blur_on), null) },
@@ -750,6 +751,7 @@ fun AppearanceSettings(
 
                 item {
                     SwitchPreference(
+                        modifier = preferencePositions.modifierFor("backdrop_blur"),
                         title = { Text(stringResource(R.string.album_backdrop)) },
                         description = stringResource(R.string.album_backdrop_desc),
                         icon = { Icon(painterResource(R.drawable.blur_on), null) },
@@ -760,6 +762,7 @@ fun AppearanceSettings(
 
                 item {
                     PreferenceEntry(
+                        modifier = preferencePositions.modifierFor("backdrop_blur_amount"),
                         title = { Text(stringResource(R.string.backdrop_blur_amount)) },
                         description = stringResource(R.string.backdrop_blur_amount_value, backdropBlurAmount),
                         icon = { Icon(painterResource(R.drawable.blur_on), null) },
@@ -779,20 +782,24 @@ fun AppearanceSettings(
                 }
 
                 item {
-                    EnumListPreference(
-                        title = { Text(stringResource(R.string.font_preference)) },
-                        description = stringResource(R.string.font_preference_desc),
-                        icon = { Icon(painterResource(R.drawable.text_fields), null) },
-                        selectedValue = fontPreference,
-                        onValueSelected = onFontPreferenceSelected,
-                        valueText = {
-                            when (it) {
-                                AppFontPreference.DEFAULT -> stringResource(R.string.font_preference_default)
-                                AppFontPreference.SYSTEM -> stringResource(R.string.font_preference_system)
-                                AppFontPreference.CUSTOM -> stringResource(R.string.font_preference_custom)
-                            }
-                        },
-                    )
+                    androidx.compose.foundation.layout.Box(
+                        modifier = preferencePositions.modifierFor("font_preference"),
+                    ) {
+                        EnumListPreference(
+                            title = { Text(stringResource(R.string.font_preference)) },
+                            description = stringResource(R.string.font_preference_desc),
+                            icon = { Icon(painterResource(R.drawable.text_fields), null) },
+                            selectedValue = fontPreference,
+                            onValueSelected = onFontPreferenceSelected,
+                            valueText = {
+                                when (it) {
+                                    AppFontPreference.DEFAULT -> stringResource(R.string.font_preference_default)
+                                    AppFontPreference.SYSTEM -> stringResource(R.string.font_preference_system)
+                                    AppFontPreference.CUSTOM -> stringResource(R.string.font_preference_custom)
+                                }
+                            },
+                        )
+                    }
                 }
 
                 item(visible = fontPreference == AppFontPreference.CUSTOM) {
@@ -848,12 +855,13 @@ fun AppearanceSettings(
 
                 item {
                     SwitchPreference(
+                        modifier = preferencePositions.modifierFor("show_player_volume_bar"),
                         title = { Text(stringResource(R.string.show_player_volume_bar)) },
                         description =
                             if (isVolumeBarSupported) {
                                 null
                             } else {
-                                stringResource(R.string.player_volume_bar_v7_v8_only)
+                                stringResource(R.string.dependency_player_volume_bar)
                             },
                         icon = { Icon(painterResource(R.drawable.volume_up), null) },
                         checked = showPlayerVolumeBar,
@@ -863,70 +871,77 @@ fun AppearanceSettings(
                 }
 
                 item {
+                    val activeStyleLabel =
+                        stringResource(
+                            moe.rukamori.archivetune.ui.screens.settings.studio.playerDesignStyleLabelRes(
+                                playerDesignStyle,
+                            ),
+                        )
                     androidx.compose.foundation.layout.Box(
                         modifier = preferencePositions.modifierFor("player_background_style"),
                     ) {
                         EnumListPreference(
                             title = { Text(stringResource(R.string.player_background_style)) },
-                        description =
-                            if (isPlayerStyleCustomizationEnabled) {
-                                null
-                            } else {
-                                stringResource(R.string.player_background_style_v8_v9_desc)
-                            },
-                        icon = { Icon(painterResource(R.drawable.gradient), null) },
-                        selectedValue = playerBackground,
-                        onValueSelected = { selectedBackground ->
-                            onPlayerBackgroundChange(selectedBackground)
-                            when {
-                                selectedBackground == PlayerBackgroundStyle.CUSTOM -> {
-                                    onLyricsBackgroundChange(LyricsBackgroundStyle.CUSTOM)
-                                }
+                            description =
+                                if (isPlayerBackgroundCustomizationEnabled) {
+                                    null
+                                } else {
+                                    stringResource(
+                                        R.string.dependency_player_style_custom_locked,
+                                        activeStyleLabel,
+                                    )
+                                },
+                            icon = { Icon(painterResource(R.drawable.gradient), null) },
+                            selectedValue = playerBackground,
+                            onValueSelected = { selectedBackground ->
+                                onPlayerBackgroundChange(selectedBackground)
+                                when {
+                                    selectedBackground == PlayerBackgroundStyle.CUSTOM -> {
+                                        onLyricsBackgroundChange(LyricsBackgroundStyle.CUSTOM)
+                                    }
 
-                                configuredLyricsBackground == LyricsBackgroundStyle.CUSTOM -> {
-                                    onLyricsBackgroundChange(LyricsBackgroundStyle.DEFAULT)
+                                    configuredLyricsBackground == LyricsBackgroundStyle.CUSTOM -> {
+                                        onLyricsBackgroundChange(LyricsBackgroundStyle.DEFAULT)
+                                    }
                                 }
-                            }
-                        },
-                        isEnabled = isPlayerStyleCustomizationEnabled,
-                        valueText = {
-                            when (it) {
-                                PlayerBackgroundStyle.DEFAULT -> stringResource(R.string.follow_theme)
-                                PlayerBackgroundStyle.GRADIENT -> stringResource(R.string.gradient)
-                                PlayerBackgroundStyle.CUSTOM -> stringResource(R.string.custom)
-                                PlayerBackgroundStyle.BLUR -> stringResource(R.string.player_background_blur)
-                                PlayerBackgroundStyle.COLORING -> stringResource(R.string.coloring)
-                                PlayerBackgroundStyle.BLUR_GRADIENT -> stringResource(R.string.blur_gradient)
-                                    PlayerBackgroundStyle.GLOW -> stringResource(R.string.glow)
-                                    PlayerBackgroundStyle.GLOW_ANIMATED -> "Glow Animated"
-                                }
+                            },
+                            isEnabled = isPlayerBackgroundCustomizationEnabled,
+                            valueText = {
+                                stringResource(
+                                    moe.rukamori.archivetune.ui.screens.settings.studio.playerBackgroundStyleLabelRes(
+                                        it,
+                                    ),
+                                )
                             },
                         )
                     }
                 }
 
                 item {
-                    ListPreference(
-                        title = { Text(stringResource(R.string.lyrics_background_style)) },
-                        icon = { Icon(painterResource(R.drawable.lyrics), null) },
-                        selectedValue = lyricsBackground,
-                        values = availableLyricsBackgroundStyles,
-                        onValueSelected = onLyricsBackgroundChange,
-                        isEnabled = playerBackground != PlayerBackgroundStyle.CUSTOM,
-                        valueText = {
-                            when (it) {
-                                LyricsBackgroundStyle.DEFAULT -> stringResource(R.string.lyrics_background_default)
-                                LyricsBackgroundStyle.FOLLOW_THEME -> stringResource(R.string.follow_theme)
-                                LyricsBackgroundStyle.COLORING -> stringResource(R.string.coloring)
-                                LyricsBackgroundStyle.MOVING_BLUR -> stringResource(R.string.lyrics_background_moving_blur)
-                                LyricsBackgroundStyle.CUSTOM -> stringResource(R.string.custom)
-                            }
-                        },
-                    )
+                    androidx.compose.foundation.layout.Box(
+                        modifier = preferencePositions.modifierFor("lyrics_background_style"),
+                    ) {
+                        ListPreference(
+                            title = { Text(stringResource(R.string.lyrics_background_style)) },
+                            icon = { Icon(painterResource(R.drawable.lyrics), null) },
+                            selectedValue = lyricsBackground,
+                            values = availableLyricsBackgroundStyles,
+                            onValueSelected = onLyricsBackgroundChange,
+                            isEnabled = playerBackground != PlayerBackgroundStyle.CUSTOM,
+                            valueText = {
+                                stringResource(
+                                    moe.rukamori.archivetune.ui.screens.settings.studio.lyricsBackgroundStyleLabelRes(
+                                        it,
+                                    ),
+                                )
+                            },
+                        )
+                    }
                 }
 
-                item(visible = playerBackground == PlayerBackgroundStyle.CUSTOM) {
+                item(visible = playerBackground == PlayerBackgroundStyle.CUSTOM && isPlayerBackgroundCustomizationEnabled) {
                     PreferenceEntry(
+                        modifier = preferencePositions.modifierFor("customized_background"),
                         title = { Text(stringResource(R.string.customized_background)) },
                         icon = { Icon(painterResource(R.drawable.image), null) },
                         onClick = { navController.navigate("customize_background") },
@@ -934,25 +949,28 @@ fun AppearanceSettings(
                 }
 
                 item {
-                    EnumListPreference(
-                        title = { Text(stringResource(R.string.mini_player_background_style)) },
-                        icon = { Icon(painterResource(R.drawable.gradient), null) },
-                        selectedValue = miniPlayerBackground,
-                        onValueSelected = onMiniPlayerBackgroundChange,
-                        valueText = {
-                            when (it) {
-                                MiniPlayerBackgroundStyle.THEME -> stringResource(R.string.follow_theme)
-                                MiniPlayerBackgroundStyle.GRADIENT -> stringResource(R.string.gradient)
-                                MiniPlayerBackgroundStyle.GLOW -> stringResource(R.string.glow)
-                                MiniPlayerBackgroundStyle.FROSTED -> stringResource(R.string.frosted_blur)
-                                MiniPlayerBackgroundStyle.LIQUID_GLASS -> stringResource(R.string.liquid_glass)
-                            }
-                        },
-                    )
+                    androidx.compose.foundation.layout.Box(
+                        modifier = preferencePositions.modifierFor("mini_player_background_style"),
+                    ) {
+                        EnumListPreference(
+                            title = { Text(stringResource(R.string.mini_player_background_style)) },
+                            icon = { Icon(painterResource(R.drawable.gradient), null) },
+                            selectedValue = miniPlayerBackground,
+                            onValueSelected = onMiniPlayerBackgroundChange,
+                            valueText = {
+                                stringResource(
+                                    moe.rukamori.archivetune.ui.screens.settings.studio.miniPlayerBackgroundStyleLabelRes(
+                                        it,
+                                    ),
+                                )
+                            },
+                        )
+                    }
                 }
 
                 item {
                     SwitchPreference(
+                        modifier = preferencePositions.modifierFor("hide_player_thumbnail"),
                         title = { Text(stringResource(R.string.hide_player_thumbnail)) },
                         description = stringResource(R.string.hide_player_thumbnail_desc),
                         icon = { Icon(painterResource(R.drawable.hide_image), null) },
@@ -962,9 +980,13 @@ fun AppearanceSettings(
                 }
 
                 item {
-                    ThumbnailCornerRadiusSelectorButton(
-                        onRadiusSelected = {},
-                    )
+                    androidx.compose.foundation.layout.Box(
+                        modifier = preferencePositions.modifierFor("thumbnail_corner_radius"),
+                    ) {
+                        ThumbnailCornerRadiusSelectorButton(
+                            onRadiusSelected = {},
+                        )
+                    }
                 }
 
                 item {
@@ -991,29 +1013,41 @@ fun AppearanceSettings(
                 }
 
                 item {
-                    EnumListPreference(
-                        title = { Text(stringResource(R.string.player_buttons_style)) },
-                        description =
-                            if (isPlayerStyleCustomizationEnabled) {
-                                null
-                            } else {
-                                stringResource(R.string.player_background_style_v8_v9_desc)
+                    androidx.compose.foundation.layout.Box(
+                        modifier = preferencePositions.modifierFor("player_buttons_style"),
+                    ) {
+                        EnumListPreference(
+                            title = { Text(stringResource(R.string.player_buttons_style)) },
+                            description =
+                                if (isPlayerStyleCustomizationEnabled) {
+                                    null
+                                } else {
+                                    stringResource(
+                                        R.string.dependency_player_style_custom_locked,
+                                        stringResource(
+                                            moe.rukamori.archivetune.ui.screens.settings.studio.playerDesignStyleLabelRes(
+                                                playerDesignStyle,
+                                            ),
+                                        ),
+                                    )
+                                },
+                            icon = { Icon(painterResource(R.drawable.palette), null) },
+                            selectedValue = playerButtonsStyle,
+                            onValueSelected = onPlayerButtonsStyleChange,
+                            isEnabled = isPlayerStyleCustomizationEnabled,
+                            valueText = {
+                                when (it) {
+                                    PlayerButtonsStyle.DEFAULT -> stringResource(R.string.default_style)
+                                    PlayerButtonsStyle.SECONDARY -> stringResource(R.string.secondary_color_style)
+                                }
                             },
-                        icon = { Icon(painterResource(R.drawable.palette), null) },
-                        selectedValue = playerButtonsStyle,
-                        onValueSelected = onPlayerButtonsStyleChange,
-                        isEnabled = isPlayerStyleCustomizationEnabled,
-                        valueText = {
-                            when (it) {
-                                PlayerButtonsStyle.DEFAULT -> stringResource(R.string.default_style)
-                                PlayerButtonsStyle.SECONDARY -> stringResource(R.string.secondary_color_style)
-                            }
-                        },
-                    )
+                        )
+                    }
                 }
 
                 item {
                     PreferenceEntry(
+                        modifier = preferencePositions.modifierFor("player_slider_style"),
                         title = { Text(stringResource(R.string.player_slider_style)) },
                         description = sliderStyleLabel(sliderStyle),
                         icon = { Icon(painterResource(R.drawable.sliders), null) },
@@ -1026,6 +1060,7 @@ fun AppearanceSettings(
 
                 item {
                     SwitchPreference(
+                        modifier = preferencePositions.modifierFor("enable_swipe_thumbnail"),
                         title = { Text(stringResource(R.string.enable_swipe_thumbnail)) },
                         icon = { Icon(painterResource(R.drawable.swipe), null) },
                         checked = swipeThumbnail,

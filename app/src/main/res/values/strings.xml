@@ -244,7 +244,7 @@
     <string name="loudness">Loudness</string>
     <string name="volume">Volume</string>
     <string name="show_player_volume_bar">Show volume bar</string>
-    <string name="player_volume_bar_v7_v8_only">Available only with V7 and V8 player styles</string>
+    <string name="player_volume_bar_v7_v8_only">Available only with V7, V8, and BitChord player styles</string>
     <string name="file_size">File size</string>
     <string name="unknown">Unknown</string>
     <string name="copied">Copied to clipboard</string>
@@ -463,14 +463,14 @@
     <string name="custom_value">Custom value</string>
     <string name="archivetune_canvas">ArchiveTune Canvas</string>
     <string name="archivetune_canvas_desc">Animate album artwork while playing</string>
-    <string name="player_background_style_v8_v9_desc">Unavailable with V8, V9, and V10 player styles</string>
+    <string name="player_background_style_v8_v9_desc">Controlled automatically by this player style (customizable on Cinematic / V1–V6)</string>
     <string name="show_button1_description">Toggle visibility of button 1 in Discord Rich Presence</string>
     <string name="show_button2_description">Toggle visibility of button 2 in Discord Rich Presence</string>
     <string name="discord_activity_type">Activity type</string>
     <string name="dark_theme_follow_system">Follow system</string>
     <string name="pure_black">Pure black</string>
     <string name="disable_blur">Disable blur effects</string>
-    <string name="disable_blur_desc">Disable blur effects throughout the app</string>
+    <string name="disable_blur_desc">Disables artwork and background blur in the player, lyrics, and headers. Frosted and glass navigation bar effects are configured in Navigation bar.</string>
     <string name="disable_animations">Disable animations</string>
     <string name="disable_animations_desc">Disable most app animations. Recommended for low-end devices</string>
     <string name="force_high_refresh_rate">Force high refresh rate</string>
@@ -2531,4 +2531,24 @@
     <string name="studio_demo_lyric_4_primary">Let every detail stay vivid even at the softest volume</string>
     <string name="studio_demo_lyric_4_secondary">Пусть каждая деталь остаётся живой даже на самой малой громкости</string>
     <string name="studio_demo_lyric_5_primary">Fade slowly into morning light</string>
+
+    <string name="player_background_glow_animated">Glow Animated</string>
+    <string name="studio_load_to_draft">Preview</string>
+    <string name="studio_import_load_to_draft">Load into draft</string>
+    <string name="studio_saved_to_library_hint">Saved to library — tap Apply at the top or bottom to apply to the app</string>
+    <string name="studio_draft_badge">In draft</string>
+    <string name="studio_active_badge">Active</string>
+    <string name="studio_nav_always_compact_geometry_note">Expanded bar size sliders only affect the full navigation bar (hidden while Always compact is active)</string>
+    <string name="studio_preview_own_backdrop">Own backdrop</string>
+    <string name="studio_preview_own_lyrics_style">Own lyrics backdrop</string>
+    <string name="studio_motion_test_title">Interactive motion test</string>
+    <string name="studio_motion_test_button">Test motion</string>
+    <string name="studio_motion_test_hint">Tap to feel the selected spring curve, track swap, and press feedback before applying</string>
+    <string name="studio_accent_swatches_title">Quick accent swatches</string>
+    <string name="studio_accent_custom_badge">Custom accent</string>
+    <string name="studio_dynamic_overrides_accent_hint">Dynamic artwork color is active — tap a swatch to preview a fixed accent color</string>
+    <string name="player_menu_pinned_actions_desc">Choose up to 4 quick actions pinned at the top of the player menu</string>
+    <string name="other_sources_settings_desc">Configure audio providers and fallback priority used by Other sources</string>
+    <string name="smart_dj_automix_title">Smart DJ Automix</string>
+    <string name="smart_dj_automix_desc">Silence trimming, beat matching, and harmonic phrase crossfade</string>
 </resources>

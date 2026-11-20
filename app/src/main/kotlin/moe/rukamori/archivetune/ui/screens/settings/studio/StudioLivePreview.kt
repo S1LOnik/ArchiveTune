@@ -28,6 +28,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -86,7 +87,10 @@ import kotlinx.coroutines.delay
 import moe.rukamori.archivetune.R
 import moe.rukamori.archivetune.constants.FloatingNavigationBarMaxWidth
 import moe.rukamori.archivetune.constants.HomeFeedStyle
+import moe.rukamori.archivetune.constants.LyricsBackgroundStyle
+import moe.rukamori.archivetune.constants.LyricsDisplayCharacter
 import moe.rukamori.archivetune.constants.MINI_PLAYER_BAR_HEIGHT_DP
+import moe.rukamori.archivetune.constants.MiniPlayerBackgroundStyle
 import moe.rukamori.archivetune.constants.MiniPlayerCompactHeight
 import moe.rukamori.archivetune.constants.MiniPlayerHeight
 import moe.rukamori.archivetune.constants.MiniPlayerStyle
@@ -95,13 +99,18 @@ import moe.rukamori.archivetune.constants.NavigationBarCompactBehavior
 import moe.rukamori.archivetune.constants.NavigationBarHeight
 import moe.rukamori.archivetune.constants.NavigationBarMaxWidth
 import moe.rukamori.archivetune.constants.PlayerBackgroundStyle
+import moe.rukamori.archivetune.constants.PlayerDesignStyle
 import moe.rukamori.archivetune.constants.SliderStyle
 import moe.rukamori.archivetune.ui.motion.ArchiveTuneHapticKind
+import moe.rukamori.archivetune.ui.motion.MotionConfig
 import moe.rukamori.archivetune.ui.motion.rememberArchiveTuneHapticTrigger
 import moe.rukamori.archivetune.ui.motion.rememberDecorativeMotionActive
 import moe.rukamori.archivetune.ui.player.StyledPlaybackSlider
 import moe.rukamori.archivetune.ui.screens.Screens
 import moe.rukamori.archivetune.ui.screens.settings.DarkMode
+import moe.rukamori.archivetune.ui.theme.LocalArchiveTuneThemeColor
+import moe.rukamori.archivetune.ui.theme.archiveTuneColorScheme
+import moe.rukamori.archivetune.ui.theme.resolveCustomThemeSelection
 import kotlin.math.roundToInt
 
 enum class StudioPreviewStage {
@@ -151,14 +160,22 @@ fun StudioInteractivePreview(
             DarkMode.OFF -> false
             DarkMode.AUTO -> MaterialTheme.colorScheme.surface.luminanceCompat() < 0.45f
         }
-    val frameSurface =
-        when {
-            snapshot.color.pureBlack && bgIsDark -> Color.Black
-            bgIsDark -> Color(0xFF14171D)
-            else -> Color(0xFFF6F7FA)
+    val currentAppThemeColor = LocalArchiveTuneThemeColor.current
+    val (customColor, customSeedPalette) =
+        remember(snapshot.color.customThemeColor) {
+            resolveCustomThemeSelection(snapshot.color.customThemeColor)
         }
-    val frameOnSurface = if (bgIsDark) Color(0xFFF2F4F8) else Color(0xFF151821)
-    val frameOnSurfaceVariant = if (bgIsDark) Color(0xFFAEB5C2) else Color(0xFF565E6E)
+    val effectiveThemeColor = if (snapshot.color.dynamicTheme) currentAppThemeColor else customColor
+    val effectiveSeedPalette = if (snapshot.color.dynamicTheme) null else customSeedPalette
+    val previewColorScheme =
+        remember(bgIsDark, snapshot.color.pureBlack, effectiveThemeColor, effectiveSeedPalette) {
+            archiveTuneColorScheme(
+                darkTheme = bgIsDark,
+                pureBlack = snapshot.color.pureBlack,
+                themeColor = effectiveThemeColor,
+                seedPalette = effectiveSeedPalette,
+            )
+        }
 
     Surface(
         modifier = modifier.fillMaxWidth(),
@@ -197,106 +214,113 @@ fun StudioInteractivePreview(
                 }
             }
 
-            // Scaled live app frame
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .height(332.dp)
-                        .graphicsLayer {
-                            scaleX = replayScale.value
-                            scaleY = replayScale.value
-                        }
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(frameSurface)
-                        .border(
-                            1.dp,
-                            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f),
-                            RoundedCornerShape(20.dp),
-                        ),
-            ) {
-                AnimatedVisibility(visible = isComparingSaved) {
-                    Surface(
-                        color = MaterialTheme.colorScheme.inverseSurface,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Box(
-                            contentAlignment = Alignment.Center,
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+            // Scaled live app frame scoped to the draft's real ColorScheme
+            MaterialTheme(colorScheme = previewColorScheme) {
+                val frameSurface = MaterialTheme.colorScheme.background
+                val frameOnSurface = MaterialTheme.colorScheme.onBackground
+                val frameOnSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
+
+                Column(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .height(332.dp)
+                            .graphicsLayer {
+                                scaleX = replayScale.value
+                                scaleY = replayScale.value
+                            }
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(frameSurface)
+                            .border(
+                                1.dp,
+                                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f),
+                                RoundedCornerShape(20.dp),
+                            ),
+                ) {
+                    AnimatedVisibility(visible = isComparingSaved) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.inverseSurface,
+                            modifier = Modifier.fillMaxWidth(),
                         ) {
-                            Text(
-                                text = stringResource(R.string.studio_comparing_saved),
-                                color = MaterialTheme.colorScheme.inverseOnSurface,
-                                style = MaterialTheme.typography.labelMedium,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.studio_comparing_saved),
+                                    color = MaterialTheme.colorScheme.inverseOnSurface,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
                         }
                     }
-                }
 
-                Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                    AnimatedContent(
-                        targetState = stageIndex,
-                        transitionSpec = {
-                            if (reducedMotion || !snapshot.motion.screenTransitions) {
-                                fadeIn(snap()) togetherWith fadeOut(snap())
-                            } else {
-                                val dir = if (targetState >= initialState) 1 else -1
-                                (slideInHorizontally(tween(240)) { it / 5 * dir } + fadeIn(tween(220))) togetherWith
-                                    (slideOutHorizontally(tween(220)) { -it / 5 * dir } + fadeOut(tween(180)))
+                    Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                        AnimatedContent(
+                            targetState = stageIndex,
+                            transitionSpec = {
+                                if (reducedMotion || !snapshot.motion.screenTransitions) {
+                                    fadeIn(snap()) togetherWith fadeOut(snap())
+                                } else {
+                                    val dir = if (targetState >= initialState) 1 else -1
+                                    (slideInHorizontally(tween(240)) { it / 5 * dir } + fadeIn(tween(220))) togetherWith
+                                        (slideOutHorizontally(tween(220)) { -it / 5 * dir } + fadeOut(tween(180)))
+                                }
+                            },
+                            label = "studioPreviewStage",
+                        ) { activeStage ->
+                            when (StudioPreviewStage.entries[activeStage]) {
+                                StudioPreviewStage.HOME ->
+                                    StudioHomeAndNavStage(
+                                        snapshot = snapshot,
+                                        frameOnSurface = frameOnSurface,
+                                        frameOnSurfaceVariant = frameOnSurfaceVariant,
+                                        track = StudioDemoData.DemoTracks[trackIndex],
+                                        isPlaying = isPlaying,
+                                        onTogglePlay = {
+                                            haptic(ArchiveTuneHapticKind.PLAY_PAUSE)
+                                            isPlaying = !isPlaying
+                                        },
+                                        onNextTrack = {
+                                            haptic(ArchiveTuneHapticKind.SELECTION)
+                                            trackIndex = (trackIndex + 1) % StudioDemoData.DemoTracks.size
+                                        },
+                                        onOpenPlayer = { stage = StudioPreviewStage.PLAYER },
+                                    )
+
+                                StudioPreviewStage.PLAYER ->
+                                    StudioPlayerStage(
+                                        snapshot = snapshot,
+                                        track = StudioDemoData.DemoTracks[trackIndex],
+                                        coverMode = coverMode,
+                                        isPlaying = isPlaying,
+                                        frameOnSurface = frameOnSurface,
+                                        frameOnSurfaceVariant = frameOnSurfaceVariant,
+                                        onTogglePlay = {
+                                            haptic(ArchiveTuneHapticKind.PLAY_PAUSE)
+                                            isPlaying = !isPlaying
+                                        },
+                                        onNextTrack = {
+                                            haptic(ArchiveTuneHapticKind.SELECTION)
+                                            trackIndex = (trackIndex + 1) % StudioDemoData.DemoTracks.size
+                                        },
+                                    )
+
+                                StudioPreviewStage.LYRICS ->
+                                    StudioLyricsStage(
+                                        snapshot = snapshot,
+                                        track = StudioDemoData.DemoTracks[trackIndex],
+                                        isPlaying = isPlaying,
+                                        frameOnSurface = frameOnSurface,
+                                        frameOnSurfaceVariant = frameOnSurfaceVariant,
+                                        onTogglePlay = {
+                                            haptic(ArchiveTuneHapticKind.PLAY_PAUSE)
+                                            isPlaying = !isPlaying
+                                        },
+                                    )
                             }
-                        },
-                        label = "studioPreviewStage",
-                    ) { activeStage ->
-                        when (StudioPreviewStage.entries[activeStage]) {
-                            StudioPreviewStage.HOME ->
-                                StudioHomeAndNavStage(
-                                    snapshot = snapshot,
-                                    frameOnSurface = frameOnSurface,
-                                    frameOnSurfaceVariant = frameOnSurfaceVariant,
-                                    track = StudioDemoData.DemoTracks[trackIndex],
-                                    isPlaying = isPlaying,
-                                    onTogglePlay = {
-                                        haptic(ArchiveTuneHapticKind.PLAY_PAUSE)
-                                        isPlaying = !isPlaying
-                                    },
-                                    onNextTrack = {
-                                        haptic(ArchiveTuneHapticKind.SELECTION)
-                                        trackIndex = (trackIndex + 1) % StudioDemoData.DemoTracks.size
-                                    },
-                                    onOpenPlayer = { stage = StudioPreviewStage.PLAYER },
-                                )
-
-                            StudioPreviewStage.PLAYER ->
-                                StudioPlayerStage(
-                                    snapshot = snapshot,
-                                    track = StudioDemoData.DemoTracks[trackIndex],
-                                    coverMode = coverMode,
-                                    isPlaying = isPlaying,
-                                    frameOnSurface = frameOnSurface,
-                                    frameOnSurfaceVariant = frameOnSurfaceVariant,
-                                    onTogglePlay = {
-                                        haptic(ArchiveTuneHapticKind.PLAY_PAUSE)
-                                        isPlaying = !isPlaying
-                                    },
-                                    onNextTrack = {
-                                        haptic(ArchiveTuneHapticKind.SELECTION)
-                                        trackIndex = (trackIndex + 1) % StudioDemoData.DemoTracks.size
-                                    },
-                                )
-
-                            StudioPreviewStage.LYRICS ->
-                                StudioLyricsStage(
-                                    snapshot = snapshot,
-                                    isPlaying = isPlaying,
-                                    frameOnSurface = frameOnSurface,
-                                    frameOnSurfaceVariant = frameOnSurfaceVariant,
-                                    onTogglePlay = {
-                                        haptic(ArchiveTuneHapticKind.PLAY_PAUSE)
-                                        isPlaying = !isPlaying
-                                    },
-                                )
                         }
                     }
                 }
@@ -822,6 +846,7 @@ private fun UnifiedNavAndMiniPlayerBarOverlay(
             else -> NavigationBarMaxWidth
         }
 
+    val isGlassMaterial = navBarMaterialSupportsGlassGlow(navigation.material)
     val barColor =
         when (navigation.material) {
             NavBarMaterial.STANDARD ->
@@ -834,17 +859,41 @@ private fun UnifiedNavAndMiniPlayerBarOverlay(
                 MaterialTheme.colorScheme.primaryContainer.copy(
                     alpha = (navigation.opacity * (1f - navigation.transparency)).coerceIn(0.25f, 0.98f),
                 )
-            NavBarMaterial.LIQUID_GLASS,
-            NavBarMaterial.SUKISU_GLASS,
-            -> MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.58f)
+            NavBarMaterial.LIQUID_GLASS ->
+                MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.56f)
+            NavBarMaterial.SUKISU_GLASS ->
+                MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.66f)
             NavBarMaterial.BITCHORD ->
-                MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.92f)
+                MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f)
+        }
+    val barBorderWidth =
+        when {
+            isGlassMaterial -> 1.2.dp
+            navigation.material == NavBarMaterial.FROSTED ||
+                navigation.material == NavBarMaterial.BITCHORD -> 1.dp
+            else -> 0.dp
+        }
+    val barBorderColor =
+        when {
+            isGlassMaterial && navigation.glassGlow ->
+                MaterialTheme.colorScheme.primary.copy(
+                    alpha = (0.38f * navigation.glassGlowIntensity).coerceIn(0.14f, 0.85f),
+                )
+            isGlassMaterial -> Color.White.copy(alpha = 0.28f)
+            navigation.material == NavBarMaterial.FROSTED -> Color.White.copy(alpha = 0.22f)
+            navigation.material == NavBarMaterial.BITCHORD ->
+                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)
+            else -> Color.Transparent
         }
 
     val miniHeight =
         (
             if (navigation.miniPlayerStyle == MiniPlayerStyle.BAR) {
-                (MINI_PLAYER_BAR_HEIGHT_DP * previewScale).dp
+                androidx.compose.ui.unit.lerp(
+                    (MINI_PLAYER_BAR_HEIGHT_DP * previewScale).dp,
+                    MiniPlayerCompactHeight * previewScale,
+                    compactFraction,
+                )
             } else {
                 androidx.compose.ui.unit.lerp(
                     MiniPlayerHeight * previewScale,
@@ -865,99 +914,220 @@ private fun UnifiedNavAndMiniPlayerBarOverlay(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = modifier.fillMaxWidth().padding(top = 4.dp),
     ) {
-        // Mini-Player positioned honestly relative to navigation bar
+        // Mini-Player + flanking compact Library / Search circular controls (matches MainActivity)
         val miniBottomPadding =
             if (navigation.miniPlayerStyle == MiniPlayerStyle.BAR) {
-                if (collapsed) 0.dp else 3.dp
+                androidx.compose.ui.unit.lerp(3.dp, 6.dp, compactFraction).coerceAtLeast(0.dp)
             } else {
                 6.dp
             }
-        val miniHorizontalPadding = if (navigation.miniPlayerStyle == MiniPlayerStyle.BAR) 0.dp else 12.dp
+        val baseMiniHorizontalPad = if (navigation.miniPlayerStyle == MiniPlayerStyle.BAR) 0.dp else 12.dp
+        val miniHorizontalPadding =
+            androidx.compose.ui.unit.lerp(
+                baseMiniHorizontalPad,
+                46.dp,
+                compactFraction,
+            ).coerceAtLeast(0.dp)
         val miniShape =
             if (navigation.miniPlayerStyle == MiniPlayerStyle.BAR) {
-                RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)
+                val topRadius = androidx.compose.ui.unit.lerp(12.dp, 22.dp, compactFraction).coerceAtLeast(0.dp)
+                val bottomRadius = androidx.compose.ui.unit.lerp(0.dp, 22.dp, compactFraction).coerceAtLeast(0.dp)
+                RoundedCornerShape(
+                    topStart = topRadius,
+                    topEnd = topRadius,
+                    bottomStart = bottomRadius,
+                    bottomEnd = bottomRadius,
+                )
             } else {
-                RoundedCornerShape(18.dp)
+                RoundedCornerShape(
+                    androidx.compose.ui.unit.lerp(18.dp, 24.dp, compactFraction).coerceAtLeast(0.dp),
+                )
             }
 
-        Surface(
-            onClick = onMiniPlayerClick,
-            shape = miniShape,
-            color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.96f),
-            tonalElevation = 4.dp,
-            shadowElevation = 4.dp,
+        val miniIsGradient = navigation.miniPlayerBackground == MiniPlayerBackgroundStyle.GRADIENT
+        val miniTitleColor = if (miniIsGradient) Color.White else MaterialTheme.colorScheme.onSurface
+        val miniSubtitleColor =
+            if (miniIsGradient) Color.White.copy(alpha = 0.78f) else MaterialTheme.colorScheme.onSurfaceVariant
+        val miniBgBrush =
+            when (navigation.miniPlayerBackground) {
+                MiniPlayerBackgroundStyle.THEME ->
+                    Brush.horizontalGradient(
+                        listOf(
+                            MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.96f),
+                            MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.96f),
+                        ),
+                    )
+                MiniPlayerBackgroundStyle.GRADIENT ->
+                    Brush.horizontalGradient(
+                        track.darkColors.map { it.copy(alpha = 0.92f) },
+                    )
+                MiniPlayerBackgroundStyle.GLOW ->
+                    Brush.horizontalGradient(
+                        listOf(
+                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.84f),
+                            MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f),
+                            MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.78f),
+                        ),
+                    )
+                MiniPlayerBackgroundStyle.FROSTED ->
+                    Brush.horizontalGradient(
+                        listOf(
+                            MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.72f),
+                            MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.78f),
+                        ),
+                    )
+                MiniPlayerBackgroundStyle.LIQUID_GLASS ->
+                    Brush.verticalGradient(
+                        listOf(
+                            MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.62f),
+                            MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.50f),
+                        ),
+                    )
+            }
+        val miniBorderColor =
+            when (navigation.miniPlayerBackground) {
+                MiniPlayerBackgroundStyle.LIQUID_GLASS ->
+                    if (navigation.glassGlow) {
+                        MaterialTheme.colorScheme.primary.copy(
+                            alpha = (0.36f * navigation.glassGlowIntensity).coerceIn(0.14f, 0.8f),
+                        )
+                    } else {
+                        Color.White.copy(alpha = 0.28f)
+                    }
+                MiniPlayerBackgroundStyle.FROSTED -> Color.White.copy(alpha = 0.24f)
+                MiniPlayerBackgroundStyle.GLOW -> MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
+                else -> Color.Transparent
+            }
+
+        Box(
             modifier =
                 Modifier
-                    .padding(horizontal = miniHorizontalPadding)
-                    .padding(bottom = miniBottomPadding)
                     .fillMaxWidth()
-                    .height(miniHeight),
+                    .padding(bottom = miniBottomPadding),
         ) {
-            Column(modifier = Modifier.fillMaxSize()) {
-                Row(
+            if (compactFraction > 0.01f) {
+                StudioCompactCircleButton(
+                    iconRes = Screens.Library.iconIdActive,
+                    bgColor = barColor,
+                    borderWidth = barBorderWidth,
+                    borderColor = barBorderColor,
+                    iconTint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier =
                         Modifier
-                            .weight(1f)
-                            .fillMaxWidth()
-                            .padding(horizontal = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Box(
+                            .align(Alignment.CenterStart)
+                            .padding(start = 10.dp)
+                            .alpha(compactFraction.coerceIn(0f, 1f)),
+                )
+                StudioCompactCircleButton(
+                    iconRes = R.drawable.search,
+                    bgColor = barColor,
+                    borderWidth = barBorderWidth,
+                    borderColor = barBorderColor,
+                    iconTint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier =
+                        Modifier
+                            .align(Alignment.CenterEnd)
+                            .padding(end = 10.dp)
+                            .alpha(compactFraction.coerceIn(0f, 1f)),
+                )
+            }
+
+            Surface(
+                onClick = onMiniPlayerClick,
+                shape = miniShape,
+                color = Color.Transparent,
+                tonalElevation = 0.dp,
+                shadowElevation = if (navigation.miniPlayerBackground == MiniPlayerBackgroundStyle.LIQUID_GLASS) 2.dp else 4.dp,
+                modifier =
+                    Modifier
+                        .align(Alignment.Center)
+                        .padding(horizontal = miniHorizontalPadding)
+                        .fillMaxWidth()
+                        .height(miniHeight)
+                        .clip(miniShape)
+                        .background(miniBgBrush)
+                        .then(
+                            if (miniBorderColor != Color.Transparent) {
+                                Modifier.border(1.dp, miniBorderColor, miniShape)
+                            } else {
+                                Modifier
+                            },
+                        ),
+            ) {
+                Column(modifier = Modifier.fillMaxSize()) {
+                    Row(
                         modifier =
                             Modifier
-                                .size(30.dp)
-                                .clip(RoundedCornerShape(7.dp))
-                                .background(Brush.linearGradient(track.darkColors)),
-                    )
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = stringResource(track.titleRes),
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
+                                .weight(1f)
+                                .fillMaxWidth()
+                                .padding(horizontal = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Box(
+                            modifier =
+                                Modifier
+                                    .size(28.dp)
+                                    .clip(RoundedCornerShape(7.dp))
+                                    .background(Brush.linearGradient(track.darkColors)),
                         )
-                        Text(
-                            text = track.artist,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = stringResource(track.titleRes),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = miniTitleColor,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Text(
+                                text = track.artist,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = miniSubtitleColor,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        IconButton(onClick = onTogglePlay, modifier = Modifier.size(28.dp)) {
+                            Icon(
+                                painter =
+                                    painterResource(
+                                        if (isPlaying) R.drawable.pause else R.drawable.play,
+                                    ),
+                                contentDescription =
+                                    stringResource(
+                                        if (isPlaying) R.string.widget_pause else R.string.play,
+                                    ),
+                                tint = miniTitleColor,
+                                modifier = Modifier.size(16.dp),
+                            )
+                        }
+                        if (compactFraction < 0.7f) {
+                            IconButton(onClick = onNextTrack, modifier = Modifier.size(28.dp)) {
+                                Icon(
+                                    painter = painterResource(R.drawable.apple_skip_next),
+                                    contentDescription = stringResource(R.string.next),
+                                    tint = miniTitleColor,
+                                    modifier = Modifier.size(16.dp),
+                                )
+                            }
+                        }
+                    }
+                    if (navigation.miniPlayerStyle == MiniPlayerStyle.BAR) {
+                        LinearProgressIndicator(
+                            progress = { 0.42f },
+                            color = if (miniIsGradient) Color.White else MaterialTheme.colorScheme.primary,
+                            trackColor = miniSubtitleColor.copy(alpha = 0.25f),
+                            modifier = Modifier.fillMaxWidth().height(2.dp),
                         )
                     }
-                    IconButton(onClick = onTogglePlay, modifier = Modifier.size(30.dp)) {
-                        Icon(
-                            painter =
-                                painterResource(
-                                    if (isPlaying) R.drawable.pause else R.drawable.play,
-                                ),
-                            contentDescription =
-                                stringResource(
-                                    if (isPlaying) R.string.widget_pause else R.string.play,
-                                ),
-                            modifier = Modifier.size(17.dp),
-                        )
-                    }
-                    IconButton(onClick = onNextTrack, modifier = Modifier.size(30.dp)) {
-                        Icon(
-                            painter = painterResource(R.drawable.apple_skip_next),
-                            contentDescription = stringResource(R.string.next),
-                            modifier = Modifier.size(17.dp),
-                        )
-                    }
-                }
-                if (navigation.miniPlayerStyle == MiniPlayerStyle.BAR) {
-                    LinearProgressIndicator(
-                        progress = { 0.42f },
-                        modifier = Modifier.fillMaxWidth().height(2.dp),
-                    )
                 }
             }
         }
 
-        // Real NavBar geometry using real height, widthFraction, cornerRadius & fontScale honesty
+        // Real NavBar geometry using real height, widthFraction, cornerRadius & material sheen
         if (visibleBarHeight > 1.dp) {
+            val barShape = RoundedCornerShape(cornerDp.coerceAtLeast(0.dp))
             Box(
                 modifier =
                     Modifier
@@ -966,17 +1136,35 @@ private fun UnifiedNavAndMiniPlayerBarOverlay(
                         .fillMaxWidth(effectiveWidthFraction)
                         .height(visibleBarHeight)
                         .graphicsLayer { alpha = (1f - compactFraction * 1.1f).coerceIn(0f, 1f) }
-                        .clip(RoundedCornerShape(cornerDp))
+                        .clip(barShape)
                         .background(barColor)
-                        .border(
-                            width = if (navigation.material in setOf(NavBarMaterial.LIQUID_GLASS, NavBarMaterial.SUKISU_GLASS)) 1.dp else 0.dp,
-                            color =
-                                if (navigation.glassGlow) {
-                                    MaterialTheme.colorScheme.primary.copy(alpha = (0.35f * navigation.glassGlowIntensity).coerceIn(0.1f, 0.8f))
-                                } else {
-                                    Color.White.copy(alpha = 0.22f)
-                                },
-                            shape = RoundedCornerShape(cornerDp),
+                        .then(
+                            if (isGlassMaterial) {
+                                Modifier.background(
+                                    Brush.verticalGradient(
+                                        listOf(
+                                            Color.White.copy(alpha = 0.16f),
+                                            Color.Transparent,
+                                            if (navigation.glassGlow) {
+                                                MaterialTheme.colorScheme.primary.copy(
+                                                    alpha = (0.12f * navigation.glassGlowIntensity).coerceIn(0.05f, 0.28f),
+                                                )
+                                            } else {
+                                                Color.Transparent
+                                            },
+                                        ),
+                                    ),
+                                )
+                            } else {
+                                Modifier
+                            },
+                        )
+                        .then(
+                            if (barBorderWidth > 0.dp) {
+                                Modifier.border(barBorderWidth, barBorderColor, barShape)
+                            } else {
+                                Modifier
+                            },
                         ),
             ) {
                 Row(
@@ -1001,7 +1189,13 @@ private fun UnifiedNavAndMiniPlayerBarOverlay(
                                 contentAlignment = Alignment.Center,
                                 modifier =
                                     Modifier
-                                        .clip(CircleShape)
+                                        .clip(
+                                            if (navigation.material == NavBarMaterial.BITCHORD) {
+                                                RoundedCornerShape(10.dp)
+                                            } else {
+                                                CircleShape
+                                            },
+                                        )
                                         .background(
                                             if (selected) {
                                                 MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)
@@ -1024,7 +1218,7 @@ private fun UnifiedNavAndMiniPlayerBarOverlay(
                                 )
                             }
                             if (!navigation.hideLabels) {
-                                Spacer(modifier = Modifier.height((navigation.labelSpacing * previewScale).coerceAtMost(6f).dp))
+                                Spacer(modifier = Modifier.height((navigation.labelSpacing * previewScale).coerceIn(0f, 6f).dp))
                                 Text(
                                     text = stringResource(screen.titleId),
                                     style = MaterialTheme.typography.labelSmall,
@@ -1047,6 +1241,39 @@ private fun UnifiedNavAndMiniPlayerBarOverlay(
 }
 
 @Composable
+private fun StudioCompactCircleButton(
+    iconRes: Int,
+    bgColor: Color,
+    borderWidth: androidx.compose.ui.unit.Dp,
+    borderColor: Color,
+    iconTint: Color,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier =
+            modifier
+                .size(30.dp)
+                .clip(CircleShape)
+                .background(bgColor)
+                .then(
+                    if (borderWidth > 0.dp) {
+                        Modifier.border(borderWidth, borderColor, CircleShape)
+                    } else {
+                        Modifier
+                    },
+                ),
+    ) {
+        Icon(
+            painter = painterResource(iconRes),
+            contentDescription = null,
+            tint = iconTint,
+            modifier = Modifier.size(15.dp),
+        )
+    }
+}
+
+@Composable
 private fun StudioPlayerStage(
     snapshot: AppearanceProfileSnapshot,
     track: StudioDemoTrack,
@@ -1058,145 +1285,424 @@ private fun StudioPlayerStage(
     onNextTrack: () -> Unit,
 ) {
     var progress by remember { mutableFloatStateOf(0.38f) }
+    val style = snapshot.player.designStyle
+    val supportsCustomBg = playerStyleSupportsCustomBackground(style)
+    val showVolumeBar = playerStyleSupportsVolumeBar(style) && snapshot.player.showVolumeBar
     val artworkColors =
         when (coverMode) {
             StudioCoverPreviewMode.LIGHT -> track.lightColors
             StudioCoverPreviewMode.DARK -> track.darkColors
             StudioCoverPreviewMode.NONE -> emptyList()
         }
-    val playerBgBrush =
+    val primaryAccent = artworkColors.firstOrNull() ?: MaterialTheme.colorScheme.primary
+    val secondaryAccent = artworkColors.lastOrNull() ?: MaterialTheme.colorScheme.tertiary
+
+    val isStyleDarkBackdrop =
         when {
-            snapshot.player.backgroundStyle == PlayerBackgroundStyle.DEFAULT ->
-                Brush.verticalGradient(listOf(Color.Transparent, Color.Transparent))
-            artworkColors.isEmpty() ->
-                Brush.verticalGradient(
-                    listOf(
-                        MaterialTheme.colorScheme.surfaceContainerHigh,
-                        MaterialTheme.colorScheme.surfaceContainer,
-                    ),
+            !supportsCustomBg ->
+                style in setOf(
+                    PlayerDesignStyle.V7,
+                    PlayerDesignStyle.V8,
+                    PlayerDesignStyle.APPLE_MUSIC,
+                    PlayerDesignStyle.BITCHORD,
+                    PlayerDesignStyle.TIKTOK,
+                    PlayerDesignStyle.LOOPER,
                 )
-            else -> Brush.verticalGradient(artworkColors.map { it.copy(alpha = 0.72f) })
+            snapshot.player.backgroundStyle == PlayerBackgroundStyle.DEFAULT -> false
+            snapshot.player.backgroundStyle in setOf(
+                PlayerBackgroundStyle.GLOW,
+                PlayerBackgroundStyle.GLOW_ANIMATED,
+                PlayerBackgroundStyle.BLUR,
+                PlayerBackgroundStyle.BLUR_GRADIENT,
+                PlayerBackgroundStyle.CUSTOM,
+            ) -> true
+            coverMode == StudioCoverPreviewMode.LIGHT -> false
+            else -> true
         }
+
+    val playerBgBrush =
+        if (!supportsCustomBg) {
+            when (style) {
+                PlayerDesignStyle.V7,
+                PlayerDesignStyle.V8,
+                -> Brush.verticalGradient(listOf(primaryAccent.copy(alpha = 0.85f), Color(0xFF0E1118)))
+                PlayerDesignStyle.V9 ->
+                    Brush.verticalGradient(
+                        listOf(
+                            MaterialTheme.colorScheme.surfaceContainerLow,
+                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f),
+                        ),
+                    )
+                PlayerDesignStyle.V10 ->
+                    Brush.verticalGradient(
+                        listOf(
+                            MaterialTheme.colorScheme.surface,
+                            MaterialTheme.colorScheme.surfaceContainerHigh,
+                        ),
+                    )
+                PlayerDesignStyle.APPLE_MUSIC ->
+                    Brush.linearGradient(
+                        listOf(
+                            primaryAccent.copy(alpha = 0.78f),
+                            secondaryAccent.copy(alpha = 0.86f),
+                            Color(0xFF12141C),
+                        ),
+                    )
+                PlayerDesignStyle.BITCHORD ->
+                    Brush.verticalGradient(listOf(Color(0xFF131620), Color(0xFF1F2433)))
+                PlayerDesignStyle.TIKTOK ->
+                    Brush.verticalGradient(
+                        listOf(
+                            primaryAccent.copy(alpha = 0.68f),
+                            Color(0xFF0C0D12),
+                            Color(0xFF08090D),
+                        ),
+                    )
+                PlayerDesignStyle.SIMPMUSIC ->
+                    Brush.verticalGradient(
+                        listOf(
+                            MaterialTheme.colorScheme.surfaceContainerHigh,
+                            MaterialTheme.colorScheme.background,
+                        ),
+                    )
+                PlayerDesignStyle.SPATIALFLOW ->
+                    Brush.linearGradient(
+                        listOf(
+                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.52f),
+                            MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.42f),
+                            MaterialTheme.colorScheme.surface,
+                        ),
+                    )
+                PlayerDesignStyle.LOOPER ->
+                    Brush.verticalGradient(listOf(Color(0xFF14181F), Color(0xFF0B0E14)))
+                else -> Brush.verticalGradient(listOf(Color.Transparent, Color.Transparent))
+            }
+        } else {
+            when (snapshot.player.backgroundStyle) {
+                PlayerBackgroundStyle.DEFAULT ->
+                    Brush.verticalGradient(listOf(Color.Transparent, Color.Transparent))
+                PlayerBackgroundStyle.GRADIENT ->
+                    if (artworkColors.isEmpty()) {
+                        Brush.verticalGradient(
+                            listOf(
+                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
+                                MaterialTheme.colorScheme.surfaceContainer,
+                            ),
+                        )
+                    } else {
+                        Brush.verticalGradient(artworkColors.map { it.copy(alpha = 0.82f) })
+                    }
+                PlayerBackgroundStyle.COLORING -> {
+                    val solid =
+                        if (artworkColors.isEmpty()) {
+                            MaterialTheme.colorScheme.primaryContainer
+                        } else {
+                            primaryAccent.copy(alpha = 0.88f)
+                        }
+                    Brush.verticalGradient(listOf(solid, solid))
+                }
+                PlayerBackgroundStyle.BLUR ->
+                    Brush.radialGradient(
+                        colors =
+                            listOf(
+                                primaryAccent.copy(alpha = if (snapshot.color.disableBlur) 0.55f else 0.78f),
+                                secondaryAccent.copy(alpha = 0.62f),
+                                Color(0xFF12151E),
+                            ),
+                    )
+                PlayerBackgroundStyle.BLUR_GRADIENT ->
+                    Brush.verticalGradient(
+                        listOf(
+                            primaryAccent.copy(alpha = 0.78f),
+                            secondaryAccent.copy(alpha = 0.56f),
+                            MaterialTheme.colorScheme.surfaceContainerLowest,
+                        ),
+                    )
+                PlayerBackgroundStyle.GLOW ->
+                    Brush.radialGradient(
+                        colors = listOf(primaryAccent.copy(alpha = 0.82f), Color(0xFF10131B)),
+                    )
+                PlayerBackgroundStyle.GLOW_ANIMATED ->
+                    Brush.linearGradient(
+                        listOf(
+                            primaryAccent.copy(alpha = 0.85f),
+                            secondaryAccent.copy(alpha = 0.76f),
+                            Color(0xFF10121A),
+                        ),
+                    )
+                PlayerBackgroundStyle.CUSTOM ->
+                    Brush.linearGradient(
+                        listOf(
+                            Color(0xFF20253A),
+                            primaryAccent.copy(alpha = 0.45f),
+                            Color(0xFF141824),
+                        ),
+                    )
+            }
+        }
+
     val onPlayerContent =
         when {
-            snapshot.player.backgroundStyle == PlayerBackgroundStyle.DEFAULT || artworkColors.isEmpty() ->
-                frameOnSurface
-            coverMode == StudioCoverPreviewMode.LIGHT -> Color(0xFF141820)
-            else -> Color.White
+            isStyleDarkBackdrop -> Color.White
+            supportsCustomBg && snapshot.player.backgroundStyle != PlayerBackgroundStyle.DEFAULT && artworkColors.isNotEmpty() ->
+                Color(0xFF141820)
+            else -> frameOnSurface
         }
-    val onPlayerSub = onPlayerContent.copy(alpha = 0.75f)
+    val onPlayerSub = onPlayerContent.copy(alpha = 0.74f)
+    val coverBaseSize = if (showVolumeBar) 98.dp else 112.dp
+    val leftAlignedHeader =
+        style in setOf(
+            PlayerDesignStyle.APPLE_MUSIC,
+            PlayerDesignStyle.V10,
+            PlayerDesignStyle.TIKTOK,
+            PlayerDesignStyle.BITCHORD,
+        )
 
     Box(
         modifier =
             Modifier
                 .fillMaxSize()
-                .background(playerBgBrush)
-                .padding(14.dp),
+                .background(playerBgBrush),
     ) {
+        // Extra atmospheric layer for GLOW_ANIMATED / CUSTOM / BITCHORD / SPATIALFLOW
+        if (supportsCustomBg && snapshot.player.backgroundStyle == PlayerBackgroundStyle.GLOW_ANIMATED) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                drawCircle(
+                    color = primaryAccent.copy(alpha = 0.34f),
+                    radius = size.minDimension * 0.48f,
+                    center = Offset(size.width * 0.25f, size.height * 0.28f),
+                )
+                drawCircle(
+                    color = secondaryAccent.copy(alpha = 0.28f),
+                    radius = size.minDimension * 0.42f,
+                    center = Offset(size.width * 0.82f, size.height * 0.65f),
+                )
+            }
+        } else if (supportsCustomBg && snapshot.player.backgroundStyle == PlayerBackgroundStyle.CUSTOM) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                for (i in 0..4) {
+                    val y = size.height * (i / 4f)
+                    drawLine(
+                        color = Color.White.copy(alpha = 0.08f),
+                        start = Offset(0f, y),
+                        end = Offset(size.width, y - 36f),
+                        strokeWidth = 2f,
+                    )
+                }
+            }
+        }
+
         Column(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().padding(horizontal = 14.dp, vertical = 10.dp),
             verticalArrangement = Arrangement.SpaceBetween,
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = snapshot.player.designStyle.name,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = onPlayerSub,
-                )
-                Text(
-                    text = stringResource(track.sourceLabelRes),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = onPlayerSub,
-                )
-            }
-
-            if (!snapshot.player.hideThumbnail) {
-                AnimatedContent(
-                    targetState = track to coverMode,
-                    transitionSpec = {
-                        if (snapshot.motion.disableAnimations || !snapshot.motion.artworkTransitions) {
-                            fadeIn(snap()) togetherWith fadeOut(snap())
-                        } else {
-                            (slideInHorizontally(tween(240)) { it / 3 } + fadeIn(tween(220))) togetherWith
-                                (slideOutHorizontally(tween(220)) { -it / 3 } + fadeOut(tween(180)))
-                        }
-                    },
-                    label = "studioPlayerTrackSwap",
-                ) { (activeTrack, mode) ->
-                    val shape = RoundedCornerShape(snapshot.player.thumbnailCornerRadius.dp)
-                    val coverModifier =
-                        if (snapshot.player.cropToSquare) {
-                            Modifier.size(124.dp).aspectRatio(1f).clip(shape)
-                        } else {
-                            Modifier.width(138.dp).height(112.dp).clip(shape)
-                        }
-                    when (mode) {
-                        StudioCoverPreviewMode.NONE ->
-                            Box(
-                                modifier =
-                                    coverModifier.background(
-                                        Brush.linearGradient(
-                                            listOf(
-                                                MaterialTheme.colorScheme.surfaceContainerHighest,
-                                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
-                                            ),
-                                        ),
-                                    ),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Canvas(modifier = Modifier.fillMaxSize()) {
-                                    drawCircle(
-                                        color = Color.White.copy(alpha = 0.14f),
-                                        radius = size.minDimension * 0.34f,
-                                        center = Offset(size.width * 0.72f, size.height * 0.3f),
-                                    )
-                                }
-                                Icon(
-                                    painter = painterResource(R.drawable.music_note),
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(36.dp),
-                                )
-                            }
-                        StudioCoverPreviewMode.LIGHT ->
-                            Box(
-                                modifier = coverModifier.background(Brush.linearGradient(activeTrack.lightColors)),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Text(
-                                    text = stringResource(activeTrack.albumRes),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = Color(0xFF1E2430),
-                                    textAlign = TextAlign.Center,
-                                    modifier = Modifier.padding(8.dp),
-                                )
-                            }
-                        StudioCoverPreviewMode.DARK ->
-                            Box(
-                                modifier = coverModifier.background(Brush.linearGradient(activeTrack.darkColors)),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Text(
-                                    text = stringResource(activeTrack.albumRes),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = Color.White,
-                                    textAlign = TextAlign.Center,
-                                    modifier = Modifier.padding(8.dp),
-                                )
-                            }
-                    }
-                }
-            }
-
+            // Top bar: style name + own-backdrop pill or source pill
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                if (style == PlayerDesignStyle.APPLE_MUSIC) {
+                    Box(
+                        modifier =
+                            Modifier
+                                .width(32.dp)
+                                .height(3.dp)
+                                .clip(CircleShape)
+                                .background(Color.White.copy(alpha = 0.42f)),
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = stringResource(playerDesignStyleLabelRes(style)),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = onPlayerContent,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (!supportsCustomBg) {
+                        Surface(
+                            shape = RoundedCornerShape(999.dp),
+                            color = onPlayerContent.copy(alpha = 0.14f),
+                        ) {
+                            Text(
+                                text = stringResource(R.string.studio_preview_own_backdrop),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = onPlayerContent,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
+                            )
+                        }
+                    } else {
+                        Text(
+                            text = stringResource(playerBackgroundStyleLabelRes(snapshot.player.backgroundStyle)),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = onPlayerSub,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
+
+            // Middle artwork + style-specific framing
+            if (!snapshot.player.hideThumbnail) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement =
+                        if (style == PlayerDesignStyle.TIKTOK) Arrangement.SpaceBetween else Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    AnimatedContent(
+                        targetState = track to coverMode,
+                        transitionSpec = {
+                            if (snapshot.motion.disableAnimations || !snapshot.motion.artworkTransitions) {
+                                fadeIn(snap()) togetherWith fadeOut(snap())
+                            } else {
+                                (slideInHorizontally(tween(240)) { it / 3 } + fadeIn(tween(220))) togetherWith
+                                    (slideOutHorizontally(tween(220)) { -it / 3 } + fadeOut(tween(180)))
+                            }
+                        },
+                        label = "studioPlayerTrackSwap",
+                    ) { (activeTrack, mode) ->
+                        val shape = RoundedCornerShape(snapshot.player.thumbnailCornerRadius.coerceAtLeast(0f).dp)
+                        val coverModifier =
+                            when {
+                                style == PlayerDesignStyle.SIMPMUSIC ->
+                                    Modifier.width(coverBaseSize + 36.dp).height(coverBaseSize - 6.dp).clip(shape)
+                                snapshot.player.cropToSquare ->
+                                    Modifier.size(coverBaseSize).aspectRatio(1f).clip(shape)
+                                else ->
+                                    Modifier.width(coverBaseSize + 14.dp).height(coverBaseSize - 10.dp).clip(shape)
+                            }
+                        val framedModifier =
+                            when (style) {
+                                PlayerDesignStyle.BITCHORD,
+                                PlayerDesignStyle.V10,
+                                -> coverModifier.border(1.dp, onPlayerContent.copy(alpha = 0.22f), shape)
+                                else -> coverModifier
+                            }
+                        when (mode) {
+                            StudioCoverPreviewMode.NONE ->
+                                Box(
+                                    modifier =
+                                        framedModifier.background(
+                                            Brush.linearGradient(
+                                                listOf(
+                                                    MaterialTheme.colorScheme.surfaceContainerHighest,
+                                                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
+                                                ),
+                                            ),
+                                        ),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Canvas(modifier = Modifier.fillMaxSize()) {
+                                        drawCircle(
+                                            color = Color.White.copy(alpha = 0.14f),
+                                            radius = size.minDimension * 0.34f,
+                                            center = Offset(size.width * 0.72f, size.height * 0.3f),
+                                        )
+                                    }
+                                    Icon(
+                                        painter = painterResource(R.drawable.music_note),
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(32.dp),
+                                    )
+                                }
+                            StudioCoverPreviewMode.LIGHT ->
+                                Box(
+                                    modifier = framedModifier.background(Brush.linearGradient(activeTrack.lightColors)),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Text(
+                                        text = stringResource(activeTrack.albumRes),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = Color(0xFF1E2430),
+                                        textAlign = TextAlign.Center,
+                                        modifier = Modifier.padding(8.dp),
+                                    )
+                                }
+                            StudioCoverPreviewMode.DARK ->
+                                Box(
+                                    modifier = framedModifier.background(Brush.linearGradient(activeTrack.darkColors)),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Text(
+                                        text = stringResource(activeTrack.albumRes),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = Color.White,
+                                        textAlign = TextAlign.Center,
+                                        modifier = Modifier.padding(8.dp),
+                                    )
+                                }
+                        }
+                    }
+
+                    // TikTok vertical right-rail action stack or BitChord dock accent
+                    if (style == PlayerDesignStyle.TIKTOK) {
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.padding(end = 2.dp),
+                        ) {
+                            listOf(R.drawable.music_note, R.drawable.lyrics, R.drawable.tune).forEach { iconRes ->
+                                Box(
+                                    contentAlignment = Alignment.Center,
+                                    modifier =
+                                        Modifier
+                                            .size(26.dp)
+                                            .clip(CircleShape)
+                                            .background(Color.White.copy(alpha = 0.16f)),
+                                ) {
+                                    Icon(
+                                        painter = painterResource(iconRes),
+                                        contentDescription = null,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(14.dp),
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Controls container (tonal card for V9/SPATIALFLOW, frosted dock for BITCHORD, clean for others)
+            val controlsCardBg =
+                when (style) {
+                    PlayerDesignStyle.V9 -> MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.9f)
+                    PlayerDesignStyle.SPATIALFLOW -> MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.72f)
+                    PlayerDesignStyle.BITCHORD -> Color.White.copy(alpha = 0.08f)
+                    PlayerDesignStyle.LOOPER -> Color.White.copy(alpha = 0.07f)
+                    else -> Color.Transparent
+                }
+            val controlsShape = RoundedCornerShape(14.dp)
+
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .then(
+                            if (controlsCardBg != Color.Transparent) {
+                                Modifier
+                                    .clip(controlsShape)
+                                    .background(controlsCardBg)
+                                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                            } else {
+                                Modifier
+                            },
+                        ),
+                horizontalAlignment = if (leftAlignedHeader) Alignment.Start else Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(3.dp),
             ) {
                 Text(
                     text = stringResource(track.titleRes),
@@ -1220,39 +1726,72 @@ private fun StudioPlayerStage(
                     valueRange = 0f..1f,
                     onValueChange = { progress = it },
                     onValueChangeFinished = {},
-                    activeColor = MaterialTheme.colorScheme.primary,
+                    activeColor = if (isStyleDarkBackdrop) Color.White else MaterialTheme.colorScheme.primary,
                     isPlaying = isPlaying && !snapshot.motion.disableAnimations,
-                    modifier = Modifier.fillMaxWidth().height(26.dp),
+                    modifier = Modifier.fillMaxWidth().height(22.dp),
                 )
 
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(20.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    IconButton(onClick = onNextTrack) {
+                    IconButton(onClick = onNextTrack, modifier = Modifier.size(34.dp)) {
                         Icon(
                             painter = painterResource(R.drawable.apple_skip_previous),
                             contentDescription = null,
                             tint = onPlayerContent,
+                            modifier = Modifier.size(20.dp),
                         )
                     }
+                    Spacer(modifier = Modifier.width(14.dp))
+                    val playButtonShape =
+                        when (style) {
+                            PlayerDesignStyle.V9,
+                            PlayerDesignStyle.BITCHORD,
+                            -> RoundedCornerShape(12.dp)
+                            else -> CircleShape
+                        }
                     Surface(
                         onClick = onTogglePlay,
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.primary,
+                        shape = playButtonShape,
+                        color = if (isStyleDarkBackdrop) Color.White else MaterialTheme.colorScheme.primary,
                     ) {
                         Icon(
                             painter = painterResource(if (isPlaying) R.drawable.pause else R.drawable.play),
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onPrimary,
-                            modifier = Modifier.padding(10.dp).size(22.dp),
+                            tint = if (isStyleDarkBackdrop) Color(0xFF14171D) else MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.padding(8.dp).size(20.dp),
                         )
                     }
-                    IconButton(onClick = onNextTrack) {
+                    Spacer(modifier = Modifier.width(14.dp))
+                    IconButton(onClick = onNextTrack, modifier = Modifier.size(34.dp)) {
                         Icon(
                             painter = painterResource(R.drawable.apple_skip_next),
                             contentDescription = null,
                             tint = onPlayerContent,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+                }
+
+                if (showVolumeBar) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.volume_up),
+                            contentDescription = null,
+                            tint = onPlayerSub,
+                            modifier = Modifier.size(14.dp),
+                        )
+                        LinearProgressIndicator(
+                            progress = { 0.68f },
+                            color = onPlayerContent.copy(alpha = 0.85f),
+                            trackColor = onPlayerContent.copy(alpha = 0.22f),
+                            modifier = Modifier.weight(1f).height(4.dp).clip(CircleShape),
                         )
                     }
                 }
@@ -1264,6 +1803,7 @@ private fun StudioPlayerStage(
 @Composable
 private fun StudioLyricsStage(
     snapshot: AppearanceProfileSnapshot,
+    track: StudioDemoTrack,
     isPlaying: Boolean,
     frameOnSurface: Color,
     frameOnSurfaceVariant: Color,
@@ -1282,10 +1822,83 @@ private fun StudioLyricsStage(
         }
     }
 
-    val previewFontSp = (snapshot.lyrics.textSize * 0.56f).coerceIn(11f, 20f).sp
+    val effectivePlayerBg =
+        if (playerStyleSupportsCustomBackground(snapshot.player.designStyle)) {
+            snapshot.player.backgroundStyle
+        } else {
+            PlayerBackgroundStyle.DEFAULT
+        }
+    val resolvedLyricsBg = snapshot.lyrics.backgroundStyle.resolveFor(effectivePlayerBg)
+    val usesOwnLyrics = playerStyleUsesOwnFullscreenLyrics(snapshot.player.designStyle)
+
+    val lyricsBgBrush =
+        when (resolvedLyricsBg) {
+            LyricsBackgroundStyle.DEFAULT ->
+                Brush.verticalGradient(
+                    listOf(
+                        MaterialTheme.colorScheme.surfaceContainer,
+                        MaterialTheme.colorScheme.background,
+                    ),
+                )
+            LyricsBackgroundStyle.FOLLOW_THEME ->
+                Brush.verticalGradient(listOf(Color.Transparent, Color.Transparent))
+            LyricsBackgroundStyle.COLORING ->
+                Brush.verticalGradient(
+                    listOf(
+                        track.darkColors.first().copy(alpha = 0.90f),
+                        track.darkColors.last().copy(alpha = 0.94f),
+                    ),
+                )
+            LyricsBackgroundStyle.MOVING_BLUR ->
+                Brush.radialGradient(
+                    colors =
+                        listOf(
+                            track.darkColors.first().copy(alpha = 0.82f),
+                            track.darkColors.last().copy(alpha = 0.72f),
+                            Color(0xFF0E111A),
+                        ),
+                )
+            LyricsBackgroundStyle.CUSTOM ->
+                Brush.linearGradient(
+                    listOf(
+                        Color(0xFF20253A),
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.45f),
+                        Color(0xFF141824),
+                    ),
+                )
+        }
+    val darkLyricsSurface =
+        resolvedLyricsBg in setOf(
+            LyricsBackgroundStyle.COLORING,
+            LyricsBackgroundStyle.MOVING_BLUR,
+            LyricsBackgroundStyle.CUSTOM,
+        )
+    val activeTextColor = if (darkLyricsSurface) Color.White else frameOnSurface
+    val inactiveTextColor =
+        if (darkLyricsSurface) Color.White.copy(alpha = 0.72f) else frameOnSurfaceVariant
+
+    val previewFontSp = (snapshot.lyrics.textSize * 0.54f).coerceIn(11f, 19f).sp
+    val characterLabel =
+        stringResource(
+            when (snapshot.lyrics.displayCharacter) {
+                LyricsDisplayCharacter.READING -> R.string.lyrics_character_reading
+                LyricsDisplayCharacter.FOCUS -> R.string.lyrics_character_focus
+                LyricsDisplayCharacter.STAGE -> R.string.lyrics_character_stage
+            },
+        )
+    val textAlign =
+        if (snapshot.lyrics.displayCharacter == LyricsDisplayCharacter.STAGE) {
+            TextAlign.Center
+        } else {
+            TextAlign.Start
+        }
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(14.dp),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(lyricsBgBrush)
+                .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Row(
@@ -1293,12 +1906,25 @@ private fun StudioLyricsStage(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = snapshot.lyrics.displayCharacter.name,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.SemiBold,
-            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "$characterLabel · ${stringResource(lyricsBackgroundStyleLabelRes(resolvedLyricsBg))}",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (darkLyricsSurface) Color.White else MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (usesOwnLyrics) {
+                    Text(
+                        text = stringResource(R.string.studio_preview_own_lyrics_style),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = inactiveTextColor,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
             Surface(
                 onClick = onTogglePlay,
                 shape = RoundedCornerShape(999.dp),
@@ -1316,44 +1942,74 @@ private fun StudioLyricsStage(
         Column(
             modifier = Modifier.weight(1f).fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy((4f * snapshot.lyrics.lineSpacing).dp),
+            horizontalAlignment =
+                if (snapshot.lyrics.displayCharacter == LyricsDisplayCharacter.STAGE) {
+                    Alignment.CenterHorizontally
+                } else {
+                    Alignment.Start
+                },
         ) {
             StudioDemoData.DemoLyricsLines.forEachIndexed { idx, line ->
                 val isCurrent = idx == activeLine
                 val inactiveAlpha =
                     when (snapshot.lyrics.displayCharacter) {
-                        moe.rukamori.archivetune.constants.LyricsDisplayCharacter.READING -> 0.72f
-                        moe.rukamori.archivetune.constants.LyricsDisplayCharacter.FOCUS -> 0.45f
-                        moe.rukamori.archivetune.constants.LyricsDisplayCharacter.STAGE -> 0.34f
+                        LyricsDisplayCharacter.READING -> 0.74f
+                        LyricsDisplayCharacter.FOCUS -> 0.44f
+                        LyricsDisplayCharacter.STAGE -> 0.28f
+                    }
+                val activeFontScale =
+                    when (snapshot.lyrics.displayCharacter) {
+                        LyricsDisplayCharacter.READING -> 1.02f
+                        LyricsDisplayCharacter.FOCUS -> 1.10f
+                        LyricsDisplayCharacter.STAGE -> 1.18f
                     }
                 val blurRadius =
                     if (!isCurrent && snapshot.lyrics.lineBlur && !snapshot.color.disableBlur && !reducedMotion) {
-                        2.5.dp
+                        when (snapshot.lyrics.displayCharacter) {
+                            LyricsDisplayCharacter.READING -> 1.2.dp
+                            LyricsDisplayCharacter.FOCUS -> 2.4.dp
+                            LyricsDisplayCharacter.STAGE -> 3.2.dp
+                        }
                     } else {
                         0.dp
                     }
                 val rowBg =
-                    if (isCurrent && reducedMotion) {
-                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
-                    } else {
-                        Color.Transparent
+                    when {
+                        isCurrent && snapshot.lyrics.displayCharacter == LyricsDisplayCharacter.STAGE ->
+                            (if (darkLyricsSurface) Color.White else MaterialTheme.colorScheme.primary).copy(alpha = 0.14f)
+                        isCurrent && reducedMotion ->
+                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                        else -> Color.Transparent
                     }
 
                 Column(
+                    horizontalAlignment =
+                        if (snapshot.lyrics.displayCharacter == LyricsDisplayCharacter.STAGE) {
+                            Alignment.CenterHorizontally
+                        } else {
+                            Alignment.Start
+                        },
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
+                            .clip(RoundedCornerShape(10.dp))
                             .background(rowBg)
                             .clickable { activeLine = idx }
-                            .padding(horizontal = 6.dp, vertical = 4.dp)
-                            .alpha(if (isCurrent) 1f else inactiveAlpha)
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                            .alpha((if (isCurrent) 1f else inactiveAlpha).coerceIn(0f, 1f))
                             .let { mod -> if (blurRadius > 0.dp) mod.blur(blurRadius) else mod },
                 ) {
                     Text(
                         text = stringResource(line.primaryTextRes),
-                        fontSize = if (isCurrent) previewFontSp else (previewFontSp.value * 0.88f).sp,
-                        fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal,
-                        color = if (isCurrent) frameOnSurface else frameOnSurfaceVariant,
+                        fontSize = if (isCurrent) (previewFontSp.value * activeFontScale).sp else (previewFontSp.value * 0.86f).sp,
+                        fontWeight =
+                            when {
+                                !isCurrent -> FontWeight.Normal
+                                snapshot.lyrics.displayCharacter == LyricsDisplayCharacter.STAGE -> FontWeight.ExtraBold
+                                else -> FontWeight.Bold
+                            },
+                        color = if (isCurrent) activeTextColor else inactiveTextColor,
+                        textAlign = textAlign,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -1361,10 +2017,195 @@ private fun StudioLyricsStage(
                         Text(
                             text = stringResource(line.translationRes),
                             style = MaterialTheme.typography.labelSmall,
-                            color = frameOnSurfaceVariant,
+                            color = inactiveTextColor,
+                            textAlign = textAlign,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun StudioMotionDemoCard(
+    motion: MotionProfileState,
+    modifier: Modifier = Modifier,
+) {
+    val demoConfig =
+        remember(motion) {
+            MotionConfig(
+                profile = motion.profile,
+                legacyDisableAnimations = motion.disableAnimations,
+                systemAnimatorScale = 1f,
+                screenTransitionsChannel = motion.screenTransitions,
+                artworkMotionChannel = motion.artworkTransitions,
+                pressFeedbackChannel = motion.pressFeedback,
+                decorativeBackgroundChannel = motion.decorativeBackground,
+            )
+        }
+    val haptic = rememberArchiveTuneHapticTrigger()
+    var step by remember { mutableIntStateOf(0) }
+    val pressScale = remember { Animatable(1f) }
+
+    LaunchedEffect(step, demoConfig) {
+        if (step == 0) return@LaunchedEffect
+        if (demoConfig.pressFeedbackEnabled) {
+            pressScale.snapTo(0.93f)
+            pressScale.animateTo(1f, demoConfig.pressSpring())
+        } else {
+            pressScale.snapTo(1f)
+        }
+    }
+
+    val activeTab = step % 3
+    val tabFraction by animateFloatAsState(
+        targetValue = activeTab / 2f,
+        animationSpec = demoConfig.navSpring(),
+        label = "studioMotionDemoTab",
+    )
+    val safeTabFraction = tabFraction.coerceIn(0f, 1f)
+    val glowAlpha by animateFloatAsState(
+        targetValue = if (demoConfig.decorativeBackgroundEnabled && step % 2 == 1) 0.34f else 0.12f,
+        animationSpec = demoConfig.microTween(baseMillis = 360),
+        label = "studioMotionDemoGlow",
+    )
+    val track = StudioDemoData.DemoTracks[step % StudioDemoData.DemoTracks.size]
+
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .graphicsLayer {
+                    scaleX = pressScale.value
+                    scaleY = pressScale.value
+                }
+                .clickable {
+                    haptic(ArchiveTuneHapticKind.SELECTION)
+                    step++
+                },
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .background(
+                        Brush.horizontalGradient(
+                            listOf(
+                                MaterialTheme.colorScheme.primary.copy(alpha = glowAlpha.coerceIn(0f, 0.5f)),
+                                Color.Transparent,
+                                MaterialTheme.colorScheme.tertiary.copy(alpha = (glowAlpha * 0.7f).coerceIn(0f, 0.4f)),
+                            ),
+                        ),
+                    )
+                    .padding(12.dp),
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                        Text(
+                            text = stringResource(R.string.studio_motion_test_title),
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Text(
+                            text = stringResource(R.string.studio_motion_test_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    FilledTonalButton(
+                        onClick = {
+                            haptic(ArchiveTuneHapticKind.SELECTION)
+                            step++
+                        },
+                        shapes = ButtonDefaults.shapes(),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                    ) {
+                        Text(stringResource(R.string.studio_motion_test_button))
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    AnimatedContent(
+                        targetState = track,
+                        transitionSpec = {
+                            if (!demoConfig.artworkMotionEnabled) {
+                                fadeIn(snap()) togetherWith fadeOut(snap())
+                            } else {
+                                (slideInHorizontally(demoConfig.trackSwapSpec()) { it / 2 } +
+                                    fadeIn(demoConfig.trackSwapSpec())) togetherWith
+                                    (slideOutHorizontally(demoConfig.trackSwapSpec()) { -it / 2 } +
+                                        fadeOut(demoConfig.trackSwapSpec()))
+                            }
+                        },
+                        label = "studioMotionDemoArtwork",
+                    ) { activeTrack ->
+                        Box(
+                            modifier =
+                                Modifier
+                                    .size(36.dp)
+                                    .clip(RoundedCornerShape(9.dp))
+                                    .background(Brush.linearGradient(activeTrack.darkColors)),
+                        )
+                    }
+
+                    BoxWithConstraints(
+                        modifier =
+                            Modifier
+                                .weight(1f)
+                                .height(28.dp)
+                                .clip(RoundedCornerShape(999.dp))
+                                .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                    ) {
+                        val pillWidth = (maxWidth / 3f).coerceAtLeast(24.dp)
+                        val travel = (maxWidth - pillWidth).coerceAtLeast(0.dp)
+                        Box(
+                            modifier =
+                                Modifier
+                                    .offset(x = (travel * safeTabFraction).coerceAtLeast(0.dp))
+                                    .width(pillWidth)
+                                    .fillMaxSize()
+                                    .padding(3.dp)
+                                    .clip(RoundedCornerShape(999.dp))
+                                    .background(MaterialTheme.colorScheme.primary),
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxSize(),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            listOf("1", "2", "3").forEachIndexed { idx, label ->
+                                Box(
+                                    modifier = Modifier.weight(1f),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Text(
+                                        text = label,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color =
+                                            if (idx == activeTab) {
+                                                MaterialTheme.colorScheme.onPrimary
+                                            } else {
+                                                MaterialTheme.colorScheme.onSurfaceVariant
+                                            },
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }

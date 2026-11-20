@@ -52,6 +52,7 @@ import kotlin.math.abs
 import kotlin.math.min
 
 val DefaultThemeColor = Color(0xFFED5564)
+val LocalArchiveTuneThemeColor = staticCompositionLocalOf { DefaultThemeColor }
 val LocalArchiveTuneFontPreference = staticCompositionLocalOf { AppFontPreference.DEFAULT }
 val LocalArchiveTuneFontFamily = staticCompositionLocalOf { AppFontFamily }
 
@@ -127,19 +128,14 @@ fun ArchiveTuneTheme(
         }
 
     val appColorScheme =
-        remember(seedPalette, themeColor, darkTheme) {
-            if (seedPalette != null) {
-                exactPaletteColorScheme(
-                    palette = seedPalette,
-                    isDark = darkTheme,
-                )
-            } else {
-                materialKolorDynamicColorScheme(
-                    keyColor = themeColor,
-                    isDark = darkTheme,
-                    style = paletteStyle,
-                )
-            }
+        remember(seedPalette, themeColor, darkTheme, paletteStyle) {
+            archiveTuneColorScheme(
+                darkTheme = darkTheme,
+                pureBlack = false,
+                themeColor = themeColor,
+                seedPalette = seedPalette,
+                paletteStyle = paletteStyle,
+            )
         }
 
     val baseColorScheme =
@@ -186,6 +182,7 @@ fun ArchiveTuneTheme(
         }
 
     CompositionLocalProvider(
+        LocalArchiveTuneThemeColor provides themeColor,
         LocalArchiveTuneFontPreference provides fontPreference,
         LocalArchiveTuneFontFamily provides resolvedFontFamily,
     ) {
@@ -286,6 +283,66 @@ private object DisabledMotionScheme : MotionScheme {
     override fun <T> fastEffectsSpec(): FiniteAnimationSpec<T> = snap()
 
     override fun <T> slowEffectsSpec(): FiniteAnimationSpec<T> = snap()
+}
+
+fun resolveCustomThemeSelection(rawValue: String): Pair<Color, ThemeSeedPalette?> {
+    val trimmed = rawValue.trim()
+    if (trimmed.isEmpty()) {
+        return DefaultThemeColor to null
+    }
+    if (trimmed.startsWith("#")) {
+        val parsed = parseHexColorOrNull(trimmed) ?: DefaultThemeColor
+        return parsed to null
+    }
+    if (trimmed.startsWith("seedPalette:")) {
+        val palette = ThemeSeedPaletteCodec.decodeFromPreference(trimmed)
+        return (palette?.primary ?: DefaultThemeColor) to palette
+    }
+    val preset =
+        moe.rukamori.archivetune.ui.screens.settings.ThemePalettes
+            .findById(trimmed)
+    return if (preset != null) {
+        val seedPalette =
+            ThemeSeedPalette(
+                primary = preset.primary,
+                secondary = preset.secondary,
+                tertiary = preset.tertiary,
+                neutral = preset.neutral,
+            )
+        seedPalette.primary to seedPalette
+    } else {
+        DefaultThemeColor to null
+    }
+}
+
+fun archiveTuneColorScheme(
+    darkTheme: Boolean,
+    pureBlack: Boolean,
+    themeColor: Color = DefaultThemeColor,
+    seedPalette: ThemeSeedPalette? = null,
+    contrastLevel: Double = 0.0,
+    paletteStyle: PaletteStyle = paletteStyleFor(seedPalette?.primary ?: themeColor),
+): ColorScheme {
+    val baseColorScheme =
+        if (seedPalette != null) {
+            mergedSeedColorScheme(
+                primarySeed = seedPalette.primary,
+                secondarySeed = seedPalette.secondary,
+                tertiarySeed = seedPalette.tertiary,
+                neutralSeed = seedPalette.neutral,
+                isDark = darkTheme,
+                contrastLevel = contrastLevel,
+                style = paletteStyle,
+            )
+        } else {
+            materialKolorDynamicColorScheme(
+                keyColor = themeColor,
+                isDark = darkTheme,
+                contrastLevel = contrastLevel,
+                style = paletteStyle,
+            )
+        }
+    return if (darkTheme && pureBlack) baseColorScheme.pureBlack(true) else baseColorScheme
 }
 
 private fun exactPaletteColorScheme(
@@ -529,7 +586,7 @@ object ThemeSeedPaletteCodec {
                     neutral = palette.neutral.toHexArgbString(),
                 ),
             )
-        val b64 = Base64.encodeToString(payload.toByteArray(Charsets.UTF_8), Base64.URL_SAFE or Base64.NO_WRAP)
+        val b64 = encodeBase64Url(payload.toByteArray(Charsets.UTF_8))
         return PreferencePrefix + b64
     }
 
@@ -538,8 +595,7 @@ object ThemeSeedPaletteCodec {
         val b64 = value.removePrefix(PreferencePrefix)
         val decoded =
             runCatching {
-                val bytes = Base64.decode(b64, Base64.URL_SAFE or Base64.NO_WRAP)
-                bytes.toString(Charsets.UTF_8)
+                decodeBase64Url(b64)?.toString(Charsets.UTF_8)
             }.getOrNull()
                 ?: return null
         return decodeFromJson(decoded)
@@ -607,8 +663,7 @@ object ThemeSeedPaletteCodec {
         val b64 = value.removePrefix(PreferencePrefix)
         val decoded =
             runCatching {
-                val bytes = Base64.decode(b64, Base64.URL_SAFE or Base64.NO_WRAP)
-                bytes.toString(Charsets.UTF_8)
+                decodeBase64Url(b64)?.toString(Charsets.UTF_8)
             }.getOrNull()
                 ?: return null
         return extractNameFromJsonOrNull(decoded)
@@ -638,12 +693,29 @@ object ThemeSeedPaletteCodec {
 
     private fun Color.toHexArgbString(): String = String.format("#%08X", this.toArgb())
 
-    private fun String.toColorOrNull(): Color? {
-        val normalized = trim()
-        if (normalized.isEmpty()) return null
-        return runCatching {
-            val withHash = if (normalized.startsWith("#")) normalized else "#$normalized"
-            Color(android.graphics.Color.parseColor(withHash))
+    private fun String.toColorOrNull(): Color? = parseHexColorOrNull(this)
+
+    private fun encodeBase64Url(bytes: ByteArray): String =
+        runCatching {
+            Base64.encodeToString(bytes, Base64.URL_SAFE or Base64.NO_WRAP)
         }.getOrNull()
-    }
+            ?: java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
+
+    private fun decodeBase64Url(encoded: String): ByteArray? =
+        runCatching {
+            Base64.decode(encoded, Base64.URL_SAFE or Base64.NO_WRAP)
+        }.getOrNull()
+            ?: runCatching { java.util.Base64.getUrlDecoder().decode(encoded) }.getOrNull()
+}
+
+internal fun parseHexColorOrNull(raw: String): Color? {
+    val normalized = raw.trim().removePrefix("#")
+    if (normalized.isEmpty()) return null
+    val argb =
+        when (normalized.length) {
+            6 -> normalized.toLongOrNull(16)?.or(0xFF000000L)
+            8 -> normalized.toLongOrNull(16)
+            else -> null
+        } ?: return null
+    return Color(argb and 0xFFFFFFFFL)
 }

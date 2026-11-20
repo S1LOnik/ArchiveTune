@@ -14,6 +14,7 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -72,6 +73,8 @@ import androidx.navigation.NavController
 import moe.rukamori.archivetune.LocalPlayerAwareWindowInsets
 import moe.rukamori.archivetune.R
 import moe.rukamori.archivetune.constants.HideNavigationBarLabelsKey
+import moe.rukamori.archivetune.constants.MiniPlayerBackgroundStyle
+import moe.rukamori.archivetune.constants.MiniPlayerBackgroundStyleKey
 import moe.rukamori.archivetune.constants.MiniPlayerStyle
 import moe.rukamori.archivetune.constants.MiniPlayerStyleKey
 import moe.rukamori.archivetune.constants.NAVIGATION_BAR_CORNER_RADIUS_DEFAULT
@@ -248,6 +251,11 @@ fun NavigationBarSettings(navController: NavController, scrollTo: String? = null
 
         val (miniPlayerStyle, onMiniPlayerStyleChange) =
             rememberEnumPreference(MiniPlayerStyleKey, defaultValue = MiniPlayerStyle.STANDARD)
+        val (miniPlayerBackgroundStyle, onMiniPlayerBackgroundStyleChange) =
+            rememberEnumPreference(
+                MiniPlayerBackgroundStyleKey,
+                defaultValue = MiniPlayerBackgroundStyle.THEME,
+            )
         val previewMaterial =
             when {
                 sukisuLiquidGlassNavBar -> moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.SUKISU_GLASS
@@ -271,6 +279,7 @@ fun NavigationBarSettings(navController: NavController, scrollTo: String? = null
                 glassGlow = navigationBarGlassGlow,
                 glassGlowIntensity = navigationBarGlassGlowIntensity,
                 miniPlayerStyle = miniPlayerStyle,
+                miniPlayerBackground = miniPlayerBackgroundStyle,
             )
 
         Column(
@@ -307,6 +316,7 @@ fun NavigationBarSettings(navController: NavController, scrollTo: String? = null
                             onNavigationBarTransparencyChange(nav.transparency)
                             onNavigationBarCornerRadiusChange(nav.cornerRadius)
                             onMiniPlayerStyleChange(nav.miniPlayerStyle)
+                            onMiniPlayerBackgroundStyleChange(nav.miniPlayerBackground)
                         },
                     )
                 }
@@ -329,7 +339,7 @@ fun NavigationBarSettings(navController: NavController, scrollTo: String? = null
             PreferenceGroup(title = stringResource(R.string.navigation_bar_compact_behavior)) {
                 item {
                     CompactBehaviorPreview(
-                        behavior = compactBehavior,
+                        navigation = currentNavProfile,
                         modifier = positions.modifierFor("navigation_bar_compact_behavior_preview"),
                     )
                 }
@@ -434,17 +444,19 @@ fun NavigationBarSettings(navController: NavController, scrollTo: String? = null
                 }
 
                 item {
+                    val glassBarActive = liquidGlassNavBarEnabled || sukisuLiquidGlassNavBar
                     SwitchPreference(
                         modifier = positions.modifierFor("navigation_bar_glass_glow"),
                         title = { Text(stringResource(R.string.navigation_bar_glass_glow)) },
                         description =
-                            if (liquidGlassNavBarEnabled || sukisuLiquidGlassNavBar) {
+                            if (glassBarActive) {
                                 stringResource(R.string.navigation_bar_glass_glow_desc)
                             } else {
                                 stringResource(R.string.dependency_nav_material_glow_bar)
                             },
                         icon = { Icon(painterResource(R.drawable.solar_brightness_high_linear), null) },
                         checked = navigationBarGlassGlow,
+                        isEnabled = glassBarActive,
                         onCheckedChange = onNavigationBarGlassGlowChange,
                     )
                 }
@@ -481,6 +493,22 @@ fun NavigationBarSettings(navController: NavController, scrollTo: String? = null
                 modifier = positions.modifierFor("navigation_bar_dimensions"),
                 title = stringResource(R.string.navigation_bar_dimensions),
             ) {
+                if (compactBehavior == NavigationBarCompactBehavior.ALWAYS_COMPACT) {
+                    item {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f),
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+                        ) {
+                            Text(
+                                text = stringResource(R.string.studio_nav_always_compact_geometry_note),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                            )
+                        }
+                    }
+                }
                 item {
                     SliderPreferenceRow(
                         modifier = positions.modifierFor("navigation_bar_width"),
@@ -500,6 +528,10 @@ fun NavigationBarSettings(navController: NavController, scrollTo: String? = null
                                 transparency = navigationBarTransparency,
                                 labelSpacing = navigationBarLabelSpacing,
                                 cornerRadius = navigationBarCornerRadius,
+                                material = previewMaterial,
+                                hideLabels = hideNavigationBarLabels,
+                                glassGlow = navigationBarGlassGlow,
+                                glassGlowIntensity = navigationBarGlassGlowIntensity,
                             )
                         },
                         enabled = !sukisuLiquidGlassNavBar && !navigationBarBitchord,
@@ -526,6 +558,10 @@ fun NavigationBarSettings(navController: NavController, scrollTo: String? = null
                                 transparency = navigationBarTransparency,
                                 labelSpacing = navigationBarLabelSpacing,
                                 cornerRadius = navigationBarCornerRadius,
+                                material = previewMaterial,
+                                hideLabels = hideNavigationBarLabels,
+                                glassGlow = navigationBarGlassGlow,
+                                glassGlowIntensity = navigationBarGlassGlowIntensity,
                             )
                         },
                         enabled = !liquidGlassNavBarEnabled && !sukisuLiquidGlassNavBar,
@@ -552,6 +588,10 @@ fun NavigationBarSettings(navController: NavController, scrollTo: String? = null
                                 transparency = navigationBarTransparency,
                                 labelSpacing = navigationBarLabelSpacing,
                                 cornerRadius = navigationBarCornerRadius,
+                                material = previewMaterial,
+                                hideLabels = hideNavigationBarLabels,
+                                glassGlow = navigationBarGlassGlow,
+                                glassGlowIntensity = navigationBarGlassGlowIntensity,
                             )
                         },
                         enabled = !liquidGlassNavBarEnabled && !sukisuLiquidGlassNavBar && !navigationBarBitchord && !navigationBarFrostedBlur,
@@ -578,6 +618,10 @@ fun NavigationBarSettings(navController: NavController, scrollTo: String? = null
                                 transparency = tempTransparency,
                                 labelSpacing = navigationBarLabelSpacing,
                                 cornerRadius = navigationBarCornerRadius,
+                                material = previewMaterial,
+                                hideLabels = hideNavigationBarLabels,
+                                glassGlow = navigationBarGlassGlow,
+                                glassGlowIntensity = navigationBarGlassGlowIntensity,
                             )
                         },
                         enabled = !liquidGlassNavBarEnabled && !sukisuLiquidGlassNavBar && !navigationBarBitchord && !navigationBarFrostedBlur,
@@ -604,6 +648,10 @@ fun NavigationBarSettings(navController: NavController, scrollTo: String? = null
                                 transparency = navigationBarTransparency,
                                 labelSpacing = tempSpacing,
                                 cornerRadius = navigationBarCornerRadius,
+                                material = previewMaterial,
+                                hideLabels = hideNavigationBarLabels,
+                                glassGlow = navigationBarGlassGlow,
+                                glassGlowIntensity = navigationBarGlassGlowIntensity,
                             )
                         },
                         enabled = !liquidGlassNavBarEnabled && !sukisuLiquidGlassNavBar && !navigationBarBitchord && !hideNavigationBarLabels,
@@ -635,6 +683,10 @@ fun NavigationBarSettings(navController: NavController, scrollTo: String? = null
                                 transparency = navigationBarTransparency,
                                 labelSpacing = navigationBarLabelSpacing,
                                 cornerRadius = tempRadius,
+                                material = previewMaterial,
+                                hideLabels = hideNavigationBarLabels,
+                                glassGlow = navigationBarGlassGlow,
+                                glassGlowIntensity = navigationBarGlassGlowIntensity,
                             )
                         },
                         enabled = !liquidGlassNavBarEnabled && !sukisuLiquidGlassNavBar && !navigationBarBitchord,
@@ -810,13 +862,72 @@ private fun NavBarPreview(
     transparency: Float,
     labelSpacing: Float,
     cornerRadius: Float,
+    material: moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial =
+        moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.STANDARD,
+    hideLabels: Boolean = false,
+    glassGlow: Boolean = true,
+    glassGlowIntensity: Float = NAVIGATION_BAR_GLASS_GLOW_INTENSITY_DEFAULT,
 ) {
-    val resolvedBarHeight = NavigationBarHeight * heightMultiplier
-    val shape = RoundedCornerShape(cornerRadius.dp)
+    val effectiveWidthFraction =
+        when (material) {
+            moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.SUKISU_GLASS,
+            moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.BITCHORD,
+            -> 0.92f
+            else -> widthFraction.coerceIn(0.5f, 1f)
+        }
+    val resolvedBarHeight =
+        when (material) {
+            moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.LIQUID_GLASS,
+            moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.SUKISU_GLASS,
+            -> 66.dp
+            else -> (NavigationBarHeight * heightMultiplier).coerceAtLeast(48.dp)
+        }
+    val resolvedCorner =
+        when (material) {
+            moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.LIQUID_GLASS,
+            moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.SUKISU_GLASS,
+            -> 28.dp
+            moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.BITCHORD -> 22.dp
+            else -> cornerRadius.coerceAtLeast(0f).dp
+        }
+    val shape = RoundedCornerShape(resolvedCorner)
 
-    val baseColor = MaterialTheme.colorScheme.surfaceContainer
-    val effectiveAlpha = opacity * (1f - transparency)
-    val barColor = baseColor.copy(alpha = effectiveAlpha.coerceIn(0.05f, 1f))
+    val effectiveAlpha = (opacity * (1f - transparency)).coerceIn(0.08f, 1f)
+    val barColor =
+        when (material) {
+            moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.STANDARD ->
+                MaterialTheme.colorScheme.surfaceContainer.copy(alpha = effectiveAlpha)
+            moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.FROSTED ->
+                MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.72f)
+            moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.TINTED ->
+                MaterialTheme.colorScheme.primaryContainer.copy(alpha = effectiveAlpha.coerceIn(0.25f, 0.98f))
+            moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.LIQUID_GLASS ->
+                MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.56f)
+            moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.SUKISU_GLASS ->
+                MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.66f)
+            moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.BITCHORD ->
+                MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f)
+        }
+    val isGlassMaterial =
+        moe.rukamori.archivetune.ui.screens.settings.studio.navBarMaterialSupportsGlassGlow(material)
+    val borderWidth =
+        when {
+            isGlassMaterial -> 1.2.dp
+            material == moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.FROSTED ||
+                material == moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.BITCHORD -> 1.dp
+            else -> 0.dp
+        }
+    val borderColor =
+        when {
+            isGlassMaterial && glassGlow ->
+                MaterialTheme.colorScheme.primary.copy(alpha = (0.38f * glassGlowIntensity).coerceIn(0.14f, 0.85f))
+            isGlassMaterial -> Color.White.copy(alpha = 0.30f)
+            material == moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.FROSTED ->
+                Color.White.copy(alpha = 0.22f)
+            material == moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.BITCHORD ->
+                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)
+            else -> Color.Transparent
+        }
     val indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.30f)
 
     val fauxScreenBrush =
@@ -843,12 +954,19 @@ private fun NavBarPreview(
                         bottom = 16.dp,
                         start = 16.dp,
                         end = 16.dp,
-                    ).fillMaxWidth(widthFraction.coerceIn(0.5f, 1f))
-                    .height(resolvedBarHeight),
+                    ).fillMaxWidth(effectiveWidthFraction)
+                    .height(resolvedBarHeight)
+                    .then(
+                        if (borderWidth > 0.dp) {
+                            Modifier.border(borderWidth, borderColor, shape)
+                        } else {
+                            Modifier
+                        },
+                    ),
             shape = shape,
             color = barColor,
-            tonalElevation = NavigationBarDefaults.Elevation,
-            shadowElevation = 8.dp,
+            tonalElevation = if (isGlassMaterial) 0.dp else NavigationBarDefaults.Elevation,
+            shadowElevation = if (isGlassMaterial) 4.dp else 8.dp,
         ) {
             Row(
                 modifier =
@@ -885,14 +1003,16 @@ private fun NavBarPreview(
                                 tint = if (selected) selectedColor else unselectedColor,
                             )
                         }
-                        Spacer(Modifier.height(labelSpacing.dp))
-                        Text(
-                            text = stringResource(screen.titleId),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = if (selected) selectedColor else unselectedColor,
-                            maxLines = 1,
-                            textAlign = TextAlign.Center,
-                        )
+                        if (!hideLabels) {
+                            Spacer(Modifier.height(labelSpacing.coerceAtLeast(0f).dp))
+                            Text(
+                                text = stringResource(screen.titleId),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (selected) selectedColor else unselectedColor,
+                                maxLines = 1,
+                                textAlign = TextAlign.Center,
+                            )
+                        }
                     }
                 }
             }
@@ -902,9 +1022,10 @@ private fun NavBarPreview(
 
 @Composable
 private fun CompactBehaviorPreview(
-    behavior: NavigationBarCompactBehavior,
+    navigation: moe.rukamori.archivetune.ui.screens.settings.studio.NavigationProfile,
     modifier: Modifier = Modifier,
 ) {
+    val behavior = navigation.compactBehavior
     var demoCompact by remember { mutableStateOf(false) }
     LaunchedEffect(behavior) {
         when (behavior) {
@@ -927,6 +1048,46 @@ private fun CompactBehaviorPreview(
     val primary = MaterialTheme.colorScheme.primary
     val surfaceContainer = MaterialTheme.colorScheme.surfaceContainer
     val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
+    val isGlassMaterial =
+        moe.rukamori.archivetune.ui.screens.settings.studio.navBarMaterialSupportsGlassGlow(navigation.material)
+    val navBgColor =
+        when (navigation.material) {
+            moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.STANDARD ->
+                surfaceContainer.copy(alpha = (navigation.opacity * (1f - navigation.transparency)).coerceIn(0.18f, 1f))
+            moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.FROSTED ->
+                MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.74f)
+            moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.TINTED ->
+                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.88f)
+            moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.LIQUID_GLASS ->
+                MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.56f)
+            moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.SUKISU_GLASS ->
+                MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.66f)
+            moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.BITCHORD ->
+                MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f)
+        }
+    val glassBorderColor =
+        when {
+            isGlassMaterial && navigation.glassGlow ->
+                primary.copy(alpha = (0.38f * navigation.glassGlowIntensity).coerceIn(0.14f, 0.85f))
+            isGlassMaterial -> Color.White.copy(alpha = 0.30f)
+            navigation.material == moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.FROSTED ->
+                Color.White.copy(alpha = 0.22f)
+            else -> Color.Transparent
+        }
+    val miniBgColor =
+        when (navigation.miniPlayerBackground) {
+            MiniPlayerBackgroundStyle.THEME -> surfaceContainer.copy(alpha = 0.96f)
+            MiniPlayerBackgroundStyle.GRADIENT -> primary.copy(alpha = 0.85f)
+            MiniPlayerBackgroundStyle.GLOW -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.88f)
+            MiniPlayerBackgroundStyle.FROSTED -> MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.76f)
+            MiniPlayerBackgroundStyle.LIQUID_GLASS -> MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.58f)
+        }
+    val miniContentTint =
+        if (navigation.miniPlayerBackground == MiniPlayerBackgroundStyle.GRADIENT) {
+            MaterialTheme.colorScheme.onPrimary
+        } else {
+            onSurfaceVariant
+        }
     val fauxScreenBrush =
         Brush.verticalGradient(
             listOf(
@@ -971,24 +1132,50 @@ private fun CompactBehaviorPreview(
                 }
             }
 
-            val miniPlayerHeight = lerp(30.dp, 26.dp, compactFraction).coerceAtLeast(0.dp)
+            val miniPlayerHeight = lerp(34.dp, 30.dp, compactFraction).coerceAtLeast(0.dp)
             val navSlide = lerp(0.dp, 62.dp, compactFraction).coerceAtLeast(0.dp)
+            val miniSideInset =
+                lerp(
+                    if (navigation.miniPlayerStyle == MiniPlayerStyle.BAR) 0.dp else 8.dp,
+                    36.dp,
+                    compactFraction,
+                ).coerceAtLeast(0.dp)
+            val miniCorner =
+                if (navigation.miniPlayerStyle == MiniPlayerStyle.BAR) {
+                    lerp(8.dp, 16.dp, compactFraction).coerceAtLeast(0.dp)
+                } else {
+                    16.dp
+                }
             Box(
                 modifier =
                     Modifier
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp)
-                        .padding(bottom = 62.dp),
+                        .padding(horizontal = 14.dp)
+                        .padding(bottom = lerp(64.dp, 18.dp, compactFraction).coerceAtLeast(0.dp)),
             ) {
                 Box(
                     modifier =
                         Modifier
+                            .align(Alignment.Center)
                             .fillMaxWidth()
+                            .padding(horizontal = miniSideInset)
                             .height(miniPlayerHeight)
-                            .offset { IntOffset(x = 0, y = (navSlide.toPx() * 0.35f).roundToInt()) }
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(surfaceContainer.copy(alpha = 0.96f)),
+                            .clip(RoundedCornerShape(miniCorner))
+                            .background(miniBgColor)
+                            .then(
+                                if (navigation.miniPlayerBackground == MiniPlayerBackgroundStyle.LIQUID_GLASS ||
+                                    navigation.miniPlayerBackground == MiniPlayerBackgroundStyle.FROSTED
+                                ) {
+                                    Modifier.border(
+                                        1.dp,
+                                        Color.White.copy(alpha = 0.25f),
+                                        RoundedCornerShape(miniCorner),
+                                    )
+                                } else {
+                                    Modifier
+                                },
+                            ),
                     contentAlignment = Alignment.CenterStart,
                 ) {
                     Row(
@@ -1003,7 +1190,13 @@ private fun CompactBehaviorPreview(
                                 Modifier
                                     .size(18.dp)
                                     .clip(RoundedCornerShape(5.dp))
-                                    .background(primary.copy(alpha = 0.55f)),
+                                    .background(
+                                        if (navigation.miniPlayerBackground == MiniPlayerBackgroundStyle.GRADIENT) {
+                                            MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.35f)
+                                        } else {
+                                            primary.copy(alpha = 0.55f)
+                                        },
+                                    ),
                         )
                         Box(
                             modifier =
@@ -1012,35 +1205,37 @@ private fun CompactBehaviorPreview(
                                     .weight(1f)
                                     .height(8.dp)
                                     .clip(RoundedCornerShape(4.dp))
-                                    .background(onSurfaceVariant.copy(alpha = 0.35f)),
+                                    .background(miniContentTint.copy(alpha = 0.42f)),
                         )
                         Icon(
                             painter = painterResource(R.drawable.solar_play_linear),
                             contentDescription = null,
-                            tint = onSurfaceVariant,
+                            tint = miniContentTint,
                             modifier =
                                 Modifier
                                     .size(16.dp)
-                                    .alpha((1f - compactFraction * 0.6f).coerceIn(0f, 1f)),
+                                    .alpha((1f - compactFraction * 0.4f).coerceIn(0f, 1f)),
                         )
                     }
                 }
                 CompactPreviewCircle(
+                    iconRes = Screens.Library.iconIdActive,
                     modifier =
                         Modifier
                             .align(Alignment.CenterStart)
-                            .offset { IntOffset(x = (-46.dp.toPx() * compactFraction).roundToInt(), y = 0) }
                             .alpha(compactFraction.coerceIn(0f, 1f)),
-                    tint = surfaceContainer,
+                    tint = navBgColor,
+                    borderColor = glassBorderColor,
                     iconTint = onSurfaceVariant,
                 )
                 CompactPreviewCircle(
+                    iconRes = R.drawable.search,
                     modifier =
                         Modifier
                             .align(Alignment.CenterEnd)
-                            .offset { IntOffset(x = (46.dp.toPx() * compactFraction).roundToInt(), y = 0) }
                             .alpha(compactFraction.coerceIn(0f, 1f)),
-                    tint = surfaceContainer,
+                    tint = navBgColor,
+                    borderColor = glassBorderColor,
                     iconTint = onSurfaceVariant,
                 )
             }
@@ -1049,14 +1244,28 @@ private fun CompactBehaviorPreview(
                 modifier =
                     Modifier
                         .align(Alignment.BottomCenter)
-                        .padding(bottom = 14.dp)
-                        .fillMaxWidth(0.8f)
-                        .height(44.dp)
+                        .padding(bottom = 12.dp)
+                        .fillMaxWidth(
+                            when (navigation.material) {
+                                moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.SUKISU_GLASS,
+                                moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.BITCHORD,
+                                -> 0.88f
+                                else -> navigation.widthFraction.coerceIn(0.6f, 0.94f)
+                            },
+                        )
+                        .height(if (navigation.hideLabels) 38.dp else 46.dp)
                         .offset { IntOffset(x = 0, y = (navSlide.toPx()).roundToInt()) }
-                        .graphicsLayer { alpha = (1f - compactFraction * 0.95f).coerceIn(0f, 1f) },
+                        .graphicsLayer { alpha = (1f - compactFraction * 0.95f).coerceIn(0f, 1f) }
+                        .then(
+                            if (glassBorderColor != Color.Transparent) {
+                                Modifier.border(1.dp, glassBorderColor, RoundedCornerShape(24.dp))
+                            } else {
+                                Modifier
+                            },
+                        ),
                 shape = RoundedCornerShape(24.dp),
-                color = surfaceContainer.copy(alpha = 0.96f),
-                shadowElevation = 6.dp,
+                color = navBgColor,
+                shadowElevation = if (isGlassMaterial) 3.dp else 6.dp,
             ) {
                 Row(
                     modifier =
@@ -1069,14 +1278,27 @@ private fun CompactBehaviorPreview(
                     val items = Screens.MainScreens
                     items.forEachIndexed { index, screen ->
                         val selected = index == 0
-                        Icon(
-                            painter = painterResource(
-                                if (selected) screen.iconIdActive else screen.iconIdInactive,
-                            ),
-                            contentDescription = null,
-                            tint = if (selected) primary else onSurfaceVariant,
-                            modifier = Modifier.size(20.dp),
-                        )
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center,
+                        ) {
+                            Icon(
+                                painter = painterResource(
+                                    if (selected) screen.iconIdActive else screen.iconIdInactive,
+                                ),
+                                contentDescription = null,
+                                tint = if (selected) primary else onSurfaceVariant,
+                                modifier = Modifier.size(18.dp),
+                            )
+                            if (!navigation.hideLabels) {
+                                Text(
+                                    text = stringResource(screen.titleId),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (selected) primary else onSurfaceVariant,
+                                    maxLines = 1,
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -1096,8 +1318,10 @@ private fun CompactBehaviorPreview(
 
 @Composable
 private fun CompactPreviewCircle(
+    iconRes: Int,
     modifier: Modifier = Modifier,
     tint: Color,
+    borderColor: Color = Color.Transparent,
     iconTint: Color,
 ) {
     Box(
@@ -1105,11 +1329,18 @@ private fun CompactPreviewCircle(
             modifier
                 .size(28.dp)
                 .clip(RoundedCornerShape(percent = 50))
-                .background(tint.copy(alpha = 0.96f)),
+                .background(tint)
+                .then(
+                    if (borderColor != Color.Transparent) {
+                        Modifier.border(1.dp, borderColor, RoundedCornerShape(percent = 50))
+                    } else {
+                        Modifier
+                    },
+                ),
         contentAlignment = Alignment.Center,
     ) {
         Icon(
-            painter = painterResource(R.drawable.search),
+            painter = painterResource(iconRes),
             contentDescription = null,
             tint = iconTint,
             modifier = Modifier.size(14.dp),

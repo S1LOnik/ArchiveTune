@@ -11,14 +11,18 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.unit.dp
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
@@ -96,6 +100,18 @@ fun PlayerSettings(
     scrollTo: String? = null,
 ) {
     val (showCast, setShowCast) = rememberPreference(ShowCastInPlayerMenuKey, true)
+    val (pinnedActionsRaw, onPinnedActionsRawChange) =
+        rememberPreference(
+            moe.rukamori.archivetune.constants.PlayerMenuPinnedActionsKey,
+            defaultValue = moe.rukamori.archivetune.constants.DEFAULT_PLAYER_MENU_PINNED_ACTIONS,
+        )
+    val configuredPinnedActions =
+        remember(pinnedActionsRaw) {
+            moe.rukamori.archivetune.ui.menu.parsePinnedPlayerMenuActions(pinnedActionsRaw)
+        }
+    var showCustomizePinnedActionsDialog by androidx.compose.runtime.saveable.rememberSaveable {
+        mutableStateOf(false)
+    }
     val scrollState = rememberScrollState()
     val preferencePositions = rememberPreferencePositions()
     androidx.compose.runtime.LaunchedEffect(scrollTo) {
@@ -308,6 +324,155 @@ fun PlayerSettings(
         )
     }
 
+    if (showCustomizePinnedActionsDialog) {
+        moe.rukamori.archivetune.ui.component.ListDialog(
+            onDismiss = { showCustomizePinnedActionsDialog = false },
+        ) {
+            item(key = "customize_header") {
+                Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp)) {
+                    Text(
+                        text = stringResource(R.string.player_menu_quick_actions),
+                        style = androidx.compose.material3.MaterialTheme.typography.titleMedium,
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                    )
+                    Text(
+                        text = stringResource(R.string.player_menu_customize_hint),
+                        style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
+                        color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            items(
+                count = moe.rukamori.archivetune.ui.menu.PlayerMenuQuickAction.entries.size,
+                key = { moe.rukamori.archivetune.ui.menu.PlayerMenuQuickAction.entries[it].name },
+            ) { index ->
+                val candidate = moe.rukamori.archivetune.ui.menu.PlayerMenuQuickAction.entries[index]
+                val pinnedIdx = configuredPinnedActions.indexOf(candidate)
+                val isPinned = pinnedIdx >= 0
+                val canToggleOn =
+                    isPinned ||
+                        configuredPinnedActions.size < moe.rukamori.archivetune.ui.menu.MAX_PINNED_PLAYER_MENU_ACTIONS
+                androidx.compose.foundation.layout.Row(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable(enabled = canToggleOn) {
+                                val next =
+                                    moe.rukamori.archivetune.ui.menu.togglePinnedPlayerMenuAction(
+                                        configuredPinnedActions,
+                                        candidate,
+                                    )
+                                onPinnedActionsRawChange(
+                                    moe.rukamori.archivetune.ui.menu.serializePinnedPlayerMenuActions(next),
+                                )
+                            }.padding(horizontal = 20.dp, vertical = 10.dp),
+                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                    horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(10.dp),
+                ) {
+                    Icon(
+                        painter = painterResource(candidate.iconRes),
+                        contentDescription = null,
+                        tint =
+                            if (isPinned) {
+                                androidx.compose.material3.MaterialTheme.colorScheme.primary
+                            } else {
+                                androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                        modifier = Modifier.size(22.dp),
+                    )
+                    Text(
+                        text = stringResource(candidate.labelRes),
+                        style = androidx.compose.material3.MaterialTheme.typography.bodyMedium,
+                        fontWeight =
+                            if (isPinned) {
+                                androidx.compose.ui.text.font.FontWeight.SemiBold
+                            } else {
+                                androidx.compose.ui.text.font.FontWeight.Normal
+                            },
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (isPinned) {
+                        androidx.compose.material3.IconButton(
+                            enabled = pinnedIdx > 0,
+                            onClick = {
+                                val next =
+                                    moe.rukamori.archivetune.ui.menu.movePinnedPlayerMenuAction(
+                                        configuredPinnedActions,
+                                        pinnedIdx,
+                                        pinnedIdx - 1,
+                                    )
+                                onPinnedActionsRawChange(
+                                    moe.rukamori.archivetune.ui.menu.serializePinnedPlayerMenuActions(next),
+                                )
+                            },
+                            modifier = Modifier.size(32.dp),
+                        ) {
+                            Icon(
+                                painterResource(R.drawable.arrow_upward),
+                                contentDescription = stringResource(R.string.home_move_up),
+                                modifier = Modifier.size(18.dp),
+                            )
+                        }
+                        androidx.compose.material3.IconButton(
+                            enabled = pinnedIdx < configuredPinnedActions.lastIndex,
+                            onClick = {
+                                val next =
+                                    moe.rukamori.archivetune.ui.menu.movePinnedPlayerMenuAction(
+                                        configuredPinnedActions,
+                                        pinnedIdx,
+                                        pinnedIdx + 1,
+                                    )
+                                onPinnedActionsRawChange(
+                                    moe.rukamori.archivetune.ui.menu.serializePinnedPlayerMenuActions(next),
+                                )
+                            },
+                            modifier = Modifier.size(32.dp),
+                        ) {
+                            Icon(
+                                painterResource(R.drawable.arrow_downward),
+                                contentDescription = stringResource(R.string.home_move_down),
+                                modifier = Modifier.size(18.dp),
+                            )
+                        }
+                    }
+                    Icon(
+                        painter = painterResource(if (isPinned) R.drawable.check else R.drawable.add),
+                        contentDescription = null,
+                        tint =
+                            when {
+                                isPinned -> androidx.compose.material3.MaterialTheme.colorScheme.primary
+                                canToggleOn -> androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+                                else -> androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                            },
+                    )
+                }
+            }
+            item(key = "customize_footer") {
+                androidx.compose.foundation.layout.Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween,
+                ) {
+                    androidx.compose.material3.TextButton(
+                        onClick = {
+                            onPinnedActionsRawChange(
+                                moe.rukamori.archivetune.constants.DEFAULT_PLAYER_MENU_PINNED_ACTIONS,
+                            )
+                        },
+                    ) {
+                        Text(stringResource(R.string.player_menu_reset_actions))
+                    }
+                    androidx.compose.material3.TextButton(
+                        onClick = { showCustomizePinnedActionsDialog = false },
+                    ) {
+                        Text(stringResource(android.R.string.ok))
+                    }
+                }
+            }
+        }
+    }
+
     SponsorBlockApiUrlDialog(
         state = sponsorBlockSettingsState,
         onValueChange = onSponsorBlockApiUrlDraftChange,
@@ -358,6 +523,24 @@ fun PlayerSettings(
                     }
                 }
                 item {
+                    PreferenceEntry(
+                        modifier = preferencePositions.modifierFor("player_menu_pinned"),
+                        title = { Text(stringResource(R.string.player_menu_pinned_actions_title)) },
+                        description = stringResource(R.string.player_menu_pinned_actions_desc),
+                        icon = { Icon(painterResource(R.drawable.push_pin), null) },
+                        onClick = { showCustomizePinnedActionsDialog = true },
+                    )
+                }
+                item {
+                    PreferenceEntry(
+                        modifier = preferencePositions.modifierFor("other_sources"),
+                        title = { Text(stringResource(R.string.other_sources)) },
+                        description = stringResource(R.string.other_sources_settings_desc),
+                        icon = { Icon(painterResource(R.drawable.manage_search), null) },
+                        onClick = { navController.navigate("settings/sources") },
+                    )
+                }
+                item {
                     EnumListPreference(
                         title = { Text(stringResource(R.string.audio_quality)) },
                         icon = { Icon(painterResource(R.drawable.graphic_eq), null) },
@@ -383,6 +566,7 @@ fun PlayerSettings(
 
                 item {
                     SliderPreference(
+                        modifier = preferencePositions.modifierFor("history_duration"),
                         title = { Text(stringResource(R.string.history_duration)) },
                         icon = { Icon(painterResource(R.drawable.history), null) },
                         value = historyDuration,
@@ -392,6 +576,7 @@ fun PlayerSettings(
 
                 item {
                     SwitchPreference(
+                        modifier = preferencePositions.modifierFor("crossfade"),
                         title = { Text(stringResource(R.string.audio_crossfade_title)) },
                         description = stringResource(R.string.audio_crossfade_description),
                         icon = { Icon(painterResource(R.drawable.animation), null) },
@@ -415,6 +600,7 @@ fun PlayerSettings(
 
                 item {
                     SwitchPreference(
+                        modifier = preferencePositions.modifierFor("crossfade_gapless", "crossfade_gapless_title"),
                         title = { Text(stringResource(R.string.crossfade_gapless_title)) },
                         description = stringResource(R.string.crossfade_gapless_description),
                         icon = { Icon(painterResource(R.drawable.fast_forward), null) },
@@ -426,8 +612,8 @@ fun PlayerSettings(
 
                 item {
                     SwitchPreference(
-                        title = { Text("Smart DJ Automix") },
-                        description = "Обрезка тишины, бит-матчинг и гармонический кроссфейд фраз",
+                        title = { Text(stringResource(R.string.smart_dj_automix_title)) },
+                        description = stringResource(R.string.smart_dj_automix_desc),
                         icon = { Icon(painterResource(R.drawable.tune), null) },
                         checked = smartDjAutomixEnabled,
                         onCheckedChange = onSmartDjAutomixEnabledChange,
@@ -437,6 +623,7 @@ fun PlayerSettings(
 
                 item {
                     SwitchPreference(
+                        modifier = preferencePositions.modifierFor("skip_silence"),
                         title = { Text(stringResource(R.string.skip_silence)) },
                         icon = { Icon(painterResource(R.drawable.fast_forward), null) },
                         checked = skipSilence,
@@ -447,6 +634,7 @@ fun PlayerSettings(
 
                 item {
                     SwitchPreference(
+                        modifier = preferencePositions.modifierFor("audio_normalization"),
                         title = { Text(stringResource(R.string.audio_normalization)) },
                         icon = { Icon(painterResource(R.drawable.volume_up), null) },
                         checked = audioNormalization,
@@ -456,6 +644,7 @@ fun PlayerSettings(
 
                 item {
                     SwitchPreference(
+                        modifier = preferencePositions.modifierFor("audio_offload"),
                         title = { Text(stringResource(R.string.audio_offload)) },
                         description = stringResource(R.string.audio_offload_desc),
                         icon = { Icon(painterResource(R.drawable.speed), null) },
@@ -472,6 +661,7 @@ fun PlayerSettings(
 
                 item {
                     SwitchPreference(
+                        modifier = preferencePositions.modifierFor("seek_seconds", "seek_seconds_addup"),
                         title = { Text(stringResource(R.string.seek_seconds_addup)) },
                         description = stringResource(R.string.seek_seconds_addup_description),
                         icon = { Icon(painterResource(R.drawable.arrow_forward), null) },
@@ -544,6 +734,7 @@ fun PlayerSettings(
             PreferenceGroup(title = stringResource(R.string.queue)) {
                 item {
                     SwitchPreference(
+                        modifier = preferencePositions.modifierFor("persistent_queue"),
                         title = { Text(stringResource(R.string.persistent_queue)) },
                         description = stringResource(R.string.persistent_queue_desc),
                         icon = { Icon(painterResource(R.drawable.queue_music), null) },
@@ -554,6 +745,7 @@ fun PlayerSettings(
 
                 item {
                     SwitchPreference(
+                        modifier = preferencePositions.modifierFor("permanent_shuffle"),
                         title = { Text(stringResource(R.string.permanent_shuffle)) },
                         description = stringResource(R.string.permanent_shuffle_desc),
                         icon = { Icon(painterResource(R.drawable.shuffle), null) },
@@ -564,6 +756,7 @@ fun PlayerSettings(
 
                 item {
                     SwitchPreference(
+                        modifier = preferencePositions.modifierFor("auto_download_on_like"),
                         title = { Text(stringResource(R.string.auto_download_on_like)) },
                         description = stringResource(R.string.auto_download_on_like_desc),
                         icon = { Icon(painterResource(R.drawable.download), null) },
@@ -574,6 +767,7 @@ fun PlayerSettings(
 
                 item {
                     SwitchPreference(
+                        modifier = preferencePositions.modifierFor("auto_skip_error", "auto_skip_next_on_error"),
                         title = { Text(stringResource(R.string.auto_skip_next_on_error)) },
                         description = stringResource(R.string.auto_skip_next_on_error_desc),
                         icon = { Icon(painterResource(R.drawable.skip_next), null) },
@@ -586,6 +780,7 @@ fun PlayerSettings(
             PreferenceGroup(title = stringResource(R.string.misc)) {
                 item {
                     SwitchPreference(
+                        modifier = preferencePositions.modifierFor("stop_task_clear", "stop_music_on_task_clear"),
                         title = { Text(stringResource(R.string.stop_music_on_task_clear)) },
                         icon = { Icon(painterResource(R.drawable.clear_all), null) },
                         checked = stopMusicOnTaskClear,
@@ -595,6 +790,7 @@ fun PlayerSettings(
 
                 item {
                     SwitchPreference(
+                        modifier = preferencePositions.modifierFor("wakelock"),
                         title = { Text(stringResource(R.string.wakelock)) },
                         description = stringResource(R.string.wakelock_desc),
                         icon = { Icon(painterResource(R.drawable.bolt), null) },
@@ -605,6 +801,7 @@ fun PlayerSettings(
 
                 item {
                     PreferenceEntry(
+                        modifier = preferencePositions.modifierFor("artist_separators"),
                         title = { Text(stringResource(R.string.artist_separators)) },
                         description = artistSeparators.map { "\"$it\"" }.joinToString("  "),
                         icon = { Icon(painterResource(R.drawable.artist), null) },
@@ -614,6 +811,7 @@ fun PlayerSettings(
 
                 item {
                     SwitchPreference(
+                        modifier = preferencePositions.modifierFor("external_downloader"),
                         title = { Text(stringResource(R.string.external_downloader)) },
                         description = stringResource(R.string.external_downloader_desc),
                         icon = { Icon(painterResource(R.drawable.download), null) },
@@ -624,6 +822,7 @@ fun PlayerSettings(
 
                 item {
                     PreferenceEntry(
+                        modifier = preferencePositions.modifierFor("external_downloader_package"),
                         title = { Text(stringResource(R.string.external_downloader_package)) },
                         description = externalDownloaderPackage.ifEmpty { stringResource(R.string.external_downloader_package_desc) },
                         icon = { Icon(painterResource(R.drawable.integration), null) },

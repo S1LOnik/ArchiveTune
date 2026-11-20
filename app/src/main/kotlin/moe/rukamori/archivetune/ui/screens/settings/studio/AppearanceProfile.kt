@@ -196,6 +196,108 @@ data class MotionProfileState(
     val backAnimationStyle: BackAnimationStyle = BackAnimationStyle.DEFAULT,
 )
 
+fun playerStyleSupportsCustomBackground(style: PlayerDesignStyle): Boolean =
+    style in setOf(
+        PlayerDesignStyle.V1,
+        PlayerDesignStyle.V2,
+        PlayerDesignStyle.V3,
+        PlayerDesignStyle.V4,
+        PlayerDesignStyle.V5,
+        PlayerDesignStyle.V6,
+    )
+
+fun playerStyleSupportsVolumeBar(style: PlayerDesignStyle): Boolean =
+    style == PlayerDesignStyle.V7 ||
+        style == PlayerDesignStyle.V8 ||
+        style == PlayerDesignStyle.BITCHORD
+
+fun playerStyleUsesOwnFullscreenLyrics(style: PlayerDesignStyle): Boolean =
+    style == PlayerDesignStyle.APPLE_MUSIC ||
+        style == PlayerDesignStyle.TIKTOK ||
+        style == PlayerDesignStyle.SPATIALFLOW
+
+@StringRes
+fun playerDesignStyleLabelRes(style: PlayerDesignStyle): Int =
+    when (style) {
+        PlayerDesignStyle.V1 -> R.string.player_design_v1
+        PlayerDesignStyle.V2 -> R.string.player_design_v2
+        PlayerDesignStyle.V3 -> R.string.player_design_v3
+        PlayerDesignStyle.V4 -> R.string.player_design_v4
+        PlayerDesignStyle.V5 -> R.string.player_design_v5
+        PlayerDesignStyle.V6 -> R.string.player_design_v6
+        PlayerDesignStyle.V7 -> R.string.player_design_v7
+        PlayerDesignStyle.V8 -> R.string.player_design_v8
+        PlayerDesignStyle.V9 -> R.string.player_design_v9
+        PlayerDesignStyle.V10 -> R.string.player_design_v10
+        PlayerDesignStyle.APPLE_MUSIC -> R.string.player_design_apple_music
+        PlayerDesignStyle.BITCHORD -> R.string.player_design_bitchord
+        PlayerDesignStyle.TIKTOK -> R.string.player_design_tiktok
+        PlayerDesignStyle.SIMPMUSIC -> R.string.player_design_simpmusic
+        PlayerDesignStyle.SPATIALFLOW -> R.string.player_design_spatialflow
+        PlayerDesignStyle.LOOPER -> R.string.player_design_looper
+    }
+
+@StringRes
+fun playerBackgroundStyleLabelRes(style: PlayerBackgroundStyle): Int =
+    when (style) {
+        PlayerBackgroundStyle.DEFAULT -> R.string.follow_theme
+        PlayerBackgroundStyle.GRADIENT -> R.string.gradient
+        PlayerBackgroundStyle.CUSTOM -> R.string.custom
+        PlayerBackgroundStyle.BLUR -> R.string.player_background_blur
+        PlayerBackgroundStyle.COLORING -> R.string.coloring
+        PlayerBackgroundStyle.BLUR_GRADIENT -> R.string.blur_gradient
+        PlayerBackgroundStyle.GLOW -> R.string.glow
+        PlayerBackgroundStyle.GLOW_ANIMATED -> R.string.player_background_glow_animated
+    }
+
+@StringRes
+fun miniPlayerBackgroundStyleLabelRes(style: MiniPlayerBackgroundStyle): Int =
+    when (style) {
+        MiniPlayerBackgroundStyle.THEME -> R.string.follow_theme
+        MiniPlayerBackgroundStyle.GRADIENT -> R.string.gradient
+        MiniPlayerBackgroundStyle.GLOW -> R.string.glow
+        MiniPlayerBackgroundStyle.FROSTED -> R.string.frosted_blur
+        MiniPlayerBackgroundStyle.LIQUID_GLASS -> R.string.liquid_glass
+    }
+
+@StringRes
+fun lyricsModeLabelRes(mode: LyricsMode): Int =
+    when (mode) {
+        LyricsMode.V2 -> R.string.lyrics_mode_v2
+        LyricsMode.ENHANCED -> R.string.lyrics_mode_enhanced
+        LyricsMode.SPOTIFY -> R.string.lyrics_mode_spotify
+    }
+
+@StringRes
+fun lyricsBackgroundStyleLabelRes(style: LyricsBackgroundStyle): Int =
+    when (style) {
+        LyricsBackgroundStyle.DEFAULT -> R.string.lyrics_background_default
+        LyricsBackgroundStyle.FOLLOW_THEME -> R.string.follow_theme
+        LyricsBackgroundStyle.COLORING -> R.string.coloring
+        LyricsBackgroundStyle.MOVING_BLUR -> R.string.lyrics_background_moving_blur
+        LyricsBackgroundStyle.CUSTOM -> R.string.custom
+    }
+
+fun navBarMaterialSupportsGlassGlow(material: NavBarMaterial): Boolean =
+    material == NavBarMaterial.LIQUID_GLASS || material == NavBarMaterial.SUKISU_GLASS
+
+fun navBarMaterialLocksWidth(material: NavBarMaterial): Boolean =
+    material == NavBarMaterial.SUKISU_GLASS || material == NavBarMaterial.BITCHORD
+
+fun navBarMaterialLocksHeight(material: NavBarMaterial): Boolean =
+    material == NavBarMaterial.LIQUID_GLASS || material == NavBarMaterial.SUKISU_GLASS
+
+fun navBarMaterialLocksOpacity(material: NavBarMaterial): Boolean =
+    material == NavBarMaterial.LIQUID_GLASS ||
+        material == NavBarMaterial.SUKISU_GLASS ||
+        material == NavBarMaterial.BITCHORD ||
+        material == NavBarMaterial.FROSTED
+
+fun navBarMaterialLocksCornerRadius(material: NavBarMaterial): Boolean =
+    material == NavBarMaterial.LIQUID_GLASS ||
+        material == NavBarMaterial.SUKISU_GLASS ||
+        material == NavBarMaterial.BITCHORD
+
 @Serializable
 @Immutable
 data class AppearanceProfileSnapshot(
@@ -213,15 +315,6 @@ data class AppearanceProfileSnapshot(
             } else {
                 player.designStyle
             }
-        val designAllowsCustomBackground =
-            resolvedDesign !in setOf(
-                PlayerDesignStyle.V7,
-                PlayerDesignStyle.V8,
-                PlayerDesignStyle.V9,
-                PlayerDesignStyle.V10,
-            )
-        val resolvedBg =
-            if (designAllowsCustomBackground) player.backgroundStyle else PlayerBackgroundStyle.DEFAULT
 
         return copy(
             navigation =
@@ -237,7 +330,7 @@ data class AppearanceProfileSnapshot(
             player =
                 player.copy(
                     designStyle = resolvedDesign,
-                    backgroundStyle = resolvedBg,
+                    backgroundStyle = player.backgroundStyle,
                     thumbnailCornerRadius = player.thumbnailCornerRadius.coerceIn(0f, 48f),
                 ),
             lyrics =
@@ -349,6 +442,20 @@ data class AppearanceProfileSnapshot(
     }
 
     companion object {
+        private val draftJson =
+            Json {
+                ignoreUnknownKeys = true
+                encodeDefaults = true
+            }
+
+        fun encodeDraftJson(snapshot: AppearanceProfileSnapshot): String =
+            draftJson.encodeToString(snapshot.normalized())
+
+        fun decodeDraftJson(raw: String): AppearanceProfileSnapshot? =
+            runCatching {
+                draftJson.decodeFromString<AppearanceProfileSnapshot>(raw).normalized()
+            }.getOrNull()
+
         fun defaultSnapshot(isLowRamDevice: Boolean = false): AppearanceProfileSnapshot =
             AppearanceProfileSnapshot(
                 motion =

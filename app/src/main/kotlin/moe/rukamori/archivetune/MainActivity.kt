@@ -927,39 +927,9 @@ class MainActivity : ComponentActivity() {
             val pureBlackEnabled by rememberPreference(PureBlackKey, defaultValue = false)
             val pureBlack = pureBlackEnabled && useDarkTheme
 
-            val customThemeSeedPalette =
+            val (customThemeColor, customThemeSeedPalette) =
                 remember(customThemeColorValue) {
-                    if (customThemeColorValue.startsWith("#")) {
-                        null
-                    } else if (customThemeColorValue.startsWith("seedPalette:")) {
-                        moe.rukamori.archivetune.ui.theme.ThemeSeedPaletteCodec
-                            .decodeFromPreference(customThemeColorValue)
-                    } else {
-                        moe.rukamori.archivetune.ui.screens.settings.ThemePalettes
-                            .findById(customThemeColorValue)
-                            ?.let {
-                                moe.rukamori.archivetune.ui.theme.ThemeSeedPalette(
-                                    primary = it.primary,
-                                    secondary = it.secondary,
-                                    tertiary = it.tertiary,
-                                    neutral = it.neutral,
-                                )
-                            }
-                    }
-                }
-
-            val customThemeColor =
-                remember(customThemeColorValue, customThemeSeedPalette) {
-                    if (customThemeColorValue.startsWith("#")) {
-                        try {
-                            val colorString = customThemeColorValue.removePrefix("#")
-                            Color(android.graphics.Color.parseColor("#$colorString"))
-                        } catch (e: Exception) {
-                            DefaultThemeColor
-                        }
-                    } else {
-                        customThemeSeedPalette?.primary ?: DefaultThemeColor
-                    }
+                    moe.rukamori.archivetune.ui.theme.resolveCustomThemeSelection(customThemeColorValue)
                 }
 
             var themeColor by rememberSaveable(stateSaver = ColorSaver) {
