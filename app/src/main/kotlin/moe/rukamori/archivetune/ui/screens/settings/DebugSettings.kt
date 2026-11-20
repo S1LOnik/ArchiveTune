@@ -78,6 +78,7 @@ import moe.rukamori.archivetune.LeakCanaryToggle
 import moe.rukamori.archivetune.LocalPlayerAwareWindowInsets
 import moe.rukamori.archivetune.LocalPlayerConnection
 import moe.rukamori.archivetune.R
+import moe.rukamori.archivetune.constants.SkipAppearanceConfirmationKey
 import moe.rukamori.archivetune.ui.component.IconButton
 import moe.rukamori.archivetune.ui.component.PreferenceEntry
 import moe.rukamori.archivetune.ui.component.PreferenceGroup
@@ -91,6 +92,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DebugSettings(navController: NavController) {
+    val (skipAppearanceConfirmation, onSkipAppearanceConfirmationChange) =
+        rememberPreference(SkipAppearanceConfirmationKey, false)
     val (showDevDebug, onShowDevDebugChange) =
         rememberPreference(
             key = booleanPreferencesKey("dev_show_discord_debug"),
@@ -157,6 +160,15 @@ fun DebugSettings(navController: NavController) {
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             PreferenceGroup(title = stringResource(R.string.experimental_features)) {
+                item {
+                    SwitchPreference(
+                        title = { Text(stringResource(R.string.debug_skip_appearance_confirmation)) },
+                        description = stringResource(R.string.debug_skip_appearance_confirmation_desc),
+                        icon = { Icon(painterResource(R.drawable.palette), null) },
+                        checked = skipAppearanceConfirmation,
+                        onCheckedChange = onSkipAppearanceConfirmationChange,
+                    )
+                }
                 item {
                     SwitchPreference(
                         title = { Text(stringResource(R.string.show_discord_debug_ui)) },

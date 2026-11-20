@@ -8,22 +8,31 @@
 package moe.rukamori.archivetune.ui.screens
 
 import android.net.Uri
+import androidx.compose.animation.AnimatedContentScope
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.TopAppBarScrollBehavior
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.navigation.NamedNavArgument
+import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
-import androidx.navigation.compose.composable
+import androidx.navigation.compose.composable as navComposable
 import androidx.navigation.navArgument
 import moe.rukamori.archivetune.BuildConfig
+import moe.rukamori.archivetune.constants.MotionTransitionStyle
 import moe.rukamori.archivetune.constants.UpdateChannel
 import moe.rukamori.archivetune.defaultUpdateChannel
 import moe.rukamori.archivetune.musicrecognition.MusicRecognitionRoute
@@ -106,6 +115,9 @@ import moe.rukamori.archivetune.ui.screens.settings.TelegramSettings
 import moe.rukamori.archivetune.ui.screens.settings.TELEGRAM_LOGIN_ROUTE
 import moe.rukamori.archivetune.ui.screens.settings.ThemeCreatorScreen
 import moe.rukamori.archivetune.ui.screens.settings.UpdateScreen
+import moe.rukamori.archivetune.ui.motion.LocalMotionConfig
+import moe.rukamori.archivetune.ui.motion.MotionConfig
+import moe.rukamori.archivetune.ui.motion.screenMotionBlur
 import moe.rukamori.archivetune.viewmodels.HomeViewModel
 import moe.rukamori.archivetune.viewmodels.OnlineSearchSort
 
@@ -115,7 +127,7 @@ fun NavGraphBuilder.navigationBuilder(
     scrollBehavior: TopAppBarScrollBehavior,
     homeViewModel: HomeViewModel,
     latestVersionName: () -> String,
-    disableAnimations: Boolean = false,
+    motionConfig: () -> MotionConfig,
     onClearUpdateBadge: () -> Unit = {},
     homeScrollConnection: NestedScrollConnection? = null,
     searchScrollConnection: NestedScrollConnection? = null,
@@ -224,35 +236,39 @@ fun NavGraphBuilder.navigationBuilder(
                 },
             ),
         enterTransition = {
-            if (disableAnimations) {
-                fadeIn(tween(0))
-            } else {
-                fadeIn(tween(240))
+            val motion = motionConfig()
+            when {
+                !motion.screenTransitionsEnabled -> EnterTransition.None
+                motion.screenTransitionStyle != MotionTransitionStyle.DEFAULT -> null
+                else -> fadeIn(tween(motion.scaleDuration(240)))
             }
         },
         exitTransition = {
-            if (disableAnimations) {
-                fadeOut(tween(0))
-            } else if (targetState.destination.route?.startsWith(OnlineSearchResultRoutePrefix) == true) {
-                fadeOut(tween(180))
-            } else {
-                fadeOut(tween(200)) + slideOutHorizontally { -it / 3 }
+            val motion = motionConfig()
+            when {
+                !motion.screenTransitionsEnabled -> ExitTransition.None
+                motion.screenTransitionStyle != MotionTransitionStyle.DEFAULT -> null
+                targetState.destination.route?.startsWith(OnlineSearchResultRoutePrefix) == true ->
+                    fadeOut(tween(motion.scaleDuration(180)))
+                else -> fadeOut(tween(motion.scaleDuration(200))) + slideOutHorizontally { -it / 3 }
             }
         },
         popEnterTransition = {
-            if (disableAnimations) {
-                fadeIn(tween(0))
-            } else if (initialState.destination.route?.startsWith(OnlineSearchResultRoutePrefix) == true) {
-                fadeIn(tween(220))
-            } else {
-                fadeIn(tween(220)) + slideInHorizontally { -it / 3 }
+            val motion = motionConfig()
+            when {
+                !motion.screenTransitionsEnabled -> EnterTransition.None
+                motion.screenTransitionStyle != MotionTransitionStyle.DEFAULT -> null
+                initialState.destination.route?.startsWith(OnlineSearchResultRoutePrefix) == true ->
+                    fadeIn(tween(motion.scaleDuration(220)))
+                else -> fadeIn(tween(motion.scaleDuration(220))) + slideInHorizontally { -it / 3 }
             }
         },
         popExitTransition = {
-            if (disableAnimations) {
-                fadeOut(tween(0))
-            } else {
-                fadeOut(tween(200))
+            val motion = motionConfig()
+            when {
+                !motion.screenTransitionsEnabled -> ExitTransition.None
+                motion.screenTransitionStyle != MotionTransitionStyle.DEFAULT -> null
+                else -> fadeOut(tween(motion.scaleDuration(200)))
             }
         },
     ) {
@@ -699,5 +715,28 @@ fun NavGraphBuilder.navigationBuilder(
     }
     composable("settings/navigation") {
         NavigationBarSettings(navController, null)
+    }
+}
+
+private fun NavGraphBuilder.composable(
+    route: String,
+    arguments: List<NamedNavArgument> = emptyList(),
+    enterTransition: (AnimatedContentTransitionScope<NavBackStackEntry>.() -> EnterTransition?)? = null,
+    exitTransition: (AnimatedContentTransitionScope<NavBackStackEntry>.() -> ExitTransition?)? = null,
+    popEnterTransition: (AnimatedContentTransitionScope<NavBackStackEntry>.() -> EnterTransition?)? = enterTransition,
+    popExitTransition: (AnimatedContentTransitionScope<NavBackStackEntry>.() -> ExitTransition?)? = exitTransition,
+    content: @Composable AnimatedContentScope.(NavBackStackEntry) -> Unit,
+) {
+    navComposable(
+        route = route,
+        arguments = arguments,
+        enterTransition = enterTransition,
+        exitTransition = exitTransition,
+        popEnterTransition = popEnterTransition,
+        popExitTransition = popExitTransition,
+    ) { entry ->
+        Box(modifier = screenMotionBlur(LocalMotionConfig.current), propagateMinConstraints = true) {
+            content(this@navComposable, entry)
+        }
     }
 }

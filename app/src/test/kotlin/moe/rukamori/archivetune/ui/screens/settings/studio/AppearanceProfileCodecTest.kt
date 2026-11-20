@@ -10,7 +10,9 @@ package moe.rukamori.archivetune.ui.screens.settings.studio
 import androidx.datastore.preferences.core.mutablePreferencesOf
 import moe.rukamori.archivetune.constants.HomeFeedStyle
 import moe.rukamori.archivetune.constants.LyricsDisplayCharacter
+import moe.rukamori.archivetune.constants.MiniPlayerBackgroundStyle
 import moe.rukamori.archivetune.constants.MiniPlayerStyle
+import moe.rukamori.archivetune.constants.MotionTransitionStyle
 import moe.rukamori.archivetune.constants.MotionProfile
 import moe.rukamori.archivetune.constants.PlayerBackgroundStyle
 import moe.rukamori.archivetune.constants.PlayerDesignStyle
@@ -48,7 +50,11 @@ class AppearanceProfileCodecTest {
                     ),
                 motion =
                     MotionProfileState(
-                        profile = MotionProfile.SMOOTH,
+                        profile = MotionProfile.CINEMATIC,
+                        durationPercent = 125,
+                        screenStyle = MotionTransitionStyle.ZOOM,
+                        menuStyle = MotionTransitionStyle.FADE,
+                        motionBlur = true,
                         screenTransitions = true,
                         decorativeBackground = false,
                     ),
@@ -89,6 +95,7 @@ class AppearanceProfileCodecTest {
         assertEquals("Future Studio", decoded.name)
         assertEquals(PlayerDesignStyle.APPLE_MUSIC, decoded.snapshot.player.designStyle)
         assertEquals(LyricsDisplayCharacter.READING, decoded.snapshot.lyrics.displayCharacter)
+        assertEquals(MotionProfileState(), decoded.snapshot.motion)
     }
 
     @Test
@@ -111,7 +118,22 @@ class AppearanceProfileCodecTest {
 
     @Test
     fun `atomic write and read round trip via datastore preferences`() {
-        val snapshot = StudioStarterPresets.first().snapshot
+        val starter = StudioStarterPresets.first().snapshot
+        val snapshot = starter.copy(
+            navigation = starter.navigation.copy(
+                material = NavBarMaterial.GLOW,
+                miniPlayerBackground = MiniPlayerBackgroundStyle.SUKISU_GLASS,
+                miniPlayerGlassGlow = false,
+                miniPlayerGlassGlowIntensity = 1.3f,
+            ),
+            motion = starter.motion.copy(
+                profile = MotionProfile.SPRINGY,
+                durationPercent = 70,
+                screenStyle = MotionTransitionStyle.SLIDE,
+                menuStyle = MotionTransitionStyle.ZOOM,
+                motionBlur = true,
+            ),
+        )
         val prefs = mutablePreferencesOf()
         snapshot.writeToPreferences(prefs)
 

@@ -34,7 +34,10 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.floatPreferencesKey
-import com.kyant.backdrop.Backdrop
+import moe.rukamori.archivetune.constants.MiniPlayerBackgroundStyle
+import moe.rukamori.archivetune.ui.player.BottomBarBackground
+import moe.rukamori.archivetune.ui.player.supportsGlassGlow
+import moe.rukamori.archivetune.ui.player.usesArtworkPalette
 
 val NavigationBarGlassGlowKey = booleanPreferencesKey("navigationBarGlassGlow")
 
@@ -113,57 +116,40 @@ fun CompactControlCircle(
     iconRes: Int,
     contentDescription: String?,
     onClick: () -> Unit,
-    backdrop: Backdrop?,
+    backgroundStyle: MiniPlayerBackgroundStyle,
     glowStrength: Float,
     modifier: Modifier = Modifier,
     tint: Color = Color.Unspecified,
 ) {
-    val useGlass = backdrop != null
-    if (useGlass) {
-        Box(
-            modifier =
-                modifier
-                    .size(CompactControlSize)
-                    .liquidGlass(
-                        backdrop = backdrop,
-                        shape = CircleShape,
-                        interactive = false,
-                        blurRadius = LiquidGlassPillBlurRadius,
-                        baseColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    )
-                    .glassGlowOverlay(glowStrength, CircleShape)
-                    .clip(CircleShape)
-                    .clickable(onClick = onClick),
-            contentAlignment = Alignment.Center,
-        ) {
+    val iconColor =
+        when {
+            backgroundStyle.usesArtworkPalette -> Color.White
+            backgroundStyle.supportsGlassGlow && LocalLiquidGlassBackdrop.current != null -> liquidGlassContentColor()
+            tint != Color.Unspecified -> tint
+            else -> MaterialTheme.colorScheme.onSurface
+        }
+    Surface(
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.92f),
+        tonalElevation = 3.dp,
+        shadowElevation = if (backgroundStyle.supportsGlassGlow) 0.dp else 4.dp,
+        modifier = modifier.size(CompactControlSize).clip(CircleShape).clickable(onClick = onClick),
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            if (backgroundStyle != MiniPlayerBackgroundStyle.THEME) {
+                BottomBarBackground(
+                    style = backgroundStyle,
+                    shape = CircleShape,
+                    glowStrength = glowStrength,
+                    modifier = Modifier.matchParentSize(),
+                )
+            }
             Icon(
                 painter = painterResource(iconRes),
                 contentDescription = contentDescription,
-                tint = if (tint == Color.Unspecified) liquidGlassContentColor() else tint,
+                tint = iconColor,
                 modifier = Modifier.size(24.dp),
             )
-        }
-    } else {
-        Surface(
-            shape = CircleShape,
-            color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.92f),
-            tonalElevation = 3.dp,
-            shadowElevation = 4.dp,
-            modifier =
-                modifier
-                    .size(CompactControlSize)
-                    .glassGlowOverlay(glowStrength, CircleShape)
-                    .clip(CircleShape)
-                    .clickable(onClick = onClick),
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    painter = painterResource(iconRes),
-                    contentDescription = contentDescription,
-                    tint = if (tint == Color.Unspecified) MaterialTheme.colorScheme.onSurface else tint,
-                    modifier = Modifier.size(24.dp),
-                )
-            }
         }
     }
 }

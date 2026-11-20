@@ -53,6 +53,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -62,6 +63,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -69,12 +71,17 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
+import androidx.datastore.preferences.core.edit
 import androidx.navigation.NavController
+import kotlinx.coroutines.launch
 import moe.rukamori.archivetune.LocalPlayerAwareWindowInsets
 import moe.rukamori.archivetune.R
 import moe.rukamori.archivetune.constants.HideNavigationBarLabelsKey
 import moe.rukamori.archivetune.constants.MiniPlayerBackgroundStyle
 import moe.rukamori.archivetune.constants.MiniPlayerBackgroundStyleKey
+import moe.rukamori.archivetune.constants.MiniPlayerGlassGlowKey
+import moe.rukamori.archivetune.constants.MiniPlayerGlassGlowIntensityKey
+import moe.rukamori.archivetune.constants.NavigationBarArtworkStyleKey
 import moe.rukamori.archivetune.constants.MiniPlayerStyle
 import moe.rukamori.archivetune.constants.MiniPlayerStyleKey
 import moe.rukamori.archivetune.constants.NAVIGATION_BAR_CORNER_RADIUS_DEFAULT
@@ -108,7 +115,14 @@ import moe.rukamori.archivetune.ui.component.PreferenceEntry
 import moe.rukamori.archivetune.ui.component.PreferenceGroup
 import moe.rukamori.archivetune.ui.component.EnumListPreference
 import moe.rukamori.archivetune.ui.component.SwitchPreference
+import moe.rukamori.archivetune.ui.player.BottomBarBackground
+import moe.rukamori.archivetune.ui.player.supportsGlassGlow
+import moe.rukamori.archivetune.ui.player.usesArtworkPalette
 import moe.rukamori.archivetune.ui.screens.Screens
+import moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial
+import moe.rukamori.archivetune.ui.screens.settings.studio.miniPlayerBackgroundStyleLabelRes
+import moe.rukamori.archivetune.ui.screens.settings.studio.writeNavigationBarMaterial
+import moe.rukamori.archivetune.utils.dataStore
 import moe.rukamori.archivetune.ui.utils.backToMain
 import moe.rukamori.archivetune.utils.rememberPreference
 import moe.rukamori.archivetune.constants.PlayerDesignStyle
@@ -127,14 +141,14 @@ import moe.rukamori.archivetune.ui.component.SettingsPageTopBar
 
 @Composable
 fun NavigationBarSettings(navController: NavController, scrollTo: String? = null) {
-    val (navigationBarFrostedBlur, onNavigationBarFrostedBlurChange) =
+    val (navigationBarFrostedBlur) =
         rememberPreference(NavigationBarFrostedBlurKey, defaultValue = false)
-    val (navigationBarTintFrostedBlur, onNavigationBarTintFrostedBlurChange) =
+    val (navigationBarTintFrostedBlur) =
         rememberPreference(NavigationBarTintFrostedBlurKey, defaultValue = false)
 
     val (liquidGlassEnabled) =
         rememberPreference(LiquidGlassEnabledKey, defaultValue = true)
-    val (liquidGlassNavBarEnabled, onLiquidGlassNavBarEnabledChange) =
+    val (liquidGlassNavBarEnabled) =
         rememberPreference(LiquidGlassNavBarEnabledKey, defaultValue = false)
     val (navigationBarGlassGlow, onNavigationBarGlassGlowChange) =
         rememberPreference(NavigationBarGlassGlowKey, defaultValue = true)
@@ -144,55 +158,16 @@ fun NavigationBarSettings(navController: NavController, scrollTo: String? = null
             defaultValue = NAVIGATION_BAR_GLASS_GLOW_INTENSITY_DEFAULT,
         )
 
-    val (navigationBarBitchord, onNavigationBarBitchordChange) =
+    val (navigationBarBitchord) =
         rememberPreference(NavigationBarBitchordKey, defaultValue = false)
-    val (sukisuLiquidGlassNavBar, onSukisuLiquidGlassNavBarChange) =
+    val (sukisuLiquidGlassNavBar) =
         rememberPreference(SukisuLiquidGlassNavBarKey, defaultValue = false)
 
-    val onFrostedBlurChange: (Boolean) -> Unit = { checked ->
-        onNavigationBarFrostedBlurChange(checked)
-        if (checked) {
-            if (navigationBarTintFrostedBlur) onNavigationBarTintFrostedBlurChange(false)
-            if (navigationBarBitchord) onNavigationBarBitchordChange(false)
-            if (liquidGlassNavBarEnabled) onLiquidGlassNavBarEnabledChange(false)
-            if (sukisuLiquidGlassNavBar) onSukisuLiquidGlassNavBarChange(false)
-        }
-    }
-    val onTintFrostedBlurChange: (Boolean) -> Unit = { checked ->
-        onNavigationBarTintFrostedBlurChange(checked)
-        if (checked) {
-            if (navigationBarFrostedBlur) onNavigationBarFrostedBlurChange(false)
-            if (navigationBarBitchord) onNavigationBarBitchordChange(false)
-            if (liquidGlassNavBarEnabled) onLiquidGlassNavBarEnabledChange(false)
-            if (sukisuLiquidGlassNavBar) onSukisuLiquidGlassNavBarChange(false)
-        }
-    }
-    val onLiquidGlassNavBarChange: (Boolean) -> Unit = { checked ->
-        onLiquidGlassNavBarEnabledChange(checked)
-        if (checked) {
-            if (navigationBarFrostedBlur) onNavigationBarFrostedBlurChange(false)
-            if (navigationBarTintFrostedBlur) onNavigationBarTintFrostedBlurChange(false)
-            if (navigationBarBitchord) onNavigationBarBitchordChange(false)
-            if (sukisuLiquidGlassNavBar) onSukisuLiquidGlassNavBarChange(false)
-        }
-    }
-    val onBitchordChange: (Boolean) -> Unit = { checked ->
-        onNavigationBarBitchordChange(checked)
-        if (checked) {
-            if (navigationBarFrostedBlur) onNavigationBarFrostedBlurChange(false)
-            if (navigationBarTintFrostedBlur) onNavigationBarTintFrostedBlurChange(false)
-            if (liquidGlassNavBarEnabled) onLiquidGlassNavBarEnabledChange(false)
-            if (sukisuLiquidGlassNavBar) onSukisuLiquidGlassNavBarChange(false)
-        }
-    }
-    val onSukisuNavBarChange: (Boolean) -> Unit = { checked ->
-        onSukisuLiquidGlassNavBarChange(checked)
-        if (checked) {
-            if (navigationBarFrostedBlur) onNavigationBarFrostedBlurChange(false)
-            if (navigationBarTintFrostedBlur) onNavigationBarTintFrostedBlurChange(false)
-            if (navigationBarBitchord) onNavigationBarBitchordChange(false)
-            if (liquidGlassNavBarEnabled) onLiquidGlassNavBarEnabledChange(false)
-        }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val (navArtwork) = rememberEnumPreference(NavigationBarArtworkStyleKey, MiniPlayerBackgroundStyle.THEME)
+    val onNavMaterialChange: (NavBarMaterial) -> Unit = { material ->
+        scope.launch { context.dataStore.edit { it.writeNavigationBarMaterial(material) } }
     }
     val (hideNavigationBarLabels, onHideNavigationBarLabelsChange) =
         rememberPreference(HideNavigationBarLabelsKey, defaultValue = false)
@@ -258,14 +233,19 @@ fun NavigationBarSettings(navController: NavController, scrollTo: String? = null
                 MiniPlayerBackgroundStyleKey,
                 defaultValue = MiniPlayerBackgroundStyle.THEME,
             )
+        val (miniGlassGlow, onMiniGlassGlowChange) = rememberPreference(MiniPlayerGlassGlowKey, true)
+        val (miniGlowIntensity, onMiniGlowIntensityChange) =
+            rememberPreference(MiniPlayerGlassGlowIntensityKey, NAVIGATION_BAR_GLASS_GLOW_INTENSITY_DEFAULT)
         val previewMaterial =
             when {
-                sukisuLiquidGlassNavBar -> moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.SUKISU_GLASS
-                liquidGlassNavBarEnabled -> moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.LIQUID_GLASS
-                navigationBarBitchord -> moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.BITCHORD
-                navigationBarTintFrostedBlur -> moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.TINTED
-                navigationBarFrostedBlur -> moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.FROSTED
-                else -> moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.STANDARD
+                sukisuLiquidGlassNavBar -> NavBarMaterial.SUKISU_GLASS
+                liquidGlassNavBarEnabled -> NavBarMaterial.LIQUID_GLASS
+                navigationBarBitchord -> NavBarMaterial.BITCHORD
+                navigationBarTintFrostedBlur -> NavBarMaterial.TINTED
+                navigationBarFrostedBlur -> NavBarMaterial.FROSTED
+                navArtwork == MiniPlayerBackgroundStyle.GRADIENT -> NavBarMaterial.GRADIENT
+                navArtwork == MiniPlayerBackgroundStyle.GLOW -> NavBarMaterial.GLOW
+                else -> NavBarMaterial.STANDARD
             }
         val currentNavProfile =
             moe.rukamori.archivetune.ui.screens.settings.studio.NavigationProfile(
@@ -282,6 +262,8 @@ fun NavigationBarSettings(navController: NavController, scrollTo: String? = null
                 glassGlowIntensity = navigationBarGlassGlowIntensity,
                 miniPlayerStyle = miniPlayerStyle,
                 miniPlayerBackground = miniPlayerBackgroundStyle,
+                miniPlayerGlassGlow = miniGlassGlow,
+                miniPlayerGlassGlowIntensity = miniGlowIntensity,
             )
 
         Column(
@@ -309,11 +291,7 @@ fun NavigationBarSettings(navController: NavController, scrollTo: String? = null
                         reducedMotion = !moe.rukamori.archivetune.ui.motion.LocalMotionConfig.current.animationsEnabled,
                         onSelectPreset = { preset ->
                             val nav = preset.navigation
-                            onFrostedBlurChange(nav.material == moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.FROSTED)
-                            onTintFrostedBlurChange(nav.material == moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.TINTED)
-                            onLiquidGlassNavBarChange(nav.material == moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.LIQUID_GLASS)
-                            onSukisuNavBarChange(nav.material == moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.SUKISU_GLASS)
-                            onBitchordChange(nav.material == moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.BITCHORD)
+                            onNavMaterialChange(nav.material)
                             onCompactBehaviorChange(nav.compactBehavior)
                             onHideNavigationBarLabelsChange(nav.hideLabels)
                             onNavigationBarWidthChange(nav.widthFraction)
@@ -323,6 +301,10 @@ fun NavigationBarSettings(navController: NavController, scrollTo: String? = null
                             onNavigationBarCornerRadiusChange(nav.cornerRadius)
                             onMiniPlayerStyleChange(nav.miniPlayerStyle)
                             onMiniPlayerBackgroundStyleChange(nav.miniPlayerBackground)
+                            onNavigationBarGlassGlowChange(nav.glassGlow)
+                            onNavigationBarGlassGlowIntensityChange(nav.glassGlowIntensity)
+                            onMiniGlassGlowChange(nav.miniPlayerGlassGlow)
+                            onMiniGlowIntensityChange(nav.miniPlayerGlassGlowIntensity)
                         },
                     )
                 }
@@ -372,83 +354,56 @@ fun NavigationBarSettings(navController: NavController, scrollTo: String? = null
 
             PreferenceGroup(title = stringResource(R.string.general)) {
                 item {
-                    Column {
-                        SwitchPreference(
-                            modifier = positions.modifierFor("navigation_bar_frosted_blur", "frosted_nav_bar"),
-                            title = { Text(stringResource(R.string.navigation_bar_frosted_blur)) },
-                            description = stringResource(R.string.navigation_bar_frosted_blur_desc),
-                            icon = { Icon(painterResource(R.drawable.blur_on), null) },
-                            checked = navigationBarFrostedBlur,
-                            onCheckedChange = onFrostedBlurChange,
-                        )
-                        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S && navigationBarFrostedBlur) {
-                            Text(
-                                text = stringResource(R.string.navigation_bar_frosted_blur_unsupported),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(start = 56.dp, top = 4.dp, end = 16.dp),
-                            )
-                        }
-                    }
-                }
-
-                item {
-                    SwitchPreference(
-                        modifier = positions.modifierFor("navigation_bar_tint_frosted_blur"),
-                        title = { Text(stringResource(R.string.navigation_bar_tint_frosted_blur)) },
-                        description = stringResource(R.string.navigation_bar_tint_frosted_blur_desc),
-                        icon = { Icon(painterResource(R.drawable.format_paint), null) },
-                        checked = navigationBarTintFrostedBlur,
-                        onCheckedChange = onTintFrostedBlurChange,
+                    EnumListPreference(
+                        modifier = positions.modifierFor(
+                            "navigation_bar_frosted_blur",
+                            "frosted_nav_bar",
+                            "navigation_bar_tint_frosted_blur",
+                            "liquid_glass_nav_bar",
+                            "navigation_bar_bitchord",
+                            "sukisu_liquid_glass_nav_bar",
+                        ),
+                        title = { Text(stringResource(R.string.studio_nav_background)) },
+                        icon = { Icon(painterResource(R.drawable.nav_bar), null) },
+                        selectedValue = previewMaterial,
+                        valueText = { stringResource(it.labelRes) },
+                        onValueSelected = onNavMaterialChange,
                     )
                 }
-
                 item {
-                    SwitchPreference(
-                        modifier = positions.modifierFor("liquid_glass_nav_bar"),
-                        title = { Text(stringResource(R.string.liquid_glass_nav_bar)) },
-                        description =
-                            when {
-                                !glassSupported -> stringResource(R.string.liquid_glass_effects_unsupported)
-                                !liquidGlassEnabled -> stringResource(R.string.liquid_glass_nav_bar_disabled)
-                                else -> stringResource(R.string.liquid_glass_nav_bar_desc)
-                            },
-                        icon = { Icon(painterResource(R.drawable.blur_on), null) },
-                        checked = liquidGlassNavBarEnabled,
-
-                        isEnabled = liquidGlassEnabled && glassSupported,
-                        onCheckedChange = onLiquidGlassNavBarChange,
+                    EnumListPreference(
+                        title = { Text(stringResource(R.string.mini_player_background_style)) },
+                        icon = { Icon(painterResource(R.drawable.music_note), null) },
+                        selectedValue = miniPlayerBackgroundStyle,
+                        valueText = { stringResource(miniPlayerBackgroundStyleLabelRes(it)) },
+                        onValueSelected = onMiniPlayerBackgroundStyleChange,
                     )
                 }
-
                 item {
+                    val miniGlassActive = glassSupported && liquidGlassEnabled && miniPlayerBackgroundStyle.supportsGlassGlow
                     SwitchPreference(
-                        modifier = positions.modifierFor("navigation_bar_bitchord"),
-                        title = { Text(stringResource(R.string.navigation_bar_bitchord)) },
-                        description = stringResource(R.string.navigation_bar_bitchord_desc),
-                        icon = { Icon(painterResource(R.drawable.grid_view), null) },
-                        checked = navigationBarBitchord,
-                        onCheckedChange = onBitchordChange,
+                        title = { Text(stringResource(R.string.mini_player_glass_glow)) },
+                        description = if (miniGlassActive) null else stringResource(R.string.dependency_nav_material_glow_bar),
+                        icon = { Icon(painterResource(R.drawable.solar_brightness_high_linear), null) },
+                        checked = miniGlassGlow,
+                        isEnabled = miniGlassActive,
+                        onCheckedChange = onMiniGlassGlowChange,
                     )
                 }
-
                 item {
-                    SwitchPreference(
-                        modifier = positions.modifierFor("sukisu_liquid_glass_nav_bar"),
-                        title = { Text(stringResource(R.string.sukisu_liquid_glass_nav_bar)) },
-                        description =
-                            when {
-                                !glassSupported -> stringResource(R.string.liquid_glass_effects_unsupported)
-                                !liquidGlassEnabled -> stringResource(R.string.liquid_glass_nav_bar_disabled)
-                                else -> stringResource(R.string.sukisu_liquid_glass_nav_bar_desc)
-                            },
-                        icon = { Icon(painterResource(R.drawable.blur_on), null) },
-                        checked = sukisuLiquidGlassNavBar,
-                        isEnabled = liquidGlassEnabled && glassSupported,
-                        onCheckedChange = onSukisuNavBarChange,
+                    SliderPreferenceRow(
+                        title = stringResource(R.string.mini_player_glass_glow_intensity),
+                        description = stringResource(R.string.navigation_bar_glass_glow_intensity_desc),
+                        iconRes = R.drawable.tune,
+                        value = miniGlowIntensity,
+                        onValueChange = onMiniGlowIntensityChange,
+                        range = 0.2f..2f,
+                        valueLabel = { "${(it * 100).roundToInt()}%" },
+                        default = NAVIGATION_BAR_GLASS_GLOW_INTENSITY_DEFAULT,
+                        enabled = glassSupported && liquidGlassEnabled && miniPlayerBackgroundStyle.supportsGlassGlow && miniGlassGlow,
+                        disabledReason = stringResource(R.string.dependency_nav_material_glow),
                     )
                 }
-
                 item {
                     val glassBarActive = liquidGlassNavBarEnabled || sukisuLiquidGlassNavBar
                     SwitchPreference(
@@ -868,32 +823,32 @@ private fun NavBarPreview(
     transparency: Float,
     labelSpacing: Float,
     cornerRadius: Float,
-    material: moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial =
-        moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.STANDARD,
+    material: NavBarMaterial =
+        NavBarMaterial.STANDARD,
     hideLabels: Boolean = false,
     glassGlow: Boolean = true,
     glassGlowIntensity: Float = NAVIGATION_BAR_GLASS_GLOW_INTENSITY_DEFAULT,
 ) {
     val effectiveWidthFraction =
         when (material) {
-            moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.SUKISU_GLASS,
-            moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.BITCHORD,
+            NavBarMaterial.SUKISU_GLASS,
+            NavBarMaterial.BITCHORD,
             -> 0.92f
             else -> widthFraction.coerceIn(0.5f, 1f)
         }
     val resolvedBarHeight =
         when (material) {
-            moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.LIQUID_GLASS,
-            moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.SUKISU_GLASS,
+            NavBarMaterial.LIQUID_GLASS,
+            NavBarMaterial.SUKISU_GLASS,
             -> 66.dp
             else -> (NavigationBarHeight * heightMultiplier).coerceAtLeast(48.dp)
         }
     val resolvedCorner =
         when (material) {
-            moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.LIQUID_GLASS,
-            moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.SUKISU_GLASS,
+            NavBarMaterial.LIQUID_GLASS,
+            NavBarMaterial.SUKISU_GLASS,
             -> 28.dp
-            moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.BITCHORD -> 22.dp
+            NavBarMaterial.BITCHORD -> 22.dp
             else -> cornerRadius.coerceAtLeast(0f).dp
         }
     val shape = RoundedCornerShape(resolvedCorner)
@@ -901,17 +856,17 @@ private fun NavBarPreview(
     val effectiveAlpha = (opacity * (1f - transparency)).coerceIn(0.08f, 1f)
     val barColor =
         when (material) {
-            moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.STANDARD ->
+            NavBarMaterial.STANDARD, NavBarMaterial.GRADIENT, NavBarMaterial.GLOW ->
                 MaterialTheme.colorScheme.surfaceContainer.copy(alpha = effectiveAlpha)
-            moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.FROSTED ->
+            NavBarMaterial.FROSTED ->
                 MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.72f)
-            moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.TINTED ->
+            NavBarMaterial.TINTED ->
                 MaterialTheme.colorScheme.primaryContainer.copy(alpha = effectiveAlpha.coerceIn(0.25f, 0.98f))
-            moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.LIQUID_GLASS ->
+            NavBarMaterial.LIQUID_GLASS ->
                 MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.56f)
-            moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.SUKISU_GLASS ->
+            NavBarMaterial.SUKISU_GLASS ->
                 MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.66f)
-            moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.BITCHORD ->
+            NavBarMaterial.BITCHORD ->
                 MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f)
         }
     val isGlassMaterial =
@@ -919,8 +874,8 @@ private fun NavBarPreview(
     val borderWidth =
         when {
             isGlassMaterial -> 1.2.dp
-            material == moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.FROSTED ||
-                material == moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.BITCHORD -> 1.dp
+            material == NavBarMaterial.FROSTED ||
+                material == NavBarMaterial.BITCHORD -> 1.dp
             else -> 0.dp
         }
     val borderColor =
@@ -928,9 +883,9 @@ private fun NavBarPreview(
             isGlassMaterial && glassGlow ->
                 MaterialTheme.colorScheme.primary.copy(alpha = (0.38f * glassGlowIntensity).coerceIn(0.14f, 0.85f))
             isGlassMaterial -> Color.White.copy(alpha = 0.30f)
-            material == moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.FROSTED ->
+            material == NavBarMaterial.FROSTED ->
                 Color.White.copy(alpha = 0.22f)
-            material == moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.BITCHORD ->
+            material == NavBarMaterial.BITCHORD ->
                 MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)
             else -> Color.Transparent
         }
@@ -974,6 +929,9 @@ private fun NavBarPreview(
             tonalElevation = if (isGlassMaterial) 0.dp else NavigationBarDefaults.Elevation,
             shadowElevation = if (isGlassMaterial) 4.dp else 8.dp,
         ) {
+            material.artworkStyle?.let { style ->
+                BottomBarBackground(style = style, shape = shape, modifier = Modifier.fillMaxSize())
+            }
             Row(
                 modifier =
                     Modifier
@@ -1058,17 +1016,17 @@ private fun CompactBehaviorPreview(
         moe.rukamori.archivetune.ui.screens.settings.studio.navBarMaterialSupportsGlassGlow(navigation.material)
     val navBgColor =
         when (navigation.material) {
-            moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.STANDARD ->
+            NavBarMaterial.STANDARD, NavBarMaterial.GRADIENT, NavBarMaterial.GLOW ->
                 surfaceContainer.copy(alpha = (navigation.opacity * (1f - navigation.transparency)).coerceIn(0.18f, 1f))
-            moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.FROSTED ->
+            NavBarMaterial.FROSTED ->
                 MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.74f)
-            moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.TINTED ->
+            NavBarMaterial.TINTED ->
                 MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.88f)
-            moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.LIQUID_GLASS ->
+            NavBarMaterial.LIQUID_GLASS ->
                 MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.56f)
-            moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.SUKISU_GLASS ->
+            NavBarMaterial.SUKISU_GLASS ->
                 MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.66f)
-            moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.BITCHORD ->
+            NavBarMaterial.BITCHORD ->
                 MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f)
         }
     val glassBorderColor =
@@ -1076,21 +1034,23 @@ private fun CompactBehaviorPreview(
             isGlassMaterial && navigation.glassGlow ->
                 primary.copy(alpha = (0.38f * navigation.glassGlowIntensity).coerceIn(0.14f, 0.85f))
             isGlassMaterial -> Color.White.copy(alpha = 0.30f)
-            navigation.material == moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.FROSTED ->
+            navigation.material == NavBarMaterial.FROSTED ->
                 Color.White.copy(alpha = 0.22f)
             else -> Color.Transparent
         }
     val miniBgColor =
         when (navigation.miniPlayerBackground) {
-            MiniPlayerBackgroundStyle.THEME -> surfaceContainer.copy(alpha = 0.96f)
+            MiniPlayerBackgroundStyle.THEME, MiniPlayerBackgroundStyle.BITCHORD -> surfaceContainer.copy(alpha = 0.96f)
+            MiniPlayerBackgroundStyle.TINTED -> moe.rukamori.archivetune.ui.component.tintedBottomBarColor()
             MiniPlayerBackgroundStyle.GRADIENT -> primary.copy(alpha = 0.85f)
             MiniPlayerBackgroundStyle.GLOW -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.88f)
             MiniPlayerBackgroundStyle.FROSTED -> MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.76f)
-            MiniPlayerBackgroundStyle.LIQUID_GLASS -> MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.58f)
+            MiniPlayerBackgroundStyle.LIQUID_GLASS, MiniPlayerBackgroundStyle.SUKISU_GLASS ->
+                MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.58f)
         }
     val miniContentTint =
-        if (navigation.miniPlayerBackground == MiniPlayerBackgroundStyle.GRADIENT) {
-            MaterialTheme.colorScheme.onPrimary
+        if (navigation.miniPlayerBackground.usesArtworkPalette) {
+            Color.White
         } else {
             onSurfaceVariant
         }
@@ -1253,8 +1213,8 @@ private fun CompactBehaviorPreview(
                         .padding(bottom = 12.dp)
                         .fillMaxWidth(
                             when (navigation.material) {
-                                moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.SUKISU_GLASS,
-                                moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.BITCHORD,
+                                NavBarMaterial.SUKISU_GLASS,
+                                NavBarMaterial.BITCHORD,
                                 -> 0.88f
                                 else -> navigation.widthFraction.coerceIn(0.6f, 0.94f)
                             },

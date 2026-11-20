@@ -99,6 +99,8 @@ import androidx.compose.ui.util.lerp
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import moe.rukamori.archivetune.constants.MiniPlayerBackgroundStyle
+import moe.rukamori.archivetune.ui.player.BottomBarBackground
 import moe.rukamori.archivetune.constants.DisableAnimationsKey
 import moe.rukamori.archivetune.constants.FloatingNavigationBarMaxWidth
 import moe.rukamori.archivetune.constants.HideNavigationBarLabelsKey
@@ -163,6 +165,16 @@ private object FullMotionDurationScale : MotionDurationScale {
 }
 
 @Composable
+internal fun tintedBottomBarColor(): Color {
+    val colorScheme = MaterialTheme.colorScheme
+    return if (colorScheme.background.luminance() < 0.5f) {
+        lerp(Color.Black, colorScheme.primary, TintedDarkBaseBlend)
+    } else {
+        lerp(Color.White, colorScheme.primary, TintFrostedLightBaseBlend)
+    }
+}
+
+@Composable
 fun FloatingNavigationToolbar(
     items: List<Screens>,
     pureBlack: Boolean,
@@ -177,15 +189,11 @@ fun FloatingNavigationToolbar(
     isSelected: (Screens) -> Boolean,
     onItemClick: (Screens, Boolean) -> Unit,
     onSearchItemDoubleClick: (() -> Unit)? = null,
+    artworkStyle: MiniPlayerBackgroundStyle? = null,
 ) {
     val isDarkScheme = MaterialTheme.colorScheme.background.luminance() < 0.5f
 
-    val tintedNavBarBaseColor =
-        if (isDarkScheme) {
-            lerp(Color.Black, MaterialTheme.colorScheme.primary, TintedDarkBaseBlend)
-        } else {
-            lerp(Color.White, MaterialTheme.colorScheme.primary, TintFrostedLightBaseBlend)
-        }
+    val tintedNavBarBaseColor = tintedBottomBarColor()
     val tintedNavBarContentColor =
         if (isDarkScheme) {
             lerp(Color.White, MaterialTheme.colorScheme.primary, TintedDarkContentBlend)
@@ -245,7 +253,7 @@ fun FloatingNavigationToolbar(
     val indicatorColor =
         when {
             canLiquidGlass -> Color.Transparent
-
+            artworkStyle != null -> Color.White.copy(alpha = 0.20f)
             else -> MaterialTheme.colorScheme.primary.copy(alpha = 0.30f)
         }
     val indicatorWidth = FloatingNavigationIndicatorWidth
@@ -272,6 +280,14 @@ fun FloatingNavigationToolbar(
                 )
             }
 
+            artworkStyle != null ->
+                ShortNavigationBarItemDefaults.colors(
+                    selectedIndicatorColor = Color.Transparent,
+                    selectedIconColor = Color.White,
+                    selectedTextColor = Color.White,
+                    unselectedIconColor = Color.White.copy(alpha = 0.76f),
+                    unselectedTextColor = Color.White.copy(alpha = 0.76f),
+                )
             else ->
                 ShortNavigationBarItemDefaults.colors(
                     selectedIndicatorColor = Color.Transparent,
@@ -522,6 +538,13 @@ fun FloatingNavigationToolbar(
                                     runCatching { drawLayer(frostedBackdrop.layer) }
                                 }
                             },
+                )
+            }
+            if (artworkStyle != null) {
+                BottomBarBackground(
+                    style = artworkStyle,
+                    shape = navigationShape,
+                    modifier = Modifier.fillMaxSize().graphicsLayer { alpha = effectiveAlpha },
                 )
             }
             val transparentRipple = remember { ripple(color = Color.Transparent) }

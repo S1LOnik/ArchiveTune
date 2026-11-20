@@ -36,6 +36,9 @@ import moe.rukamori.archivetune.LocalAnimationsDisabled
 import moe.rukamori.archivetune.R
 import moe.rukamori.archivetune.constants.BackAnimationStyle
 import moe.rukamori.archivetune.ui.motion.LocalMotionConfig
+import moe.rukamori.archivetune.ui.motion.applyMenuMotion
+import moe.rukamori.archivetune.ui.motion.effectAt
+import moe.rukamori.archivetune.ui.motion.rememberMotionBlurEffects
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -47,7 +50,6 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -74,6 +76,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.isUnspecified
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
@@ -84,6 +87,7 @@ import com.kyant.backdrop.effects.colorControls
 import com.kyant.backdrop.effects.lens
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import kotlin.math.abs
 
 val LocalMenuState = compositionLocalOf { MenuState() }
 
@@ -134,11 +138,11 @@ class MenuState(
         presentation: MenuPresentation,
     ) {
         val now = android.os.SystemClock.uptimeMillis()
-        if (isVisible && this.presentation == presentation && (now - lastShowUptimeMs) in 0..260L) {
+        if (presentation == MenuPresentation.FLOATING && isVisible && this.presentation == presentation && (now - lastShowUptimeMs) in 0..260L) {
             dismiss()
             return
         }
-        if (!isVisible && lastDismissUptimeMs != Long.MIN_VALUE && (now - lastDismissUptimeMs) in 0..220L) {
+        if (presentation == MenuPresentation.FLOATING && !isVisible && lastDismissUptimeMs != Long.MIN_VALUE && (now - lastDismissUptimeMs) in 0..220L) {
             return
         }
         lastShowUptimeMs = now
@@ -185,13 +189,12 @@ fun BottomSheetMenu(
     val motionConfig = LocalMotionConfig.current
     val animationsEnabled = !LocalAnimationsDisabled.current && motionConfig.animationsEnabled
 
-    LaunchedEffect(state.isVisible, animationsEnabled) {
+    LaunchedEffect(state.isVisible, animationsEnabled, motionConfig) {
         if (state.isVisible) {
             renderState = true
             if (!animationsEnabled) {
                 enterProgress.snapTo(1f)
             } else {
-                enterProgress.snapTo(0f)
                 enterProgress.animateTo(
                     targetValue = 1f,
                     animationSpec = motionConfig.sheetSpring(),
@@ -209,7 +212,7 @@ fun BottomSheetMenu(
                 }
             } finally {
                 if (!state.isVisible) {
-                    focusManager.clearFocus()
+                    if (state.dialogContent == null) focusManager.clearFocus()
                     renderState = false
                 }
             }
@@ -230,8 +233,6 @@ fun BottomSheetMenu(
 
     if (!renderState) return
 
-    val alpha = enterProgress.value.coerceIn(0f, 1f)
-
     val immersive = state.presentation == MenuPresentation.IMMERSIVE
     val menuShape = if (immersive) ImmersiveMenuShape else FloatingMenuShape
 
@@ -239,7 +240,7 @@ fun BottomSheetMenu(
     val liquidGlassBackdrop = menuGlassBackdrop ?: LocalLiquidGlassBackdrop.current
     val glassTuning = LocalLiquidGlassTuning.current
     val glassModifier =
-        remember(liquidGlassBackdrop, glassTuning) {
+        remember(liquidGlassBackdrop, glassTuning, background, menuShape) {
             if (liquidGlassBackdrop != null && background.isUnspecified) {
                 Modifier.drawBackdrop(
                     backdrop = liquidGlassBackdrop,
@@ -326,38 +327,28 @@ fun BottomSheetMenu(
     val density = LocalDensity.current
     val configuration = LocalConfiguration.current
 
-    var expanded by remember(state.isVisible, immersive) { mutableStateOf(false) }
-    var handleDrag by remember(state.isVisible) { mutableFloatStateOf(0f) }
+    var expanded by remember(immersive) { mutableStateOf(false) }
+    var handleDrag by remember(immersive) { mutableFloatStateOf(0f) }
+    val dragReturn = remember { Animatable(0f) }
     val threshold = with(density) { 32.dp.toPx() }
-    val gestureConnection = remember(state, threshold, state.isVisible, immersive) {
+    val flingThreshold = with(density) { 420.dp.toPx() }
+    // The immersive list scrolls at either height. Its handle owns sheet gestures.
+    val floatingDismissGesture = remember(state, threshold, state.isVisible) {
         object : NestedScrollConnection {
             private var dragDistance = 0f
 
-            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                if (source != NestedScrollSource.UserInput || !immersive || expanded || available.y >= 0f) {
-                    return Offset.Zero
-                }
-                dragDistance = (dragDistance + available.y).coerceAtMost(0f)
-                if (dragDistance < -threshold) {
-                    expanded = true
-                    dragDistance = 0f
-                }
-                return Offset(0f, available.y)
-            }
-
             override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
                 if (source != NestedScrollSource.UserInput || available.y <= 0f) {
-                    if (consumed.y != 0f) dragDistance = 0f
+                    if (consumed.y != 0f) {
+                        dragDistance = 0f
+                        handleDrag = 0f
+                    }
                     return Offset.Zero
                 }
-                dragDistance = (dragDistance + available.y).coerceAtLeast(0f)
-                handleDrag = (handleDrag + available.y).coerceAtLeast(0f)
+                dragDistance += available.y
+                handleDrag = dragDistance
                 if (dragDistance > threshold * 1.4f) {
-                    if (immersive && expanded) {
-                        expanded = false
-                    } else {
-                        state.dismiss()
-                    }
+                    state.dismiss()
                     dragDistance = 0f
                     handleDrag = 0f
                 }
@@ -365,40 +356,26 @@ fun BottomSheetMenu(
             }
 
             override suspend fun onPreFling(available: Velocity): Velocity {
-                if (dragDistance > threshold) {
-                    if (immersive && expanded) {
-                        expanded = false
-                    } else {
-                        state.dismiss()
-                    }
-                    dragDistance = 0f
-                    handleDrag = 0f
-                    return available
-                }
+                val shouldDismiss = dragDistance > threshold
                 dragDistance = 0f
                 handleDrag = 0f
-                return Velocity.Zero
-            }
-
-            override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
-                dragDistance = 0f
-                handleDrag = 0f
-                return Velocity.Zero
+                if (shouldDismiss) state.dismiss()
+                return if (shouldDismiss) available else Velocity.Zero
             }
         }
     }
     val maxPopupHeight by animateDpAsState(
-        targetValue = (configuration.screenHeightDp.dp * when {
+        targetValue = configuration.screenHeightDp.dp * when {
             immersive && expanded -> 1f
             immersive -> 0.72f
             else -> 0.44f
-        }).coerceAtLeast(0.dp),
-        animationSpec = if (!animationsEnabled) snap() else motionConfig.microTween(200),
+        },
+        animationSpec = if (animationsEnabled) motionConfig.microTween(210) else snap(),
         label = "menuHeight",
     )
-    val safeMaxPopupHeight = maxPopupHeight.coerceAtLeast(0.dp)
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding().coerceAtLeast(0.dp)
-    val predictiveBackStyle = LocalBackAnimationStyle.current == BackAnimationStyle.PREDICTIVE
+    val predictiveBackStyle = animationsEnabled && LocalBackAnimationStyle.current == BackAnimationStyle.PREDICTIVE
+    val blurEffects = rememberMotionBlurEffects(enabled = motionConfig.motionBlurEnabled, vertical = true)
 
     Box(modifier = modifier.fillMaxSize()) {
         Box(
@@ -408,7 +385,7 @@ fun BottomSheetMenu(
                     .graphicsLayer {
                         val p = if (predictiveBackStyle) menuPredictiveBack.progress.value.coerceIn(0f, 1f) else 0f
                         val backFade = (1f - 0.35f * p).coerceIn(0f, 1f)
-                        this.alpha = (alpha * backFade).coerceIn(0f, 1f)
+                        alpha = enterProgress.value.coerceIn(0f, 1f) * backFade
                     }
                     .background(Color.Black.copy(alpha = 0.50f))
                     .then(
@@ -431,25 +408,28 @@ fun BottomSheetMenu(
                     .align(Alignment.BottomCenter)
                     .then(
                         if (immersive) {
-                            Modifier
+                            Modifier.statusBarsPadding()
                         } else {
                             Modifier.padding(start = 16.dp, end = 16.dp, bottom = bottomInset + 12.dp)
                         },
                     )
                     .widthIn(max = 640.dp)
-                    .heightIn(max = safeMaxPopupHeight)
                     .fillMaxWidth()
+                    .layout { measurable, constraints ->
+                        val height = maxPopupHeight.roundToPx().coerceIn(constraints.minHeight, constraints.maxHeight)
+                        val placeable = measurable.measure(constraints.copy(maxHeight = height))
+                        layout(placeable.width, placeable.height) { placeable.placeRelative(0, 0) }
+                    }
                     .graphicsLayer {
-                        val p = if (predictiveBackStyle) menuPredictiveBack.progress.value.coerceIn(0f, 1f) else 0f
-                        val scale = 1f - 0.06f * p
-                        scaleX = scale
-                        scaleY = scale
-                        this.alpha = (alpha * (1f - 0.22f * p)).coerceIn(0f, 1f)
-
-                        translationY =
-                            with(density) {
-                                (1f - alpha) * 48.dp.toPx() + p * 36.dp.toPx() + (handleDrag * 0.35f).coerceAtLeast(0f)
-                            }
+                        val progress = enterProgress.value.coerceIn(0f, 1f)
+                        val back = if (predictiveBackStyle) menuPredictiveBack.progress.value.coerceIn(0f, 1f) else 0f
+                        applyMenuMotion(
+                            progress = progress,
+                            style = motionConfig.menuTransitionStyle,
+                            backProgress = back,
+                            dragOffset = if (immersive && expanded) 0f else handleDrag.coerceAtLeast(0f) * 0.35f,
+                        )
+                        renderEffect = blurEffects.effectAt(1f - progress)
                     }
                     .shadow(
                         elevation = (24f * glassTuning.shadowFactor).coerceAtLeast(0f).dp,
@@ -467,7 +447,7 @@ fun BottomSheetMenu(
                         },
                     )
                     .clip(menuShape)
-                    .nestedScroll(gestureConnection)
+                    .then(if (immersive) Modifier else Modifier.nestedScroll(floatingDismissGesture))
                     .then(
                         if (state.isVisible) {
                             Modifier.clickable(
@@ -499,7 +479,7 @@ fun BottomSheetMenu(
                 }
             }
 
-            Column(modifier = if (immersive && expanded) Modifier.fillMaxWidth().statusBarsPadding() else Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.fillMaxWidth()) {
                 if (immersive) {
                     val closeDesc = stringResource(R.string.close_dialog)
                     Box(
@@ -507,13 +487,31 @@ fun BottomSheetMenu(
                             .fillMaxWidth()
                             .height(40.dp)
                             .draggable(
-                                state = rememberDraggableState { handleDrag = (handleDrag + it).coerceAtLeast(-threshold * 2f) },
+                                state = rememberDraggableState { handleDrag = (handleDrag + it).coerceIn(-threshold * 3f, threshold * 3f) },
                                 orientation = Orientation.Vertical,
-                                onDragStarted = { handleDrag = 0f },
-                                onDragStopped = {
-                                    if (handleDrag < -threshold) expanded = true
-                                    if (handleDrag > threshold) state.dismiss()
+                                enabled = state.isVisible,
+                                onDragStarted = {
+                                    dragReturn.stop()
                                     handleDrag = 0f
+                                },
+                                onDragStopped = { velocity ->
+                                    val distance = handleDrag
+                                    val committed =
+                                        abs(distance) >= threshold ||
+                                            (abs(velocity) >= flingThreshold && distance * velocity > 0f)
+                                    if (committed && distance < 0f) expanded = true
+                                    if (committed && distance > 0f) {
+                                        if (expanded) {
+                                            handleDrag = 0f
+                                            expanded = false
+                                        } else {
+                                            state.dismiss()
+                                        }
+                                    }
+                                    dragReturn.snapTo(handleDrag)
+                                    dragReturn.animateTo(0f, if (animationsEnabled) motionConfig.microTween(160) else snap()) {
+                                        handleDrag = value
+                                    }
                                 },
                             )
                             .clickable(

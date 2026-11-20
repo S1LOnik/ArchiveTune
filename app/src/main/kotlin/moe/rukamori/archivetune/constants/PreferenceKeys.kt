@@ -160,6 +160,9 @@ val BackdropEnabledKey = booleanPreferencesKey("backdropEnabled")
 val BackdropBlurAmountKey = intPreferencesKey("backdropBlurAmount")
 val MiniPlayerLastAnchorKey = intPreferencesKey("miniPlayerLastAnchor")
 val MiniPlayerBackgroundStyleKey = stringPreferencesKey("miniPlayerBackgroundStyle")
+val NavigationBarArtworkStyleKey = stringPreferencesKey("navigationBarArtworkStyle")
+val MiniPlayerGlassGlowKey = booleanPreferencesKey("miniPlayerGlassGlow")
+val MiniPlayerGlassGlowIntensityKey = floatPreferencesKey("miniPlayerGlassGlowIntensity")
 
 val LiquidGlassEnabledKey = booleanPreferencesKey("liquidGlassEnabled")
 val LiquidGlassNavBarEnabledKey = booleanPreferencesKey("liquidGlassNavBarEnabled")
@@ -1094,6 +1097,9 @@ enum class MiniPlayerBackgroundStyle {
     GLOW,
     FROSTED,
     LIQUID_GLASS,
+    TINTED,
+    SUKISU_GLASS,
+    BITCHORD,
 }
 
 val NavigationBarFrostedBlurKey = booleanPreferencesKey("navigationBarFrostedBlur")
@@ -1766,8 +1772,25 @@ enum class MotionProfile {
     SYSTEM,
     FAST,
     SMOOTH,
+    SPRINGY,
+    CINEMATIC,
     REDUCED,
 }
+
+enum class MotionTransitionStyle {
+    DEFAULT,
+    SLIDE,
+    FADE,
+    ZOOM,
+}
+
+val MotionDurationPercentRange = 50..150
+
+val MotionDurationPercentKey = intPreferencesKey("motionDurationPercent")
+val MotionScreenStyleKey = stringPreferencesKey("motionScreenStyle")
+val MotionMenuStyleKey = stringPreferencesKey("motionMenuStyle")
+val MotionBlurEnabledKey = booleanPreferencesKey("motionBlurEnabled")
+val SkipAppearanceConfirmationKey = booleanPreferencesKey("skipAppearanceConfirmation")
 
 val MotionProfileKey = stringPreferencesKey("motionProfile")
 val MotionScreenTransitionsKey = booleanPreferencesKey("motionScreenTransitions")

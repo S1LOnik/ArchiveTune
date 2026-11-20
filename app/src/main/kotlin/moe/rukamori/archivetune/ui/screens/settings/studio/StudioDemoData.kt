@@ -11,8 +11,10 @@ import androidx.annotation.StringRes
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.Color
 import moe.rukamori.archivetune.R
+import moe.rukamori.archivetune.models.MediaMetadata
 
 enum class StudioCoverPreviewMode {
+    CURRENT,
     LIGHT,
     DARK,
     NONE,
@@ -28,6 +30,7 @@ data class StudioDemoTrack(
     @param:StringRes val sourceLabelRes: Int,
     val lightColors: List<Color>,
     val darkColors: List<Color>,
+    val media: MediaMetadata? = null,
 )
 
 @Immutable

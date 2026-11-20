@@ -49,6 +49,16 @@ class MotionConfigTest {
     }
 
     @Test
+    fun customDurationScalesAndClampsTheSelectedPreset() {
+        val config = MotionConfig(profile = MotionProfile.CINEMATIC, durationPercent = 50)
+        assertEquals(205, config.tabTransitionDurationMs())
+        assertEquals(235, config.subScreenTransitionDurationMs())
+        assertEquals(205, config.copy(durationPercent = -1).tabTransitionDurationMs())
+        assertEquals(615, config.copy(durationPercent = 300).tabTransitionDurationMs())
+        assertEquals(0, config.copy(profile = MotionProfile.REDUCED).tabTransitionDurationMs())
+    }
+
+    @Test
     fun perChannelFlagsOperateIndependently() {
         val config =
             MotionConfig(

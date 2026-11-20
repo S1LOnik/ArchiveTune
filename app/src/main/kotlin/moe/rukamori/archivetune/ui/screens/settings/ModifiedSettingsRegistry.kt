@@ -349,6 +349,8 @@ object ModifiedSettingsRegistry {
                         MotionProfile.SYSTEM -> R.string.motion_profile_system
                         MotionProfile.FAST -> R.string.motion_profile_fast
                         MotionProfile.SMOOTH -> R.string.motion_profile_smooth
+                        MotionProfile.SPRINGY -> R.string.motion_profile_springy
+                        MotionProfile.CINEMATIC -> R.string.motion_profile_cinematic
                         MotionProfile.REDUCED -> R.string.motion_profile_reduced
                     },
                 )

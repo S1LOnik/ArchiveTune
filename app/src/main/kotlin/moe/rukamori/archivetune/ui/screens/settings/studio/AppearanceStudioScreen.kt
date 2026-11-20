@@ -100,12 +100,16 @@ import moe.rukamori.archivetune.constants.LyricsDisplayCharacter
 import moe.rukamori.archivetune.constants.LyricsMode
 import moe.rukamori.archivetune.constants.MiniPlayerBackgroundStyle
 import moe.rukamori.archivetune.constants.MiniPlayerStyle
+import moe.rukamori.archivetune.constants.MotionDurationPercentRange
 import moe.rukamori.archivetune.constants.MotionProfile
+import moe.rukamori.archivetune.constants.MotionTransitionStyle
+import moe.rukamori.archivetune.constants.SkipAppearanceConfirmationKey
 import moe.rukamori.archivetune.constants.NavigationBarCompactBehavior
 import moe.rukamori.archivetune.constants.PlayerBackgroundStyle
 import moe.rukamori.archivetune.constants.SavedAppearanceProfilesKey
 import moe.rukamori.archivetune.constants.SliderStyle
 import moe.rukamori.archivetune.ui.component.IconButton
+import moe.rukamori.archivetune.ui.player.supportsGlassGlow
 import moe.rukamori.archivetune.ui.motion.ArchiveTuneHapticKind
 import moe.rukamori.archivetune.ui.motion.rememberArchiveTuneHapticTrigger
 import moe.rukamori.archivetune.ui.screens.settings.DarkMode
@@ -120,6 +124,7 @@ import moe.rukamori.archivetune.utils.dataStore
 import moe.rukamori.archivetune.utils.isLowRamDevice
 import moe.rukamori.archivetune.utils.rememberPreference
 import java.util.UUID
+import java.io.IOException
 import kotlin.math.roundToInt
 
 private fun sectionForScrollTo(scrollTo: String?): AppearanceSection? =
@@ -210,8 +215,11 @@ fun AppearanceStudioScreen(
 
     val hasUnsavedChanges = remember(draft, savedSnapshot) { draft.normalized() != savedSnapshot }
     var isComparingSaved by remember { mutableStateOf(false) }
-    var coverMode by rememberSaveable { mutableStateOf(StudioCoverPreviewMode.LIGHT) }
+    var coverMode by rememberSaveable { mutableStateOf(StudioCoverPreviewMode.CURRENT) }
     var showUnsavedDialog by rememberSaveable { mutableStateOf(false) }
+    var returnToMainAfterDraft by rememberSaveable { mutableStateOf(false) }
+    val skipAppearanceConfirmation by rememberPreference(SkipAppearanceConfirmationKey, false)
+    var isSavingDraft by remember { mutableStateOf(false) }
 
     var showSaveStyleDialog by rememberSaveable { mutableStateOf(false) }
     var saveStyleNameDraft by rememberSaveable { mutableStateOf("") }
@@ -232,21 +240,42 @@ fun AppearanceStudioScreen(
         }
     }
 
-    val applyDraft: () -> Unit = {
+    fun saveDraft(onSaved: (() -> Unit)? = null) {
+        if (isSavingDraft) return
         val target = draft.normalized()
         val targetProfileId = draftProfileId.orEmpty()
         haptic(ArchiveTuneHapticKind.SELECTION)
+        isSavingDraft = true
         scope.launch {
-            context.dataStore.edit { mutable ->
-                target.writeToPreferences(mutable)
-                mutable[ActiveAppearanceProfileIdKey] = targetProfileId
+            val saved = try {
+                context.dataStore.edit { mutable ->
+                    target.writeToPreferences(mutable)
+                    mutable[ActiveAppearanceProfileIdKey] = targetProfileId
+                }
+                true
+            } catch (_: IOException) {
+                false
+            } finally {
+                isSavingDraft = false
             }
-            draft = target
-            hasUserEditedDraft = false
-            savedToLibraryNotice = false
+            if (!saved) {
+                snackbarHostState.showSnackbar(context.getString(R.string.studio_save_failed))
+                return@launch
+            }
+            if (draft.normalized() == target && draftProfileId.orEmpty() == targetProfileId) {
+                draft = target
+                hasUserEditedDraft = false
+                savedToLibraryNotice = false
+                if (onSaved != null) {
+                    onSaved()
+                    return@launch
+                }
+            }
             snackbarHostState.showSnackbar(context.getString(R.string.studio_applied))
         }
     }
+
+    val applyDraft: () -> Unit = { saveDraft() }
 
     val exportLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
@@ -295,16 +324,24 @@ fun AppearanceStudioScreen(
             }
         }
 
-    val attemptNavigateUp: () -> Unit = {
-        if (hasUnsavedChanges) {
-            showUnsavedDialog = true
-        } else {
-            navController.navigateUp()
+    fun exitStudio(returnToMain: Boolean) {
+        if (returnToMain) navController.backToMain() else navController.navigateUp()
+    }
+
+    fun attemptExit(returnToMain: Boolean = false) {
+        if (isSavingDraft) return
+        when {
+            !hasUnsavedChanges -> exitStudio(returnToMain)
+            skipAppearanceConfirmation -> saveDraft { exitStudio(returnToMain) }
+            else -> {
+                returnToMainAfterDraft = returnToMain
+                showUnsavedDialog = true
+            }
         }
     }
 
     BackHandler(enabled = hasUnsavedChanges && !showUnsavedDialog) {
-        showUnsavedDialog = true
+        attemptExit()
     }
 
     if (showUnsavedDialog) {
@@ -316,16 +353,7 @@ fun AppearanceStudioScreen(
                 TextButton(
                     onClick = {
                         showUnsavedDialog = false
-                        val target = draft.normalized()
-                        val targetProfileId = draftProfileId.orEmpty()
-                        scope.launch {
-                            context.dataStore.edit { mutable ->
-                                target.writeToPreferences(mutable)
-                                mutable[ActiveAppearanceProfileIdKey] = targetProfileId
-                            }
-                            hasUserEditedDraft = false
-                            navController.navigateUp()
-                        }
+                        saveDraft { exitStudio(returnToMainAfterDraft) }
                     },
                 ) {
                     Text(stringResource(R.string.studio_apply))
@@ -336,7 +364,7 @@ fun AppearanceStudioScreen(
                     onClick = {
                         showUnsavedDialog = false
                         discardDraft()
-                        navController.navigateUp()
+                        exitStudio(returnToMainAfterDraft)
                     },
                 ) {
                     Text(stringResource(R.string.studio_discard))
@@ -513,8 +541,8 @@ fun AppearanceStudioScreen(
                 },
                 navigationIcon = {
                     IconButton(
-                        onClick = attemptNavigateUp,
-                        onLongClick = navController::backToMain,
+                        onClick = { attemptExit() },
+                        onLongClick = { attemptExit(returnToMain = true) },
                     ) {
                         Icon(
                             painterResource(R.drawable.arrow_back),
@@ -1017,7 +1045,7 @@ fun AppearanceStudioScreen(
                     }
                 }
                 Text(
-                    text = stringResource(R.string.navigation_bar_settings_title),
+                    text = stringResource(R.string.studio_nav_background),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -1131,6 +1159,27 @@ fun AppearanceStudioScreen(
                         enabled = supportsGlassGlow && draft.navigation.glassGlow,
                         onValueChange = {
                             updateDraft(draft.copy(navigation = draft.navigation.copy(glassGlowIntensity = it)))
+                        },
+                    )
+                    val supportsMiniGlassGlow = draft.navigation.miniPlayerBackground.supportsGlassGlow &&
+                        draft.color.liquidGlassEnabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+                    StudioToggleRow(
+                        title = stringResource(R.string.mini_player_glass_glow),
+                        subtitle = if (supportsMiniGlassGlow) null else stringResource(R.string.dependency_nav_material_glow_bar),
+                        checked = draft.navigation.miniPlayerGlassGlow,
+                        enabled = supportsMiniGlassGlow,
+                        onCheckedChange = {
+                            updateDraft(draft.copy(navigation = draft.navigation.copy(miniPlayerGlassGlow = it)))
+                        },
+                    )
+                    StudioSliderRow(
+                        label = stringResource(R.string.mini_player_glass_glow_intensity),
+                        value = draft.navigation.miniPlayerGlassGlowIntensity,
+                        valueText = "${(draft.navigation.miniPlayerGlassGlowIntensity * 100).roundToInt()}%",
+                        range = 0.2f..2.0f,
+                        enabled = supportsMiniGlassGlow && draft.navigation.miniPlayerGlassGlow,
+                        onValueChange = {
+                            updateDraft(draft.copy(navigation = draft.navigation.copy(miniPlayerGlassGlowIntensity = it)))
                         },
                     )
                     StudioSliderRow(
@@ -1614,6 +1663,11 @@ fun AppearanceStudioScreen(
                 onOpenFullSettings = { navController.navigate("settings/appearance?scrollTo=disable_animations") },
                 modifier = positions.modifierFor("motion_profile"),
             ) {
+                Text(
+                    text = stringResource(R.string.studio_motion_presets),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -1637,6 +1691,16 @@ fun AppearanceStudioScreen(
                         )
                     }
                 }
+                val supportsMotionBlur = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+                StudioToggleRow(
+                    title = stringResource(R.string.studio_motion_blur),
+                    subtitle = stringResource(
+                        if (supportsMotionBlur) R.string.studio_motion_blur_hint else R.string.studio_motion_blur_android_12,
+                    ),
+                    enabled = supportsMotionBlur,
+                    checked = draft.motion.motionBlur && supportsMotionBlur,
+                    onCheckedChange = { updateDraft(draft.copy(motion = draft.motion.copy(motionBlur = it))) },
+                )
                 StudioMotionDemoCard(motion = draft.motion)
                 Text(
                     text = stringResource(R.string.haptic_intensity_title),
@@ -1663,6 +1727,24 @@ fun AppearanceStudioScreen(
                     }
                 }
                 StudioFineTuningBlock {
+                    val duration = draft.motion.durationPercent.coerceIn(MotionDurationPercentRange)
+                    StudioSliderRow(
+                        label = stringResource(R.string.studio_motion_duration),
+                        value = duration.toFloat(),
+                        valueText = stringResource(R.string.studio_motion_duration_value, duration),
+                        range = MotionDurationPercentRange.first.toFloat()..MotionDurationPercentRange.last.toFloat(),
+                        onValueChange = { updateDraft(draft.copy(motion = draft.motion.copy(durationPercent = it.roundToInt()))) },
+                    )
+                    MotionStylePicker(
+                        title = stringResource(R.string.studio_motion_screen_style),
+                        style = draft.motion.screenStyle,
+                        onSelect = { updateDraft(draft.copy(motion = draft.motion.copy(screenStyle = it))) },
+                    )
+                    MotionStylePicker(
+                        title = stringResource(R.string.studio_motion_menu_style),
+                        style = draft.motion.menuStyle,
+                        onSelect = { updateDraft(draft.copy(motion = draft.motion.copy(menuStyle = it))) },
+                    )
                     StudioToggleRow(
                         title = stringResource(R.string.motion_channel_screen),
                         checked = draft.motion.screenTransitions,
@@ -1994,6 +2076,40 @@ private fun darkModeLabel(mode: DarkMode): String =
         },
     )
 
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun MotionStylePicker(
+    title: String,
+    style: MotionTransitionStyle,
+    onSelect: (MotionTransitionStyle) -> Unit,
+) {
+    Text(
+        text = title,
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        MotionTransitionStyle.entries.forEach { choice ->
+            FilterChip(
+                selected = style == choice,
+                onClick = { onSelect(choice) },
+                label = {
+                    Text(
+                        stringResource(
+                            when (choice) {
+                                MotionTransitionStyle.DEFAULT -> R.string.studio_motion_style_default
+                                MotionTransitionStyle.SLIDE -> R.string.studio_motion_style_slide
+                                MotionTransitionStyle.FADE -> R.string.studio_motion_style_fade
+                                MotionTransitionStyle.ZOOM -> R.string.studio_motion_style_zoom
+                            },
+                        ),
+                    )
+                },
+            )
+        }
+    }
+}
+
 @Composable
 private fun motionProfileLabel(profile: MotionProfile): String =
     stringResource(
@@ -2001,6 +2117,8 @@ private fun motionProfileLabel(profile: MotionProfile): String =
             MotionProfile.SYSTEM -> R.string.motion_profile_system
             MotionProfile.FAST -> R.string.motion_profile_fast
             MotionProfile.SMOOTH -> R.string.motion_profile_smooth
+            MotionProfile.SPRINGY -> R.string.motion_profile_springy
+            MotionProfile.CINEMATIC -> R.string.motion_profile_cinematic
             MotionProfile.REDUCED -> R.string.motion_profile_reduced
         },
     )

@@ -1348,7 +1348,10 @@ private fun VolumeSliderL(
             sliderValue = coerced
             onValueChange(coerced)
         },
-        onValueChangeFinished = { isDragging = false },
+        onValueChangeFinished = {
+            isDragging = false
+            sliderValue = safeValue
+        },
         valueRange = 0f..1f,
         modifier = modifier.height(36.dp),
         thumb = {

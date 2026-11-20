@@ -33,6 +33,9 @@ import moe.rukamori.archivetune.constants.SukisuLiquidGlassNavBarKey
 import moe.rukamori.archivetune.constants.NavigationBarTintFrostedBlurKey
 import moe.rukamori.archivetune.constants.NavigationBarHeightKey
 import moe.rukamori.archivetune.constants.NavigationBarFrostedBlurKey
+import moe.rukamori.archivetune.constants.NavigationBarArtworkStyleKey
+import moe.rukamori.archivetune.constants.MiniPlayerBackgroundStyle
+import moe.rukamori.archivetune.constants.MiniPlayerBackgroundStyleKey
 import moe.rukamori.archivetune.constants.NavigationBarBitchordKey
 import moe.rukamori.archivetune.constants.NAVIGATION_BAR_HEIGHT_DEFAULT
 import moe.rukamori.archivetune.constants.LiquidGlassNavBarEnabledKey
@@ -48,6 +51,11 @@ import moe.rukamori.archivetune.constants.MotionDecorativeBackgroundKey
 import moe.rukamori.archivetune.constants.MotionPressFeedbackKey
 import moe.rukamori.archivetune.constants.MotionProfile
 import moe.rukamori.archivetune.constants.MotionProfileKey
+import moe.rukamori.archivetune.constants.MotionBlurEnabledKey
+import moe.rukamori.archivetune.constants.MotionDurationPercentKey
+import moe.rukamori.archivetune.constants.MotionMenuStyleKey
+import moe.rukamori.archivetune.constants.MotionScreenStyleKey
+import moe.rukamori.archivetune.constants.MotionTransitionStyle
 import moe.rukamori.archivetune.constants.MotionScreenTransitionsKey
 import moe.rukamori.archivetune.constants.PlayerBackgroundMotionPolicyKey
 import moe.rukamori.archivetune.ui.component.LocalBottomUiCompactFraction
@@ -62,6 +70,8 @@ import moe.rukamori.archivetune.ui.motion.LocalPlayerBackgroundMotionPolicy
 import moe.rukamori.archivetune.ui.motion.MotionConfig
 import moe.rukamori.archivetune.ui.motion.performArchiveTuneHaptic
 import moe.rukamori.archivetune.ui.motion.rememberSystemAnimatorScale
+import moe.rukamori.archivetune.ui.motion.screenEnter
+import moe.rukamori.archivetune.ui.motion.screenExit
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -76,7 +86,6 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
-import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
@@ -91,7 +100,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
@@ -135,13 +143,11 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.PlainTooltip
@@ -298,18 +304,9 @@ import moe.rukamori.archivetune.constants.UpdateChannelKey
 import moe.rukamori.archivetune.constants.UseSystemFontKey
 import moe.rukamori.archivetune.constants.UiScaleFactorKey
 import moe.rukamori.archivetune.db.MusicDatabase
-import moe.rukamori.archivetune.db.entities.Album
-import moe.rukamori.archivetune.db.entities.Artist
-import moe.rukamori.archivetune.db.entities.Playlist
 import moe.rukamori.archivetune.db.entities.SearchHistory
-import moe.rukamori.archivetune.db.entities.Song
 import moe.rukamori.archivetune.extensions.toMediaItem
 import moe.rukamori.archivetune.innertube.YouTube
-import moe.rukamori.archivetune.innertube.models.AlbumItem
-import moe.rukamori.archivetune.innertube.models.ArtistItem
-import moe.rukamori.archivetune.innertube.models.EpisodeItem
-import moe.rukamori.archivetune.innertube.models.PlaylistItem
-import moe.rukamori.archivetune.innertube.models.PodcastItem
 import moe.rukamori.archivetune.innertube.models.SongItem
 import moe.rukamori.archivetune.models.toMediaMetadata
 import moe.rukamori.archivetune.musicrecognition.ACTION_MUSIC_RECOGNITION
@@ -322,9 +319,7 @@ import moe.rukamori.archivetune.playback.MusicService
 import moe.rukamori.archivetune.playback.MusicService.MusicBinder
 import moe.rukamori.archivetune.playback.PlayerConnection
 import moe.rukamori.archivetune.playback.queues.ListQueue
-import moe.rukamori.archivetune.playback.queues.LocalAlbumRadio
 import moe.rukamori.archivetune.playback.queues.Queue
-import moe.rukamori.archivetune.playback.queues.YouTubeAlbumRadio
 import moe.rukamori.archivetune.playback.queues.YouTubeQueue
 import moe.rukamori.archivetune.ui.component.BottomSheetMenu
 import moe.rukamori.archivetune.ui.component.BottomSheetPage
@@ -348,6 +343,11 @@ import moe.rukamori.archivetune.ui.component.rememberBottomSheetState
 import moe.rukamori.archivetune.ui.component.shimmer.ShimmerTheme
 import moe.rukamori.archivetune.ui.menu.YouTubeSongMenu
 import moe.rukamori.archivetune.ui.player.BottomSheetPlayer
+import moe.rukamori.archivetune.ui.player.LocalBottomBarArtworkPalette
+import moe.rukamori.archivetune.ui.player.needsBackdrop
+import moe.rukamori.archivetune.ui.player.rememberBottomBarArtworkPalette
+import moe.rukamori.archivetune.ui.player.supportsGlassGlow
+import moe.rukamori.archivetune.ui.player.usesArtworkPalette
 import moe.rukamori.archivetune.ui.screens.library.LibraryHeaderContentPadding
 import moe.rukamori.archivetune.ui.screens.LOGIN_URL_ARGUMENT
 import moe.rukamori.archivetune.ui.screens.LoginScreen
@@ -392,7 +392,6 @@ import moe.rukamori.archivetune.viewmodels.OnlineSearchSort
 import java.util.Locale
 import javax.inject.Inject
 import kotlin.math.roundToInt
-import kotlin.random.Random
 import kotlin.time.Duration.Companion.days
 
 @Suppress("DEPRECATION", "ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
@@ -881,6 +880,10 @@ class MainActivity : ComponentActivity() {
                 defaultValue = defaultDisableAnimations,
             )
             val motionProfile by rememberEnumPreference(MotionProfileKey, MotionProfile.SYSTEM)
+            val motionDurationPercent by rememberPreference(MotionDurationPercentKey, 100)
+            val motionScreenStyle by rememberEnumPreference(MotionScreenStyleKey, MotionTransitionStyle.DEFAULT)
+            val motionMenuStyle by rememberEnumPreference(MotionMenuStyleKey, MotionTransitionStyle.DEFAULT)
+            val motionBlur by rememberPreference(MotionBlurEnabledKey, false)
             val motionScreenTransitions by rememberPreference(MotionScreenTransitionsKey, true)
             val motionArtworkTransitions by rememberPreference(MotionArtworkTransitionsKey, true)
             val motionPressFeedback by rememberPreference(MotionPressFeedbackKey, true)
@@ -889,6 +892,10 @@ class MainActivity : ComponentActivity() {
             val motionConfig =
                 remember(
                     motionProfile,
+                    motionDurationPercent,
+                    motionScreenStyle,
+                    motionMenuStyle,
+                    motionBlur,
                     disableAnimationsPref,
                     systemAnimatorScale,
                     motionScreenTransitions,
@@ -898,6 +905,10 @@ class MainActivity : ComponentActivity() {
                 ) {
                     MotionConfig(
                         profile = motionProfile,
+                        durationPercent = motionDurationPercent,
+                        screenTransitionStyle = motionScreenStyle,
+                        menuTransitionStyle = motionMenuStyle,
+                        motionBlurChannel = motionBlur,
                         legacyDisableAnimations = disableAnimationsPref,
                         systemAnimatorScale = systemAnimatorScale,
                         screenTransitionsChannel = motionScreenTransitions,
@@ -906,6 +917,7 @@ class MainActivity : ComponentActivity() {
                         decorativeBackgroundChannel = motionDecorativeBackground,
                     )
                 }
+            val currentMotionConfig = rememberUpdatedState(motionConfig)
             val disableAnimations = !motionConfig.animationsEnabled
             val hapticIntensity by rememberEnumPreference(HapticIntensityKey, HapticIntensity.STANDARD)
             val playerBackgroundMotionPolicy by rememberEnumPreference(
@@ -1100,8 +1112,6 @@ class MainActivity : ComponentActivity() {
                     val homeViewModel: HomeViewModel = hiltViewModel()
                     val networkBannerViewModel: NetworkBannerViewModel = hiltViewModel()
                     val newsViewModel: NewsViewModel = hiltViewModel()
-                    val allLocalItems by homeViewModel.allLocalItems.collectAsStateWithLifecycle()
-                    val allYtItems by homeViewModel.allYtItems.collectAsStateWithLifecycle()
                     val networkBannerState by networkBannerViewModel.bannerState.collectAsStateWithLifecycle()
                     val latestUnreadNewsTimestamp by newsViewModel.latestUnreadNewsTimestamp.collectAsStateWithLifecycle()
                     val hasUnreadNews = latestUnreadNewsTimestamp != null
@@ -1231,10 +1241,6 @@ class MainActivity : ComponentActivity() {
                                 !active
                         }
 
-                    val shouldShowHomeShuffleButton =
-                        currentRoute == Screens.Home.route &&
-                            (allLocalItems.isNotEmpty() || allYtItems.isNotEmpty())
-
                     val (navHeightMultiplier) = rememberPreference(NavigationBarHeightKey, NAVIGATION_BAR_HEIGHT_DEFAULT)
                     val (frostedNavBar) = rememberPreference(NavigationBarFrostedBlurKey, false)
                     val (tintedNavBar) = rememberPreference(NavigationBarTintFrostedBlurKey, false)
@@ -1250,16 +1256,40 @@ class MainActivity : ComponentActivity() {
                     val supportsGlass = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
                     val sukisuNavBar = supportsGlass && glassEnabled && sukisuNavBarEnabled
                     val glassNavBar = supportsGlass && glassEnabled && glassNavBarEnabled
+                    val miniPlayerBackground by rememberEnumPreference(MiniPlayerBackgroundStyleKey, MiniPlayerBackgroundStyle.THEME)
+                    val navArtworkPreference by rememberEnumPreference(NavigationBarArtworkStyleKey, MiniPlayerBackgroundStyle.THEME)
+                    val navArtworkStyle = navArtworkPreference.takeIf {
+                        it.usesArtworkPalette && !frostedNavBar && !tintedNavBar && !bitChordNavBar &&
+                            !glassNavBarEnabled && !sukisuNavBarEnabled
+                    }
+                    val compactBackgroundStyle = when {
+                        bitChordNavBar -> MiniPlayerBackgroundStyle.BITCHORD
+                        sukisuNavBar -> MiniPlayerBackgroundStyle.SUKISU_GLASS
+                        glassNavBar -> MiniPlayerBackgroundStyle.LIQUID_GLASS
+                        tintedNavBar -> MiniPlayerBackgroundStyle.TINTED
+                        frostedNavBar -> MiniPlayerBackgroundStyle.FROSTED
+                        else -> navArtworkStyle ?: MiniPlayerBackgroundStyle.THEME
+                    }
+                    val usesArtworkPalette = miniPlayerBackground.usesArtworkPalette || navArtworkStyle != null
+                    val miniPlayerUsesBackdrop = supportsGlass && miniPlayerBackground.needsBackdrop &&
+                        (!miniPlayerBackground.supportsGlassGlow || glassEnabled)
+                    val palettePlayer = playerConnection
+                    val bottomBarMedia = if (palettePlayer != null && (usesArtworkPalette || miniPlayerUsesBackdrop)) {
+                        palettePlayer.mediaMetadata.collectAsStateWithLifecycle().value
+                    } else {
+                        null
+                    }
+                    val artworkPalette = if (usesArtworkPalette) rememberBottomBarArtworkPalette(bottomBarMedia) else null
                     val floatingBarsBottomPadding = NavigationBarBottomPadding
                     val navVisibleHeight = if (glassNavBar || sukisuNavBar) {
                         SukiSUBarHeight
                     } else {
                         NavigationBarHeight * navHeightMultiplier.coerceIn(0.8f, 1.4f)
                     }
-                    val navBackdrop = if (
-                        !useRail && shouldShowNavigationBar && supportsGlass &&
-                        (glassNavBar || sukisuNavBar || frostedNavBar || bitChordNavBar)
-                    ) {
+                    val navNeedsBackdrop =
+                        !useRail && shouldShowNavigationBar && (glassNavBar || sukisuNavBar || frostedNavBar || bitChordNavBar)
+                    val miniPlayerNeedsBackdrop = miniPlayerUsesBackdrop && bottomBarMedia != null
+                    val navBackdrop = if (supportsGlass && (navNeedsBackdrop || miniPlayerNeedsBackdrop)) {
                         rememberThrottledBackdrop(if (pureBlack) Color.Black else MaterialTheme.colorScheme.surface)
                     } else {
                         null
@@ -1400,18 +1430,6 @@ class MainActivity : ComponentActivity() {
                                     miniPlayerCollapsedHeight,
                             expandedBound = maxHeight,
                         )
-                    var homeOverflowMenuExpanded by rememberSaveable { mutableStateOf(false) }
-                    val showHomeOverflowFab =
-                        shouldShowHomeShuffleButton &&
-                            !useRail &&
-                            (playerBottomSheetState.isDismissed || playerBottomSheetState.isCollapsed)
-
-                    LaunchedEffect(showHomeOverflowFab) {
-                        if (!showHomeOverflowFab) {
-                            homeOverflowMenuExpanded = false
-                        }
-                    }
-
                     val playerBackground by rememberEnumPreference(
                         key = PlayerBackgroundStyleKey,
                         defaultValue = PlayerBackgroundStyle.DEFAULT,
@@ -1972,6 +1990,7 @@ class MainActivity : ComponentActivity() {
                         LocalMotionConfig provides motionConfig,
                         LocalHapticIntensity provides hapticIntensity,
                         LocalPlayerBackgroundMotionPolicy provides playerBackgroundMotionPolicy,
+                        LocalBottomBarArtworkPalette provides artworkPalette,
                         LocalNavigationBarBackdrop provides frostedBackdrop,
                         LocalLiquidGlassBackdrop provides navBackdrop,
                         LocalMenuGlassBackdrop provides navBackdrop,
@@ -2642,6 +2661,7 @@ class MainActivity : ComponentActivity() {
                                                     modifier = toolbarModifier,
                                                     frostedBlur = frostedNavBar,
                                                     tintFrostedBlur = tintedNavBar,
+                                                    artworkStyle = navArtworkStyle,
                                                     frostedBackdrop = frostedBackdrop,
                                                     liquidGlass = glassNavBar,
                                                     liquidGlassBackdrop = navBackdrop,
@@ -2716,7 +2736,7 @@ class MainActivity : ComponentActivity() {
                                                                 false,
                                                             )
                                                         },
-                                                        backdrop = navBackdrop?.takeIf { glassNavBar || sukisuNavBar },
+                                                        backgroundStyle = compactBackgroundStyle,
                                                         glowStrength = if (glassNavBar || sukisuNavBar) navGlow else 0f,
                                                         modifier = Modifier.align(Alignment.CenterStart),
                                                         tint = MaterialTheme.colorScheme.primary,
@@ -2739,136 +2759,13 @@ class MainActivity : ComponentActivity() {
                                                                     )
                                                                 }
                                                             },
-                                                            backdrop = navBackdrop?.takeIf { glassNavBar || sukisuNavBar },
+                                                            backgroundStyle = compactBackgroundStyle,
                                                             glowStrength = if (glassNavBar || sukisuNavBar) navGlow else 0f,
                                                             modifier = Modifier.align(Alignment.CenterEnd),
                                                         )
                                                     }
                                                 }
                                             }
-                                        }
-
-                                        val homeOverflowFabBottomPadding =
-                                            bottomInset +
-                                                floatingBarsBottomPadding +
-                                                navVisibleHeight +
-                                                HomeOverflowFabSpacing +
-                                                if (playerBottomSheetState.isCollapsed) {
-                                                    miniPlayerCollapsedHeight + MiniPlayerBottomSpacing
-                                                } else {
-                                                    0.dp
-                                                }
-                                        HomeOverflowFabVisibility(
-                                            visible = showHomeOverflowFab,
-                                            modifier =
-                                                Modifier
-                                                    .align(Alignment.BottomEnd)
-                                                    .padding(
-                                                        end = NavigationBarHorizontalPadding,
-                                                        bottom = homeOverflowFabBottomPadding,
-                                                    ),
-                                        ) {
-                                            HomeOverflowFab(
-                                                expanded = homeOverflowMenuExpanded,
-                                                pureBlack = pureBlack,
-                                                onExpandedChange = { homeOverflowMenuExpanded = it },
-                                                onShuffleClick = {
-                                                    val useLocalSource =
-                                                        when {
-                                                            allLocalItems.isNotEmpty() && allYtItems.isNotEmpty() -> {
-                                                                Random.nextFloat() < 0.5f
-                                                            }
-
-                                                            allLocalItems.isNotEmpty() -> {
-                                                                true
-                                                            }
-
-                                                            else -> {
-                                                                false
-                                                            }
-                                                        }
-
-                                                    coroutineScope.launch(Dispatchers.Main) {
-                                                        if (useLocalSource) {
-                                                            when (val luckyItem = allLocalItems.random()) {
-                                                                is Song -> {
-                                                                    playerConnection?.playQueue(
-                                                                        if (luckyItem.song.isLocal) {
-                                                                            ListQueue(items = listOf(luckyItem.toMediaItem()))
-                                                                        } else {
-                                                                            YouTubeQueue.radio(luckyItem.toMediaMetadata())
-                                                                        },
-                                                                    )
-                                                                }
-
-                                                                is Album -> {
-                                                                    val albumWithSongs =
-                                                                        withContext(Dispatchers.IO) {
-                                                                            database.albumWithSongs(luckyItem.id).first()
-                                                                        }
-
-                                                                    albumWithSongs?.let {
-                                                                        playerConnection?.playQueue(LocalAlbumRadio(it))
-                                                                    }
-                                                                }
-
-                                                                is Artist -> {
-                                                                    Unit
-                                                                }
-
-                                                                is Playlist -> {
-                                                                    Unit
-                                                                }
-                                                            }
-                                                        } else {
-                                                            when (val luckyItem = allYtItems.random()) {
-                                                                is SongItem -> {
-                                                                    playerConnection?.playQueue(
-                                                                        YouTubeQueue.radio(luckyItem.toMediaMetadata()),
-                                                                    )
-                                                                }
-
-                                                                is AlbumItem -> {
-                                                                    playerConnection?.playQueue(
-                                                                        YouTubeAlbumRadio(luckyItem.playlistId),
-                                                                    )
-                                                                }
-
-                                                                is ArtistItem -> {
-                                                                    luckyItem.radioEndpoint?.let {
-                                                                        playerConnection?.playQueue(YouTubeQueue(it))
-                                                                    }
-                                                                }
-
-                                                                is PlaylistItem -> {
-                                                                    luckyItem.playEndpoint?.let {
-                                                                        playerConnection?.playQueue(YouTubeQueue.playlist(it))
-                                                                    }
-                                                                }
-
-                                                                is PodcastItem -> {
-                                                                    navController.navigate("podcast/${Uri.encode(luckyItem.browseId)}")
-                                                                }
-
-                                                                is EpisodeItem -> {
-                                                                    playerConnection?.playQueue(
-                                                                        ListQueue(
-                                                                            title = luckyItem.podcast?.name ?: luckyItem.title,
-                                                                            items = listOf(luckyItem.toMediaItem()),
-                                                                        ),
-                                                                    )
-                                                                }
-                                                            }
-                                                        }
-                                                    }
-                                                },
-                                                onMusicRecognitionClick = {
-                                                    navController.navigate(MusicRecognitionRoute)
-                                                },
-                                                onMusicTogetherClick = {
-                                                    navController.navigate("settings/music_together")
-                                                },
-                                            )
                                         }
                                     }
                                 },
@@ -2894,6 +2791,11 @@ class MainActivity : ComponentActivity() {
                                         when {
                                             disableAnimations || !motionConfig.screenTransitionsEnabled ->
                                                 fadeIn(tween(0))
+                                            motionConfig.screenTransitionStyle != MotionTransitionStyle.DEFAULT -> {
+                                                val changesTabs = initialTabIndex >= 0 && targetTabIndex >= 0 && initialTabIndex != targetTabIndex
+                                                val direction = if (changesTabs) targetTabIndex.compareTo(initialTabIndex) else 1
+                                                motionConfig.screenEnter(direction, if (changesTabs) tabDuration else subDuration)
+                                            }
                                             initialTabIndex >= 0 && targetTabIndex >= 0 && initialTabIndex != targetTabIndex -> {
                                                 val dir = if (targetTabIndex > initialTabIndex) 1 else -1
                                                 slideInHorizontally(
@@ -2923,6 +2825,11 @@ class MainActivity : ComponentActivity() {
                                         when {
                                             disableAnimations || !motionConfig.screenTransitionsEnabled ->
                                                 fadeOut(tween(0))
+                                            motionConfig.screenTransitionStyle != MotionTransitionStyle.DEFAULT -> {
+                                                val changesTabs = initialTabIndex >= 0 && targetTabIndex >= 0 && initialTabIndex != targetTabIndex
+                                                val direction = if (changesTabs) targetTabIndex.compareTo(initialTabIndex) else 1
+                                                motionConfig.screenExit(direction, if (changesTabs) tabDuration else subDuration)
+                                            }
                                             initialTabIndex >= 0 && targetTabIndex >= 0 && initialTabIndex != targetTabIndex -> {
                                                 val dir = if (targetTabIndex > initialTabIndex) 1 else -1
                                                 slideOutHorizontally(
@@ -2948,6 +2855,11 @@ class MainActivity : ComponentActivity() {
                                         when {
                                             disableAnimations || !motionConfig.screenTransitionsEnabled ->
                                                 fadeIn(tween(0))
+                                            motionConfig.screenTransitionStyle != MotionTransitionStyle.DEFAULT -> {
+                                                val changesTabs = initialTabIndex >= 0 && targetTabIndex >= 0 && initialTabIndex != targetTabIndex
+                                                val direction = if (changesTabs) targetTabIndex.compareTo(initialTabIndex) else -1
+                                                motionConfig.screenEnter(direction, if (changesTabs) tabDuration else subDuration)
+                                            }
                                             initialTabIndex >= 0 && targetTabIndex >= 0 && initialTabIndex != targetTabIndex -> {
                                                 val dir = if (targetTabIndex > initialTabIndex) 1 else -1
                                                 slideInHorizontally(
@@ -2980,6 +2892,11 @@ class MainActivity : ComponentActivity() {
                                         when {
                                             disableAnimations || !motionConfig.screenTransitionsEnabled ->
                                                 fadeOut(tween(0))
+                                            motionConfig.screenTransitionStyle != MotionTransitionStyle.DEFAULT -> {
+                                                val changesTabs = initialTabIndex >= 0 && targetTabIndex >= 0 && initialTabIndex != targetTabIndex
+                                                val direction = if (changesTabs) targetTabIndex.compareTo(initialTabIndex) else -1
+                                                motionConfig.screenExit(direction, if (changesTabs) tabDuration else subDuration)
+                                            }
                                             initialTabIndex >= 0 && targetTabIndex >= 0 && initialTabIndex != targetTabIndex -> {
                                                 val dir = if (targetTabIndex > initialTabIndex) 1 else -1
                                                 slideOutHorizontally(
@@ -3031,7 +2948,7 @@ class MainActivity : ComponentActivity() {
                                         topAppBarScrollBehavior,
                                         homeViewModel,
                                         { latestVersionName },
-                                        disableAnimations,
+                                        motionConfig = { currentMotionConfig.value },
                                         onClearUpdateBadge = { latestVersionName = BuildConfig.VERSION_NAME },
                                         homeScrollConnection = homeScrollBehavior.nestedScrollConnection,
                                         searchScrollConnection = searchScrollBehavior.nestedScrollConnection,
@@ -3624,158 +3541,6 @@ val LocalPlayerAwareWindowInsets =
 val LocalStableSystemBarsTopPadding = compositionLocalOf<Dp> { 0.dp }
 val LocalDownloadUtil = staticCompositionLocalOf<DownloadUtil> { error("No DownloadUtil provided") }
 val LocalSyncUtils = staticCompositionLocalOf<SyncUtils> { error("No SyncUtils provided") }
-
-private val HomeOverflowFabSize = 56.dp
-private val HomeOverflowFabSpacing = 12.dp
-private val HomeOverflowMenuIconSize = 40.dp
-
-@Composable
-private fun HomeOverflowFabVisibility(
-    visible: Boolean,
-    modifier: Modifier = Modifier,
-    content: @Composable () -> Unit,
-) {
-    val motionScheme = MaterialTheme.motionScheme
-
-    AnimatedVisibility(
-        visible = visible,
-        modifier = modifier,
-        enter =
-            fadeIn(animationSpec = motionScheme.fastEffectsSpec()) +
-                scaleIn(
-                    initialScale = 0.8f,
-                    animationSpec = motionScheme.defaultSpatialSpec(),
-                ),
-        exit =
-            fadeOut(animationSpec = motionScheme.fastEffectsSpec()) +
-                scaleOut(
-                    targetScale = 0.8f,
-                    animationSpec = motionScheme.fastSpatialSpec(),
-                ),
-        label = "homeOverflowFabVisibility",
-    ) {
-        content()
-    }
-}
-
-@Composable
-private fun HomeOverflowFab(
-    expanded: Boolean,
-    pureBlack: Boolean,
-    onExpandedChange: (Boolean) -> Unit,
-    onShuffleClick: () -> Unit,
-    onMusicRecognitionClick: () -> Unit,
-    onMusicTogetherClick: () -> Unit,
-) {
-    val menuToggle = moe.rukamori.archivetune.ui.component.rememberDropdownMenuToggle(initialExpanded = expanded)
-    BackHandler(enabled = expanded) {
-        menuToggle.onExternalItemSelection(onExpandedChange)
-    }
-    val menuItemColors =
-        MenuDefaults.itemColors(
-            textColor = if (pureBlack) Color.White else MaterialTheme.colorScheme.onSurface,
-            leadingIconColor =
-                if (pureBlack) {
-                    Color.White.copy(alpha = 0.82f)
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                },
-        )
-
-    Box {
-        FloatingActionButton(
-            onClick = { menuToggle.onExternalTriggerClick(expanded, onExpandedChange) },
-            modifier = Modifier.size(HomeOverflowFabSize),
-            containerColor = MaterialTheme.colorScheme.primary,
-            contentColor = MaterialTheme.colorScheme.onPrimary,
-        ) {
-            Icon(
-                painter = painterResource(R.drawable.more_horiz),
-                contentDescription = stringResource(R.string.more),
-            )
-        }
-
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { menuToggle.onExternalDismissRequest(onExpandedChange) },
-            shape = RoundedCornerShape(24.dp),
-            containerColor = if (pureBlack) Color.Black else MaterialTheme.colorScheme.surfaceContainerHigh,
-            tonalElevation = 6.dp,
-        ) {
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.music_recognition)) },
-                onClick = {
-                    menuToggle.onExternalItemSelection(onExpandedChange)
-                    onMusicRecognitionClick()
-                },
-                leadingIcon = {
-                    HomeOverflowMenuIcon(
-                        iconRes = R.drawable.mic,
-                        contentDescription = stringResource(R.string.music_recognition),
-                        pureBlack = pureBlack,
-                    )
-                },
-                colors = menuItemColors,
-            )
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.music_together)) },
-                onClick = {
-                    menuToggle.onExternalItemSelection(onExpandedChange)
-                    onMusicTogetherClick()
-                },
-                leadingIcon = {
-                    HomeOverflowMenuIcon(
-                        iconRes = R.drawable.multi_user,
-                        contentDescription = null,
-                        pureBlack = pureBlack,
-                    )
-                },
-                colors = menuItemColors,
-            )
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.shuffle)) },
-                onClick = {
-                    menuToggle.onExternalItemSelection(onExpandedChange)
-                    onShuffleClick()
-                },
-                leadingIcon = {
-                    HomeOverflowMenuIcon(
-                        iconRes = R.drawable.shuffle,
-                        contentDescription = stringResource(R.string.shuffle),
-                        pureBlack = pureBlack,
-                    )
-                },
-                colors = menuItemColors,
-            )
-        }
-    }
-}
-
-@Composable
-private fun HomeOverflowMenuIcon(
-    @DrawableRes iconRes: Int,
-    contentDescription: String?,
-    pureBlack: Boolean,
-) {
-    Surface(
-        modifier = Modifier.size(HomeOverflowMenuIconSize),
-        shape = CircleShape,
-        color =
-            if (pureBlack) {
-                Color.White.copy(alpha = 0.12f)
-            } else {
-                MaterialTheme.colorScheme.secondaryContainer
-            },
-        contentColor = if (pureBlack) Color.White else MaterialTheme.colorScheme.onSecondaryContainer,
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            Icon(
-                painter = painterResource(iconRes),
-                contentDescription = contentDescription,
-            )
-        }
-    }
-}
 
 private const val TopAppBarIconButtonContainerAlpha = 0.48f
 

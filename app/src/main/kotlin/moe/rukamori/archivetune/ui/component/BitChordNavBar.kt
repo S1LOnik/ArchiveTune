@@ -61,6 +61,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.drawOutline
 import androidx.compose.ui.graphics.drawscope.translate
@@ -194,7 +195,7 @@ fun BitChordNavBar(
                     },
                 )
                 .clip(pillShape)
-                .borderGuard(),
+                .borderGuard(pillShape),
         shape = pillShape,
         color =
             if (canLiquidGlass) {
@@ -315,12 +316,12 @@ fun BitChordNavBar(
     }
 }
 
-private fun Modifier.borderGuard(): Modifier =
+internal fun Modifier.borderGuard(shape: Shape): Modifier =
     this.then(
         Modifier.drawBehind {
             val stroke = BitChordGlassEdgeWidth.toPx()
             val outline =
-                RoundedCornerShape(percent = 50).createOutline(size, layoutDirection, this)
+                shape.createOutline(size, layoutDirection, this)
             drawOutline(outline, Color.White.copy(alpha = 0.10f), style = androidx.compose.ui.graphics.drawscope.Stroke(stroke))
         },
     )

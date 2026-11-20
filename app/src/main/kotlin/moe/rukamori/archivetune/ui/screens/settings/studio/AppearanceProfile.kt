@@ -8,6 +8,7 @@
 package moe.rukamori.archivetune.ui.screens.settings.studio
 
 import androidx.annotation.StringRes
+import moe.rukamori.archivetune.ui.motion.MotionConfig
 import androidx.compose.runtime.Immutable
 import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
@@ -49,6 +50,9 @@ import moe.rukamori.archivetune.constants.LyricsModeKey
 import moe.rukamori.archivetune.constants.LyricsTextSizeKey
 import moe.rukamori.archivetune.constants.MiniPlayerBackgroundStyle
 import moe.rukamori.archivetune.constants.MiniPlayerBackgroundStyleKey
+import moe.rukamori.archivetune.constants.MiniPlayerGlassGlowKey
+import moe.rukamori.archivetune.constants.MiniPlayerGlassGlowIntensityKey
+import moe.rukamori.archivetune.constants.NavigationBarArtworkStyleKey
 import moe.rukamori.archivetune.constants.MiniPlayerStyle
 import moe.rukamori.archivetune.constants.MiniPlayerStyleKey
 import moe.rukamori.archivetune.constants.MotionArtworkTransitionsKey
@@ -56,6 +60,12 @@ import moe.rukamori.archivetune.constants.MotionDecorativeBackgroundKey
 import moe.rukamori.archivetune.constants.MotionPressFeedbackKey
 import moe.rukamori.archivetune.constants.MotionProfile
 import moe.rukamori.archivetune.constants.MotionProfileKey
+import moe.rukamori.archivetune.constants.MotionBlurEnabledKey
+import moe.rukamori.archivetune.constants.MotionDurationPercentKey
+import moe.rukamori.archivetune.constants.MotionDurationPercentRange
+import moe.rukamori.archivetune.constants.MotionMenuStyleKey
+import moe.rukamori.archivetune.constants.MotionScreenStyleKey
+import moe.rukamori.archivetune.constants.MotionTransitionStyle
 import moe.rukamori.archivetune.constants.MotionScreenTransitionsKey
 import moe.rukamori.archivetune.constants.NAVIGATION_BAR_CORNER_RADIUS_DEFAULT
 import moe.rukamori.archivetune.constants.NAVIGATION_BAR_HEIGHT_DEFAULT
@@ -108,13 +118,28 @@ enum class AppearanceSection(
 @Serializable
 enum class NavBarMaterial(
     @StringRes val labelRes: Int,
+    val backgroundStyle: MiniPlayerBackgroundStyle,
 ) {
-    STANDARD(R.string.nav_material_standard),
-    FROSTED(R.string.nav_material_frosted),
-    TINTED(R.string.nav_material_tinted),
-    LIQUID_GLASS(R.string.nav_material_glass),
-    SUKISU_GLASS(R.string.nav_material_sukisu),
-    BITCHORD(R.string.nav_material_bitchord),
+    STANDARD(R.string.follow_theme, MiniPlayerBackgroundStyle.THEME),
+    GRADIENT(R.string.gradient, MiniPlayerBackgroundStyle.GRADIENT),
+    GLOW(R.string.glow, MiniPlayerBackgroundStyle.GLOW),
+    FROSTED(R.string.frosted_blur, MiniPlayerBackgroundStyle.FROSTED),
+    TINTED(R.string.nav_material_tinted, MiniPlayerBackgroundStyle.TINTED),
+    LIQUID_GLASS(R.string.nav_material_glass, MiniPlayerBackgroundStyle.LIQUID_GLASS),
+    SUKISU_GLASS(R.string.nav_material_sukisu, MiniPlayerBackgroundStyle.SUKISU_GLASS),
+    BITCHORD(R.string.nav_material_bitchord, MiniPlayerBackgroundStyle.BITCHORD);
+
+    val artworkStyle: MiniPlayerBackgroundStyle?
+        get() = if (this == GRADIENT || this == GLOW) backgroundStyle else null
+}
+
+internal fun MutablePreferences.writeNavigationBarMaterial(material: NavBarMaterial) {
+    this[NavigationBarArtworkStyleKey] = (material.artworkStyle ?: MiniPlayerBackgroundStyle.THEME).name
+    this[NavigationBarFrostedBlurKey] = material == NavBarMaterial.FROSTED
+    this[NavigationBarTintFrostedBlurKey] = material == NavBarMaterial.TINTED
+    this[LiquidGlassNavBarEnabledKey] = material == NavBarMaterial.LIQUID_GLASS
+    this[SukisuLiquidGlassNavBarKey] = material == NavBarMaterial.SUKISU_GLASS
+    this[NavigationBarBitchordKey] = material == NavBarMaterial.BITCHORD
 }
 
 @Serializable
@@ -140,6 +165,8 @@ data class NavigationProfile(
     val glassGlowIntensity: Float = NAVIGATION_BAR_GLASS_GLOW_INTENSITY_DEFAULT,
     val miniPlayerStyle: MiniPlayerStyle = MiniPlayerStyle.STANDARD,
     val miniPlayerBackground: MiniPlayerBackgroundStyle = MiniPlayerBackgroundStyle.THEME,
+    val miniPlayerGlassGlow: Boolean = true,
+    val miniPlayerGlassGlowIntensity: Float = NAVIGATION_BAR_GLASS_GLOW_INTENSITY_DEFAULT,
 )
 
 @Serializable
@@ -185,6 +212,10 @@ data class ColorProfile(
 @Immutable
 data class MotionProfileState(
     val profile: MotionProfile = MotionProfile.SYSTEM,
+    val durationPercent: Int = 100,
+    val screenStyle: MotionTransitionStyle = MotionTransitionStyle.DEFAULT,
+    val menuStyle: MotionTransitionStyle = MotionTransitionStyle.DEFAULT,
+    val motionBlur: Boolean = false,
     val disableAnimations: Boolean = false,
     val screenTransitions: Boolean = true,
     val artworkTransitions: Boolean = true,
@@ -195,6 +226,21 @@ data class MotionProfileState(
     val forceHighRefreshRate: Boolean = false,
     val backAnimationStyle: BackAnimationStyle = BackAnimationStyle.DEFAULT,
 )
+
+internal fun MotionProfileState.toMotionConfig(systemAnimatorScale: Float): MotionConfig =
+    MotionConfig(
+        profile = profile,
+        legacyDisableAnimations = disableAnimations,
+        systemAnimatorScale = systemAnimatorScale,
+        screenTransitionsChannel = screenTransitions,
+        artworkMotionChannel = artworkTransitions,
+        pressFeedbackChannel = pressFeedback,
+        decorativeBackgroundChannel = decorativeBackground,
+        durationPercent = durationPercent,
+        screenTransitionStyle = screenStyle,
+        menuTransitionStyle = menuStyle,
+        motionBlurChannel = motionBlur,
+    )
 
 fun playerStyleSupportsCustomBackground(style: PlayerDesignStyle): Boolean =
     style in setOf(
@@ -258,6 +304,9 @@ fun miniPlayerBackgroundStyleLabelRes(style: MiniPlayerBackgroundStyle): Int =
         MiniPlayerBackgroundStyle.GLOW -> R.string.glow
         MiniPlayerBackgroundStyle.FROSTED -> R.string.frosted_blur
         MiniPlayerBackgroundStyle.LIQUID_GLASS -> R.string.liquid_glass
+        MiniPlayerBackgroundStyle.TINTED -> R.string.nav_material_tinted
+        MiniPlayerBackgroundStyle.SUKISU_GLASS -> R.string.nav_material_sukisu
+        MiniPlayerBackgroundStyle.BITCHORD -> R.string.nav_material_bitchord
     }
 
 @StringRes
@@ -326,6 +375,7 @@ data class AppearanceProfileSnapshot(
                     labelSpacing = navigation.labelSpacing.coerceIn(0f, 16f),
                     cornerRadius = navigation.cornerRadius.coerceIn(0f, 48f),
                     glassGlowIntensity = navigation.glassGlowIntensity.coerceIn(0.2f, 2f),
+                    miniPlayerGlassGlowIntensity = navigation.miniPlayerGlassGlowIntensity.coerceIn(0.2f, 2f),
                 ),
             player =
                 player.copy(
@@ -342,6 +392,7 @@ data class AppearanceProfileSnapshot(
                 color.copy(
                     backdropBlurAmount = color.backdropBlurAmount.coerceIn(0, 100),
                 ),
+            motion = motion.copy(durationPercent = motion.durationPercent.coerceIn(MotionDurationPercentRange)),
         )
     }
 
@@ -380,11 +431,9 @@ data class AppearanceProfileSnapshot(
         prefs[ShowHomeCategoryChipsKey] = safe.home.showHomeCategoryChips
 
         // Navigation & MiniPlayer
-        prefs[NavigationBarFrostedBlurKey] = safe.navigation.material == NavBarMaterial.FROSTED
-        prefs[NavigationBarTintFrostedBlurKey] = safe.navigation.material == NavBarMaterial.TINTED
-        prefs[LiquidGlassNavBarEnabledKey] = safe.navigation.material == NavBarMaterial.LIQUID_GLASS
-        prefs[SukisuLiquidGlassNavBarKey] = safe.navigation.material == NavBarMaterial.SUKISU_GLASS
-        prefs[NavigationBarBitchordKey] = safe.navigation.material == NavBarMaterial.BITCHORD
+        prefs.writeNavigationBarMaterial(safe.navigation.material)
+        prefs[MiniPlayerGlassGlowKey] = safe.navigation.miniPlayerGlassGlow
+        prefs[MiniPlayerGlassGlowIntensityKey] = safe.navigation.miniPlayerGlassGlowIntensity
         prefs[NavigationBarCompactBehaviorKey] = safe.navigation.compactBehavior.name
         prefs[HideNavigationBarLabelsKey] = safe.navigation.hideLabels
         prefs[NavigationBarWidthKey] = safe.navigation.widthFraction
@@ -430,6 +479,10 @@ data class AppearanceProfileSnapshot(
 
         // Motion
         prefs[MotionProfileKey] = safe.motion.profile.name
+        prefs[MotionDurationPercentKey] = safe.motion.durationPercent
+        prefs[MotionScreenStyleKey] = safe.motion.screenStyle.name
+        prefs[MotionMenuStyleKey] = safe.motion.menuStyle.name
+        prefs[MotionBlurEnabledKey] = safe.motion.motionBlur
         prefs[DisableAnimationsKey] = safe.motion.disableAnimations
         prefs[MotionScreenTransitionsKey] = safe.motion.screenTransitions
         prefs[MotionArtworkTransitionsKey] = safe.motion.artworkTransitions
@@ -477,6 +530,8 @@ data class AppearanceProfileSnapshot(
                     prefs[NavigationBarBitchordKey] == true -> NavBarMaterial.BITCHORD
                     prefs[NavigationBarTintFrostedBlurKey] == true -> NavBarMaterial.TINTED
                     prefs[NavigationBarFrostedBlurKey] == true -> NavBarMaterial.FROSTED
+                    prefs[NavigationBarArtworkStyleKey] == MiniPlayerBackgroundStyle.GRADIENT.name -> NavBarMaterial.GRADIENT
+                    prefs[NavigationBarArtworkStyleKey] == MiniPlayerBackgroundStyle.GLOW.name -> NavBarMaterial.GLOW
                     else -> NavBarMaterial.STANDARD
                 }
             return AppearanceProfileSnapshot(
@@ -510,6 +565,9 @@ data class AppearanceProfileSnapshot(
                         miniPlayerStyle = parseEnum(prefs[MiniPlayerStyleKey], MiniPlayerStyle.STANDARD),
                         miniPlayerBackground =
                             parseEnum(prefs[MiniPlayerBackgroundStyleKey], MiniPlayerBackgroundStyle.THEME),
+                        miniPlayerGlassGlow = prefs[MiniPlayerGlassGlowKey] ?: true,
+                        miniPlayerGlassGlowIntensity =
+                            prefs[MiniPlayerGlassGlowIntensityKey] ?: NAVIGATION_BAR_GLASS_GLOW_INTENSITY_DEFAULT,
                     ),
                 player =
                     PlayerProfile(
@@ -554,6 +612,10 @@ data class AppearanceProfileSnapshot(
                 motion =
                     MotionProfileState(
                         profile = parseEnum(prefs[MotionProfileKey], MotionProfile.SYSTEM),
+                        durationPercent = prefs[MotionDurationPercentKey] ?: 100,
+                        screenStyle = parseEnum(prefs[MotionScreenStyleKey], MotionTransitionStyle.DEFAULT),
+                        menuStyle = parseEnum(prefs[MotionMenuStyleKey], MotionTransitionStyle.DEFAULT),
+                        motionBlur = prefs[MotionBlurEnabledKey] ?: false,
                         disableAnimations = prefs[DisableAnimationsKey] ?: isLowRamDevice,
                         screenTransitions = prefs[MotionScreenTransitionsKey] ?: true,
                         artworkTransitions = prefs[MotionArtworkTransitionsKey] ?: true,
