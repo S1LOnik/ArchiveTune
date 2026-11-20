@@ -44,6 +44,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -674,11 +676,11 @@ fun UnifiedNavMiniPlayerPreview(
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         if (onSelectPreset != null) {
-            Row(
+            LazyRow(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                NavMiniPlayerStarterPresets.forEach { preset ->
+                items(NavMiniPlayerStarterPresets, key = { it.id }) { preset ->
                     FilterChip(
                         selected = preset.navigation.material == navigation.material &&
                             preset.navigation.miniPlayerStyle == navigation.miniPlayerStyle &&
@@ -688,10 +690,9 @@ fun UnifiedNavMiniPlayerPreview(
                             Text(
                                 text = stringResource(preset.titleRes),
                                 maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
+                                softWrap = false,
                             )
                         },
-                        modifier = Modifier.weight(1f),
                     )
                 }
             }

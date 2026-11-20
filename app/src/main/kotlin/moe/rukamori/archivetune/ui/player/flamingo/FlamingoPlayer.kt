@@ -75,7 +75,9 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -86,9 +88,12 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -1130,8 +1135,20 @@ fun FlamingoPlayerContent(
                                 }
                             }
 
+                    val landscapeTopInset =
+                        WindowInsets.statusBars
+                            .asPaddingValues()
+                            .calculateTopPadding()
+                            .coerceAtLeast(12.dp)
+
                     Row(
-                        modifier = Modifier.fillMaxSize(),
+                        modifier =
+                            Modifier
+                                .fillMaxSize()
+                                .windowInsetsPadding(
+                                    WindowInsets.displayCutout.only(WindowInsetsSides.Horizontal),
+                                )
+                                .padding(top = landscapeTopInset),
                     ) {
                         BoxWithConstraints(
                             modifier =
@@ -1139,129 +1156,127 @@ fun FlamingoPlayerContent(
                                     .weight(1f)
                                     .fillMaxHeight(),
                         ) {
-                            val landscapeCanvasFullBleed = canvasActive && !videoShowing
-                            if (videoShowing) {
-                                Box(
-                                    modifier =
-                                        Modifier
-                                            .fillMaxSize()
-                                            .then(landscapeSwipeModifier),
-                                ) {
-                                    InlineVideoPlayer(
-                                        controlsOnTap = true,
-                                        resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM,
-                                        modifier = Modifier.fillMaxSize(),
-                                    )
-                                    Box(
-                                        modifier =
-                                            Modifier
-                                                .matchParentSize()
-                                                .background(FlamingoLandscapeRightScrim),
-                                    )
-                                }
-                            } else if (landscapeCanvasFullBleed) {
-                                Box(
-                                    modifier =
-                                        Modifier
-                                            .fillMaxSize()
-                                            .then(landscapeSwipeModifier),
-                                ) {
-                                    FlamingoLandscapeStage(
-                                        artworkUrl = artworkUrl,
-                                        canvasPrimaryUrl = canvasPrimaryUrl,
-                                        canvasFallbackUrl = canvasFallbackUrl,
-                                        isPlaying = isPlaying,
-                                        fullBleed = true,
-                                        artworkSize = null,
-                                        modifier = Modifier.fillMaxSize(),
-                                    )
-                                }
-                            } else {
-                                val landscapeArtworkSize =
-                                    (maxWidth - 96.dp)
-                                        .coerceAtMost(maxHeight * 0.68f)
-                                        .coerceAtLeast(220.dp)
-
-                                Box(
-                                    modifier =
-                                        Modifier
-                                            .fillMaxSize()
-                                            .then(landscapeSwipeModifier),
-                                ) {
-                                    FlamingoLandscapeStage(
-                                        artworkUrl = artworkUrl,
-                                        canvasPrimaryUrl = canvasPrimaryUrl,
-                                        canvasFallbackUrl = canvasFallbackUrl,
-                                        isPlaying = isPlaying,
-                                        fullBleed = false,
-                                        artworkSize = landscapeArtworkSize,
-                                        modifier = Modifier.fillMaxSize(),
-                                    )
-                                }
-                            }
-                        }
-
-                        Column(
-                            modifier =
-                                Modifier
-                                    .weight(1f)
-                                    .fillMaxHeight()
-                                    .padding(bottom = contentBottomPadding),
-                            verticalArrangement = Arrangement.Bottom,
-                        ) {
-                            Box(
-                                modifier =
-                                    Modifier
-                                        .weight(1f)
-                                        .fillMaxWidth(),
+                            androidx.compose.animation.AnimatedVisibility(
+                                visible = nowPage == FlamingoPage.Album,
+                                enter = fadeIn(tween(240, easing = FastOutSlowInEasing)),
+                                exit = fadeOut(tween(200, easing = FastOutSlowInEasing)),
+                                modifier = Modifier.matchParentSize(),
                             ) {
-                                androidx.compose.animation.AnimatedVisibility(
-                                    visible = nowPage == FlamingoPage.Lyric,
-                                    enter = fadeIn(tween(400, easing = FastOutSlowInEasing)),
-                                    exit = fadeOut(tween(300, easing = FastOutSlowInEasing)),
-                                    modifier = Modifier.matchParentSize(),
-                                ) {
+                                val landscapeCanvasFullBleed = canvasActive && !videoShowing
+                                if (videoShowing) {
                                     Box(
                                         modifier =
                                             Modifier
                                                 .fillMaxSize()
-                                                .padding(horizontal = 16.dp),
+                                                .then(landscapeSwipeModifier),
                                     ) {
-                                        if (lyricsContentReady) {
-                                            val isAiTranslated =
-                                                currentLyrics?.source == LyricsEntity.Source.AI_TRANSLATION.value
-                                            AnimatedContent(
-                                                targetState = Triple(autoTranslateLyrics, romanizationOn, isAiTranslated),
-                                                transitionSpec = {
-                                                    fadeIn(tween(360, easing = FastOutSlowInEasing)) togetherWith
-                                                        fadeOut(tween(280, easing = FastOutSlowInEasing))
-                                                },
-                                                modifier = Modifier.fillMaxSize(),
-                                                label = "FlamingoLandscapeLyricsRender",
-                                            ) { renderKey ->
-                                                val (showTranslationLines, showRomanization, _) = renderKey
-                                                CompositionLocalProvider(
-                                                    LocalLyricsScrollListener provides lyricsControlsPoke,
-                                                ) {
-                                                    LyricsEnhanced(
-                                                        sliderPositionProvider = lyricsPosProvider,
-                                                        lyricsSyncOffset = lyricsSyncOffset,
-                                                        translationVisibleOverride = showTranslationLines,
-                                                        phoneticVisibleOverride = if (showRomanization) null else false,
-                                                        textColorOverride = Color.White,
-                                                        modifier = Modifier.fillMaxSize(),
-                                                    )
-                                                }
+                                        InlineVideoPlayer(
+                                            controlsOnTap = true,
+                                            resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM,
+                                            modifier = Modifier.fillMaxSize(),
+                                        )
+                                        Box(
+                                            modifier =
+                                                Modifier
+                                                    .matchParentSize()
+                                                    .background(FlamingoLandscapeRightScrim),
+                                        )
+                                    }
+                                } else if (landscapeCanvasFullBleed) {
+                                    Box(
+                                        modifier =
+                                            Modifier
+                                                .fillMaxSize()
+                                                .then(landscapeSwipeModifier),
+                                    ) {
+                                        FlamingoLandscapeStage(
+                                            artworkUrl = artworkUrl,
+                                            canvasPrimaryUrl = canvasPrimaryUrl,
+                                            canvasFallbackUrl = canvasFallbackUrl,
+                                            isPlaying = isPlaying,
+                                            fullBleed = true,
+                                            artworkSize = null,
+                                            modifier = Modifier.fillMaxSize(),
+                                        )
+                                    }
+                                } else {
+                                    val landscapeArtworkSize =
+                                        (maxWidth - 96.dp)
+                                            .coerceAtMost(maxHeight * 0.68f)
+                                            .coerceAtLeast(220.dp)
+
+                                    Box(
+                                        modifier =
+                                            Modifier
+                                                .fillMaxSize()
+                                                .then(landscapeSwipeModifier),
+                                    ) {
+                                        FlamingoLandscapeStage(
+                                            artworkUrl = artworkUrl,
+                                            canvasPrimaryUrl = canvasPrimaryUrl,
+                                            canvasFallbackUrl = canvasFallbackUrl,
+                                            isPlaying = isPlaying,
+                                            fullBleed = false,
+                                            artworkSize = landscapeArtworkSize,
+                                            modifier = Modifier.fillMaxSize(),
+                                        )
+                                    }
+                                }
+                            }
+
+                            androidx.compose.animation.AnimatedVisibility(
+                                visible = nowPage == FlamingoPage.Lyric,
+                                enter = fadeIn(tween(320, easing = FastOutSlowInEasing)),
+                                exit = fadeOut(tween(240, easing = FastOutSlowInEasing)),
+                                modifier = Modifier.matchParentSize(),
+                            ) {
+                                Box(
+                                    modifier =
+                                        Modifier
+                                            .fillMaxSize()
+                                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                                ) {
+                                    if (lyricsContentReady) {
+                                        val isAiTranslated =
+                                            currentLyrics?.source == LyricsEntity.Source.AI_TRANSLATION.value
+                                        AnimatedContent(
+                                            targetState = Triple(autoTranslateLyrics, romanizationOn, isAiTranslated),
+                                            transitionSpec = {
+                                                fadeIn(tween(360, easing = FastOutSlowInEasing)) togetherWith
+                                                    fadeOut(tween(280, easing = FastOutSlowInEasing))
+                                            },
+                                            modifier = Modifier.fillMaxSize(),
+                                            label = "FlamingoLandscapeLyricsRender",
+                                        ) { renderKey ->
+                                            val (showTranslationLines, showRomanization, _) = renderKey
+                                            CompositionLocalProvider(
+                                                LocalLyricsScrollListener provides lyricsControlsPoke,
+                                            ) {
+                                                LyricsEnhanced(
+                                                    sliderPositionProvider = lyricsPosProvider,
+                                                    lyricsSyncOffset = lyricsSyncOffset,
+                                                    translationVisibleOverride = showTranslationLines,
+                                                    phoneticVisibleOverride = if (showRomanization) null else false,
+                                                    textColorOverride = Color.White,
+                                                    modifier = Modifier.fillMaxSize(),
+                                                )
                                             }
                                         }
                                     }
                                 }
+                            }
 
-                                androidx.compose.animation.AnimatedVisibility(
-                                    visible = nowPage == FlamingoPage.PlayingList,
-                                    enter = fadeIn(tween(AnimDurationMillis)),
-                                    exit = fadeOut(tween(AnimDurationMillis)),
-                                    modifier = Modifier.matchParentSize(),
+                            androidx.compose.animation.AnimatedVisibility(
+                                visible = nowPage == FlamingoPage.PlayingList,
+                                enter = fadeIn(tween(AnimDurationMillis)),
+                                exit = fadeOut(tween(AnimDurationMillis)),
+                                modifier = Modifier.matchParentSize(),
+                            ) {
+                                Box(
+                                    modifier =
+                                        Modifier
+                                            .fillMaxSize()
+                                            .padding(horizontal = 8.dp),
                                 ) {
                                     FlamingoPlayingList(
                                         playerConnection = playerConnection,
@@ -1276,60 +1291,65 @@ fun FlamingoPlayerContent(
                                     )
                                 }
                             }
+                        }
 
-                            Column(
-                                modifier = Modifier.fillMaxWidth(),
-                            ) {
-                                FlamingoLandscapeTitleBlock(
-                                    mediaMetadata = mediaMetadata,
-                                    currentSongLiked = currentSongLiked,
-                                    playerConnection = playerConnection,
-                                    navController = navController,
-                                    state = state,
-                                    bottomSheetPageState = bottomSheetPageState,
-                                    onMoreClick = onMoreClick,
-                                    onMorePositioned = { moreIconBounds = it },
-                                    onArtistClick = { artistPickerOpen = true },
-                                    playerMenuOpen = showAnchoredLyricsMenu,
-                                )
+                        Column(
+                            modifier =
+                                Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight()
+                                    .padding(bottom = contentBottomPadding),
+                            verticalArrangement = Arrangement.Center,
+                        ) {
+                            FlamingoLandscapeTitleBlock(
+                                mediaMetadata = mediaMetadata,
+                                currentSongLiked = currentSongLiked,
+                                playerConnection = playerConnection,
+                                navController = navController,
+                                state = state,
+                                bottomSheetPageState = bottomSheetPageState,
+                                onMoreClick = onMoreClick,
+                                onMorePositioned = { moreIconBounds = it },
+                                onArtistClick = { artistPickerOpen = true },
+                                playerMenuOpen = showAnchoredLyricsMenu,
+                            )
 
-                                FlamingoPlayerControl(
-                                    isPlayingLambda = { isPlayingStatusLambda.value },
-                                    playbackState = playbackState,
-                                    positionProvider = positionProvider,
-                                    durationProvider = { duration },
-                                    playerConnection = playerConnection,
-                                    currentFormat = currentFormat,
-                                    nowPage = { nowPageLambda.value },
-                                    onLyrics = {
-                                        nowPage = if (nowPageLambda.value == FlamingoPage.Lyric) {
-                                            FlamingoPage.Album
-                                        } else {
-                                            FlamingoPage.Lyric
-                                        }
-                                    },
-                                    onPlaylist = {
-                                        nowPage = if (nowPageLambda.value == FlamingoPage.PlayingList) {
-                                            FlamingoPage.Album
-                                        } else {
-                                            FlamingoPage.PlayingList
-                                        }
-                                    },
-                                    onSlider = {
-                                        showControl.value = true
-                                        lastClickTime.longValue = System.currentTimeMillis()
-                                    },
-                                    onQualityClick = {
-                                        bottomSheetPageState.show {
-                                            ShowMediaInfo(mediaMetadata.id)
-                                        }
-                                    },
-                                    onSliderValueChange = onSliderValueChange,
-                                    onSliderValueChangeFinished = onSliderValueChangeFinished,
-                                    modifier = Modifier
-                                        .padding(top = 8.dp),
-                                )
-                            }
+                            FlamingoPlayerControl(
+                                isPlayingLambda = { isPlayingStatusLambda.value },
+                                playbackState = playbackState,
+                                positionProvider = positionProvider,
+                                durationProvider = { duration },
+                                playerConnection = playerConnection,
+                                currentFormat = currentFormat,
+                                nowPage = { nowPageLambda.value },
+                                onLyrics = {
+                                    nowPage = if (nowPageLambda.value == FlamingoPage.Lyric) {
+                                        FlamingoPage.Album
+                                    } else {
+                                        FlamingoPage.Lyric
+                                    }
+                                },
+                                onPlaylist = {
+                                    nowPage = if (nowPageLambda.value == FlamingoPage.PlayingList) {
+                                        FlamingoPage.Album
+                                    } else {
+                                        FlamingoPage.PlayingList
+                                    }
+                                },
+                                onSlider = {
+                                    showControl.value = true
+                                    lastClickTime.longValue = System.currentTimeMillis()
+                                },
+                                onQualityClick = {
+                                    bottomSheetPageState.show {
+                                        ShowMediaInfo(mediaMetadata.id)
+                                    }
+                                },
+                                onSliderValueChange = onSliderValueChange,
+                                onSliderValueChangeFinished = onSliderValueChangeFinished,
+                                modifier = Modifier
+                                    .padding(top = 8.dp),
+                            )
                         }
                     }
                 } else {
