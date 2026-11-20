@@ -201,3 +201,7 @@
 -dontwarn io.netty.channel.kqueue.**
 -dontwarn io.netty.channel.unix.**
 
+## ArchiveTune 16.5 Appearance Studio profiles (R8 fullMode preservation)
+-keep class moe.rukamori.archivetune.ui.screens.settings.studio.** { *; }
+-keepclassmembers class moe.rukamori.archivetune.ui.screens.settings.studio.** { *; }
+

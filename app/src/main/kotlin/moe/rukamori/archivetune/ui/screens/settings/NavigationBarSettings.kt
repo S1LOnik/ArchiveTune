@@ -72,6 +72,8 @@ import androidx.navigation.NavController
 import moe.rukamori.archivetune.LocalPlayerAwareWindowInsets
 import moe.rukamori.archivetune.R
 import moe.rukamori.archivetune.constants.HideNavigationBarLabelsKey
+import moe.rukamori.archivetune.constants.MiniPlayerStyle
+import moe.rukamori.archivetune.constants.MiniPlayerStyleKey
 import moe.rukamori.archivetune.constants.NAVIGATION_BAR_CORNER_RADIUS_DEFAULT
 import moe.rukamori.archivetune.constants.NAVIGATION_BAR_HEIGHT_DEFAULT
 import moe.rukamori.archivetune.constants.NAVIGATION_BAR_LABEL_SPACING_DEFAULT
@@ -244,6 +246,33 @@ fun NavigationBarSettings(navController: NavController, scrollTo: String? = null
 
         LaunchedEffect(scrollTo) { positions.scrollToKey(scrollTo, scrollState) }
 
+        val (miniPlayerStyle, onMiniPlayerStyleChange) =
+            rememberEnumPreference(MiniPlayerStyleKey, defaultValue = MiniPlayerStyle.STANDARD)
+        val previewMaterial =
+            when {
+                sukisuLiquidGlassNavBar -> moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.SUKISU_GLASS
+                liquidGlassNavBarEnabled -> moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.LIQUID_GLASS
+                navigationBarBitchord -> moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.BITCHORD
+                navigationBarTintFrostedBlur -> moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.TINTED
+                navigationBarFrostedBlur -> moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.FROSTED
+                else -> moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.STANDARD
+            }
+        val currentNavProfile =
+            moe.rukamori.archivetune.ui.screens.settings.studio.NavigationProfile(
+                material = previewMaterial,
+                compactBehavior = compactBehavior,
+                hideLabels = hideNavigationBarLabels,
+                widthFraction = navigationBarWidth,
+                heightMultiplier = navigationBarHeight,
+                opacity = navigationBarOpacity,
+                transparency = navigationBarTransparency,
+                labelSpacing = navigationBarLabelSpacing,
+                cornerRadius = navigationBarCornerRadius,
+                glassGlow = navigationBarGlassGlow,
+                glassGlowIntensity = navigationBarGlassGlowIntensity,
+                miniPlayerStyle = miniPlayerStyle,
+            )
+
         Column(
             Modifier
                 .windowInsetsPadding(
@@ -258,6 +287,45 @@ fun NavigationBarSettings(navController: NavController, scrollTo: String? = null
                 .padding(top = topPadding)
                 .padding(bottom = playerAwareBottomPadding + SettingsDimensions.ScreenBottomPadding),
         ) {
+            PreferenceGroup(title = stringResource(R.string.preview)) {
+                item {
+                    moe.rukamori.archivetune.ui.screens.settings.studio.UnifiedNavMiniPlayerPreview(
+                        navigation = currentNavProfile,
+                        reducedMotion = !moe.rukamori.archivetune.ui.motion.LocalMotionConfig.current.animationsEnabled,
+                        onSelectPreset = { preset ->
+                            val nav = preset.navigation
+                            onFrostedBlurChange(nav.material == moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.FROSTED)
+                            onTintFrostedBlurChange(nav.material == moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.TINTED)
+                            onLiquidGlassNavBarChange(nav.material == moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.LIQUID_GLASS)
+                            onSukisuNavBarChange(nav.material == moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.SUKISU_GLASS)
+                            onBitchordChange(nav.material == moe.rukamori.archivetune.ui.screens.settings.studio.NavBarMaterial.BITCHORD)
+                            onCompactBehaviorChange(nav.compactBehavior)
+                            onHideNavigationBarLabelsChange(nav.hideLabels)
+                            onNavigationBarWidthChange(nav.widthFraction)
+                            onNavigationBarHeightChange(nav.heightMultiplier)
+                            onNavigationBarOpacityChange(nav.opacity)
+                            onNavigationBarTransparencyChange(nav.transparency)
+                            onNavigationBarCornerRadiusChange(nav.cornerRadius)
+                            onMiniPlayerStyleChange(nav.miniPlayerStyle)
+                        },
+                    )
+                }
+                item {
+                    EnumListPreference(
+                        title = { Text(stringResource(R.string.mini_player_style_title)) },
+                        icon = { Icon(painterResource(R.drawable.music_note), null) },
+                        selectedValue = miniPlayerStyle,
+                        onValueSelected = onMiniPlayerStyleChange,
+                        valueText = {
+                            when (it) {
+                                MiniPlayerStyle.STANDARD -> stringResource(R.string.mini_player_style_pill)
+                                MiniPlayerStyle.BAR -> stringResource(R.string.mini_player_style_bar)
+                            }
+                        },
+                    )
+                }
+            }
+
             PreferenceGroup(title = stringResource(R.string.navigation_bar_compact_behavior)) {
                 item {
                     CompactBehaviorPreview(

@@ -448,7 +448,10 @@ fun NavGraphBuilder.navigationBuilder(
         route = "settings/appearance_studio?scrollTo={scrollTo}",
         arguments = listOf(navArgument("scrollTo") { type = NavType.StringType; nullable = true; defaultValue = null }),
     ) {
-        AppearanceSettings(navController, scrollTo = it.savedStateHandle["scrollTo"])
+        moe.rukamori.archivetune.ui.screens.settings.studio.AppearanceStudioScreen(
+            navController = navController,
+            scrollTo = it.savedStateHandle["scrollTo"],
+        )
     }
     composable(
         route = "settings/appearance?scrollTo={scrollTo}",
