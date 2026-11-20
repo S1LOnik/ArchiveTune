@@ -427,18 +427,34 @@ fun NavGraphBuilder.navigationBuilder(
     composable("settings") {
         SettingsScreen(navController, latestVersionName())
     }
-    composable("settings/account") {
+    composable(
+        route = "settings/account?scrollTo={scrollTo}",
+        arguments = listOf(navArgument("scrollTo") { type = NavType.StringType; nullable = true; defaultValue = null }),
+    ) {
         AccountSettings(
             navController = navController,
             latestVersionName = latestVersionName(),
             viewModel = homeViewModel,
+            scrollTo = it.savedStateHandle["scrollTo"],
         )
     }
     composable("settings/hidden_playlists") {
         HiddenPlaylistsScreen(navController)
     }
-    composable("settings/appearance") {
-        AppearanceSettings(navController)
+    composable("settings/modified") {
+        moe.rukamori.archivetune.ui.screens.settings.ModifiedSettingsScreen(navController)
+    }
+    composable(
+        route = "settings/appearance_studio?scrollTo={scrollTo}",
+        arguments = listOf(navArgument("scrollTo") { type = NavType.StringType; nullable = true; defaultValue = null }),
+    ) {
+        AppearanceSettings(navController, scrollTo = it.savedStateHandle["scrollTo"])
+    }
+    composable(
+        route = "settings/appearance?scrollTo={scrollTo}",
+        arguments = listOf(navArgument("scrollTo") { type = NavType.StringType; nullable = true; defaultValue = null }),
+    ) {
+        AppearanceSettings(navController, scrollTo = it.savedStateHandle["scrollTo"])
     }
     composable("settings/mascot") {
         MascotSettings(navController)
@@ -465,11 +481,17 @@ fun NavGraphBuilder.navigationBuilder(
     ) {
         AppearanceExtrasSettings(navController, scrollTo = it.savedStateHandle["scrollTo"])
     }
-    composable("settings/content") {
-        ContentSettings(navController)
+    composable(
+        route = "settings/content?scrollTo={scrollTo}",
+        arguments = listOf(navArgument("scrollTo") { type = NavType.StringType; nullable = true; defaultValue = null }),
+    ) {
+        ContentSettings(navController, scrollTo = it.savedStateHandle["scrollTo"])
     }
-    composable("settings/lyrics") {
-        LyricsSettings(navController)
+    composable(
+        route = "settings/lyrics?scrollTo={scrollTo}",
+        arguments = listOf(navArgument("scrollTo") { type = NavType.StringType; nullable = true; defaultValue = null }),
+    ) {
+        LyricsSettings(navController, scrollTo = it.savedStateHandle["scrollTo"])
     }
     // [FIX-ZCODE] destinations for "settings/lyrics/providers", "settings/lyrics/romanisation"
     // and "settings/language_packs" (crash logs 10–11 wave: half of settings entries crashed
@@ -492,8 +514,11 @@ fun NavGraphBuilder.navigationBuilder(
     composable("settings/internet") {
         InternetSettings(navController)
     }
-    composable("settings/player") {
-        PlayerSettings(navController)
+    composable(
+        route = "settings/player?scrollTo={scrollTo}",
+        arguments = listOf(navArgument("scrollTo") { type = NavType.StringType; nullable = true; defaultValue = null }),
+    ) {
+        PlayerSettings(navController, scrollTo = it.savedStateHandle["scrollTo"])
     }
     composable("settings/canvas") {
         CanvasSettings(navController)

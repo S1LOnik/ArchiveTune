@@ -55,8 +55,14 @@ import java.util.Locale
 @Composable
 fun ContentSettings(
     navController: NavController,
+    scrollTo: String? = null,
 ) {
     val context = LocalContext.current
+    val scrollState = rememberScrollState()
+    val preferencePositions = rememberPreferencePositions()
+    androidx.compose.runtime.LaunchedEffect(scrollTo) {
+        preferencePositions.scrollToKey(scrollTo, scrollState)
+    }
     val (useSystemLanguage, onUseSystemLanguageChange) = rememberPreference(key = UseSystemLanguageKey, defaultValue = true)
 
     val (contentLanguage, onContentLanguageChange) = rememberPreference(key = ContentLanguageKey, defaultValue = "system")
@@ -74,7 +80,8 @@ fun ContentSettings(
     Column(
         Modifier
             .windowInsetsPadding(LocalPlayerAwareWindowInsets.current)
-            .verticalScroll(rememberScrollState())
+            .then(preferencePositions.containerModifier())
+            .verticalScroll(scrollState)
             .padding(bottom = SettingsDimensions.ScreenBottomPadding),
     ) {
         PreferenceGroup(title = stringResource(R.string.general)) {
@@ -171,8 +178,8 @@ fun ContentSettings(
             }
         }
 
-        AiContentFilterPreferences()
-        YouTubeLikesPreferences()
+        AiContentFilterPreferences(preferencePositions)
+        YouTubeLikesPreferences(preferencePositions)
 
         PreferenceGroup(title = stringResource(R.string.app_language)) {
             item {
@@ -238,7 +245,7 @@ fun ContentSettings(
 }
 
 @Composable
-private fun AiContentFilterPreferences() {
+private fun AiContentFilterPreferences(preferencePositions: PreferencePositions) {
     val (enabled, setEnabled) = rememberPreference(AiContentFilterEnabledKey, false)
     val (authors, setAuthors) = rememberPreference(AiMusicAuthorsKey, DefaultAiMusicAuthors)
     var editor by rememberSaveable { mutableStateOf<String?>(null) }
@@ -272,37 +279,49 @@ private fun AiContentFilterPreferences() {
     }
     PreferenceGroup(title = stringResource(R.string.ai_content_filter)) {
         item {
-            SwitchPreference(
-                title = { Text(stringResource(R.string.ai_music_filter_enable)) },
-                description = stringResource(R.string.ai_music_filter_summary),
-                icon = { Icon(painterResource(R.drawable.auto_awesome), null) },
-                checked = enabled,
-                onCheckedChange = setEnabled,
-            )
+            androidx.compose.foundation.layout.Box(
+                modifier = preferencePositions.modifierFor("ai_content_filter"),
+            ) {
+                SwitchPreference(
+                    title = { Text(stringResource(R.string.ai_music_filter_enable)) },
+                    description = stringResource(R.string.ai_music_filter_summary),
+                    icon = { Icon(painterResource(R.drawable.auto_awesome), null) },
+                    checked = enabled,
+                    onCheckedChange = setEnabled,
+                )
+            }
         }
         item {
-            PreferenceEntry(
-                title = { Text(stringResource(R.string.ai_music_authors)) },
-                description = stringResource(R.string.ai_music_authors_count, authors.size),
-                icon = { Icon(painterResource(R.drawable.person), null) },
-                onClick = { editor = authors.sorted().joinToString("\n") },
-            )
+            androidx.compose.foundation.layout.Box(
+                modifier = preferencePositions.modifierFor("ai_music_authors"),
+            ) {
+                PreferenceEntry(
+                    title = { Text(stringResource(R.string.ai_music_authors)) },
+                    description = stringResource(R.string.ai_music_authors_count, authors.size),
+                    icon = { Icon(painterResource(R.drawable.person), null) },
+                    onClick = { editor = authors.sorted().joinToString("\n") },
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun YouTubeLikesPreferences() {
+private fun YouTubeLikesPreferences(preferencePositions: PreferencePositions) {
     val (videos, setVideos) = rememberPreference(YouTubeLikesIncludeVideosKey, false)
     val (podcasts, setPodcasts) = rememberPreference(YouTubeLikesIncludePodcastsKey, false)
     PreferenceGroup(title = stringResource(R.string.youtube_likes_filter)) {
         item {
-            SwitchPreference(
-                title = { Text(stringResource(R.string.youtube_likes_include_videos)) },
-                icon = { Icon(painterResource(R.drawable.slow_motion_video), null) },
-                checked = videos,
-                onCheckedChange = setVideos,
-            )
+            androidx.compose.foundation.layout.Box(
+                modifier = preferencePositions.modifierFor("youtube_likes"),
+            ) {
+                SwitchPreference(
+                    title = { Text(stringResource(R.string.youtube_likes_include_videos)) },
+                    icon = { Icon(painterResource(R.drawable.slow_motion_video), null) },
+                    checked = videos,
+                    onCheckedChange = setVideos,
+                )
+            }
         }
         item {
             SwitchPreference(

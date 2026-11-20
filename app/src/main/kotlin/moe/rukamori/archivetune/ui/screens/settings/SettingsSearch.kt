@@ -8,7 +8,7 @@
 package moe.rukamori.archivetune.ui.screens.settings
 
 internal object SettingsSearch {
-    private val SEPARATOR_REGEX = Regex("[^a-z0-9]+")
+    private val SEPARATOR_REGEX = Regex("[^\\p{L}\\p{Nd}]+")
 
     private val SYNONYMS: Map<String, List<String>> =
         mapOf(
@@ -18,37 +18,111 @@ internal object SettingsSearch {
             "customise" to listOf("customize"),
             "organise" to listOf("organize"),
             "night" to listOf("dark"),
-            "vibration" to listOf("haptic"),
-            "vibrate" to listOf("haptic"),
-            "vibrations" to listOf("haptic"),
+            "vibration" to listOf("haptic", "вибрация", "виброотклик"),
+            "vibrate" to listOf("haptic", "вибрация", "виброотклик"),
+            "vibrations" to listOf("haptic", "вибрация", "виброотклик"),
+            "haptic" to listOf("vibration", "вибрация", "виброотклик", "haptics"),
+            "haptics" to listOf("vibration", "haptic", "вибрация", "виброотклик"),
             "wallpaper" to listOf("background", "backdrop"),
             "lockscreen" to listOf("aod", "always", "screen"),
-            "song" to listOf("track", "music"),
-            "songs" to listOf("track", "music"),
-            "pic" to listOf("thumbnail", "artwork", "image", "cover"),
-            "picture" to listOf("thumbnail", "artwork", "image", "cover"),
-            "art" to listOf("artwork", "thumbnail", "cover"),
+            "song" to listOf("track", "music", "песня"),
+            "songs" to listOf("track", "music", "песни"),
+            "pic" to listOf("thumbnail", "artwork", "image", "cover", "обложка"),
+            "picture" to listOf("thumbnail", "artwork", "image", "cover", "обложка"),
+            "art" to listOf("artwork", "thumbnail", "cover", "обложка"),
+            "artwork" to listOf("cover", "thumbnail", "square", "обложка", "квадратная"),
+            "thumbnail" to listOf("artwork", "cover", "square", "crop", "обложка", "квадратная"),
+            "cover" to listOf("artwork", "thumbnail", "square", "crop", "обложка", "квадратная"),
+            "square" to listOf("crop", "thumbnail", "cover", "artwork", "квадратная"),
             "vol" to listOf("volume"),
             "eq" to listOf("equalizer", "normalization"),
-            "lang" to listOf("language"),
-            "translate" to listOf("translation", "translator"),
+            "lang" to listOf("language", "язык"),
+            "translate" to listOf("translation", "translator", "перевод"),
             "pass" to listOf("password"),
             "pwd" to listOf("password"),
             "login" to listOf("account", "sign"),
             "signin" to listOf("account", "login"),
             "hires" to listOf("lossless", "flac", "quality"),
             "hifi" to listOf("lossless", "flac", "quality"),
-            "size" to listOf("scale", "font"),
-            "speed" to listOf("limit", "bandwidth"),
+            "size" to listOf("scale", "font", "размер"),
+            "speed" to listOf("limit", "bandwidth", "скорость"),
             "net" to listOf("network", "internet"),
             "wifi" to listOf("network", "internet"),
             "data" to listOf("network", "internet"),
             "notification" to listOf("notify"),
-            "delete" to listOf("clear", "remove"),
-            "reset" to listOf("clear", "remove"),
+            "delete" to listOf("clear", "remove", "убрать"),
+            "reset" to listOf("clear", "remove", "сбросить"),
             "folder" to listOf("directory", "location", "path"),
             "toggle" to listOf("enable", "show"),
             "sync" to listOf("synchronize", "synchronise"),
+            "cast" to listOf("chromecast", "route", "каст", "трансляция", "трансляцию"),
+            "chromecast" to listOf("cast", "каст", "трансляция", "трансляцию"),
+            "navbar" to listOf("navigation", "nav", "bottom", "bar", "навбар", "панель", "нижняя"),
+            "nav" to listOf("navigation", "navbar", "bottom", "bar", "навбар", "панель"),
+            "navigation" to listOf("navbar", "nav", "bottom", "bar", "навбар", "панель", "навигация", "нижняя"),
+            "labels" to listOf("label", "подписи", "ярлыки"),
+            "hide" to listOf("hidden", "remove", "disable", "убрать", "скрыть", "отключить", "без"),
+            "remove" to listOf("hide", "disable", "убрать", "скрыть", "отключить"),
+            "disable" to listOf("hide", "off", "without", "отключить", "убрать", "без"),
+            "motion" to listOf("animation", "animations", "transition", "движение", "анимации", "переходы"),
+            "animation" to listOf("animations", "motion", "transition", "движение", "анимации"),
+            "animations" to listOf("animation", "motion", "transition", "движение", "анимации", "анимаций"),
+            "lyrics" to listOf("lyric", "lrc", "слова", "текст", "тексты", "песни"),
+            "hidden" to listOf("hide", "invisible", "скрытые", "скрыть"),
+            "playlists" to listOf("playlist", "плейлисты", "плейлист"),
+            "playlist" to listOf("playlists", "плейлист", "плейлисты"),
+            "ai" to listOf("artificial", "author", "authors", "artist", "artists", "ии", "исполнители", "авторы", "нейросеть"),
+            "artists" to listOf("artist", "author", "authors", "исполнители", "авторы", "артисты"),
+            "other" to listOf("alternative", "sources", "другие", "источники"),
+            "sources" to listOf("source", "provider", "providers", "источники", "источник"),
+            "appearance" to listOf("studio", "theme", "style", "оформление", "вид", "стиль", "дизайн"),
+            "studio" to listOf("appearance", "theme", "style", "оформление", "студия", "стиль"),
+            "theme" to listOf("appearance", "style", "palette", "оформление", "тема"),
+            "miniplayer" to listOf("mini", "player", "bar", "pill", "мини", "плеер", "строка"),
+            "каст" to listOf("cast", "chromecast", "трансляция", "трансляцию", "показывать"),
+            "трансляция" to listOf("cast", "chromecast", "каст", "трансляцию"),
+            "трансляцию" to listOf("cast", "chromecast", "каст", "трансляция"),
+            "убрать" to listOf("hide", "disable", "remove", "show", "скрыть", "отключить", "без", "показывать"),
+            "скрыть" to listOf("hide", "hidden", "disable", "remove", "убрать", "скрытые", "показывать"),
+            "отключить" to listOf("disable", "off", "hide", "remove", "убрать", "без", "отключены"),
+            "без" to listOf("disable", "off", "no", "hide", "reduced", "убрать", "скрыть", "отключить", "минимум"),
+            "нижняя" to listOf("navigation", "nav", "bar", "navbar", "bottom", "панель", "навбар", "нижней"),
+            "панель" to listOf("bar", "navbar", "navigation", "nav", "bottom", "нижняя", "навбар", "панели"),
+            "навбар" to listOf("navigation", "nav", "bar", "navbar", "bottom", "панель", "нижняя", "навигация"),
+            "навигация" to listOf("navigation", "nav", "bar", "navbar", "навбар", "панель"),
+            "подписи" to listOf("labels", "label", "titles", "ярлыки", "названия"),
+            "ярлыки" to listOf("labels", "label", "подписи"),
+            "движение" to listOf("motion", "animation", "animations", "transition", "анимации", "переходы", "характер"),
+            "анимация" to listOf("animation", "animations", "motion", "движение", "анимации"),
+            "анимации" to listOf("animation", "animations", "motion", "движение", "анимаций"),
+            "анимаций" to listOf("animation", "animations", "motion", "движение", "анимации"),
+            "слова" to listOf("lyrics", "lyric", "текст", "тексты", "песни"),
+            "текст" to listOf("lyrics", "lyric", "слова", "тексты", "песни"),
+            "тексты" to listOf("lyrics", "lyric", "слова", "текст", "песни"),
+            "песни" to listOf("lyrics", "songs", "tracks", "слова", "текст", "тексты"),
+            "песня" to listOf("lyrics", "song", "track", "слова"),
+            "обложка" to listOf("cover", "artwork", "thumbnail", "crop", "square", "квадратная", "обложки"),
+            "обложки" to listOf("cover", "artwork", "thumbnail", "crop", "square", "квадратная", "обложка"),
+            "квадратная" to listOf("square", "crop", "thumbnail", "cover", "artwork", "обложка", "квадрату"),
+            "квадратные" to listOf("square", "crop", "thumbnail", "cover", "artwork", "обложки"),
+            "скрытые" to listOf("hidden", "hide", "скрыть", "скрыт", "плейлисты"),
+            "плейлисты" to listOf("playlists", "playlist", "плейлист"),
+            "плейлист" to listOf("playlist", "playlists", "плейлисты"),
+            "ии" to listOf("ai", "artificial", "нейросеть", "авторы", "авторов", "исполнители", "исполнителей"),
+            "исполнители" to listOf("artists", "artist", "authors", "author", "авторы", "артисты"),
+            "авторы" to listOf("authors", "author", "artists", "artist", "исполнители"),
+            "авторов" to listOf("authors", "author", "artists", "artist", "авторы", "исполнители"),
+            "другие" to listOf("other", "alternative", "sources", "источники"),
+            "источники" to listOf("sources", "source", "providers", "other", "источник"),
+            "оформление" to listOf("appearance", "studio", "theme", "style", "дизайн", "вид", "стиль", "студия"),
+            "стиль" to listOf("style", "theme", "preset", "design", "пресет", "оформление"),
+            "главная" to listOf("home", "feed", "quick", "домой"),
+            "плеер" to listOf("player", "miniplayer", "проигрыватель"),
+            "вибро" to listOf("haptics", "haptic", "vibration", "вибрация", "виброотклик"),
+            "вибрация" to listOf("haptics", "haptic", "vibration", "виброотклик"),
+            "виброотклик" to listOf("haptics", "haptic", "vibration", "вибрация"),
+            "сброс" to listOf("reset", "clear", "default", "сбросить"),
+            "изменено" to listOf("modified", "changed", "custom", "edited"),
         )
 
     private enum class Tier { STRICT, RELAXED }
@@ -125,7 +199,6 @@ internal object SettingsSearch {
 
                 if (childMatches.isNotEmpty()) {
                     matches += childMatches
-                    continue
                 }
 
                 val parentHaystack =
@@ -134,6 +207,8 @@ internal object SettingsSearch {
                         strongFields = item.keywords + listOfNotNull(item.subtitle),
                         contextFields = emptyList(),
                     )
+                val shouldSkipParent = childMatches.isNotEmpty() && parentHaystack.titleText != queryText
+                if (shouldSkipParent) continue
                 evaluate(
                     haystack = parentHaystack,
                     terms = terms,
@@ -213,11 +288,11 @@ internal object SettingsSearch {
         score += strengthSum * 10
 
         when {
-            haystack.titleText == queryText -> score += 400
-            haystack.titleText.startsWith(queryText) -> score += 250
-            haystack.titleText.contains(queryText) -> score += 180
-            haystack.strongText.contains(queryText) -> score += 90
-            haystack.squashed.contains(querySquashed) -> score += 30
+            haystack.titleText == queryText -> score += 2_000
+            haystack.titleText.startsWith(queryText) -> score += 600
+            haystack.titleText.contains(queryText) -> score += 260
+            haystack.strongText.contains(queryText) -> score += 120
+            haystack.squashed.contains(querySquashed) -> score += 40
         }
 
         if (haystack.contextText.isNotEmpty()) {
@@ -322,9 +397,10 @@ internal object SettingsSearch {
     private fun tokenizeAll(fields: List<String>): List<String> =
         fields.flatMap { field -> normalizeText(field).split(' ') }.filter { it.isNotBlank() }
 
-    private fun normalizeText(text: String): String =
+    internal fun normalizeText(text: String): String =
         text
             .lowercase()
+            .replace('ё', 'е')
             .replace(SEPARATOR_REGEX, " ")
             .trim()
 }

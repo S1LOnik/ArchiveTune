@@ -151,7 +151,15 @@ import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AppearanceSettings(navController: NavController) {
+fun AppearanceSettings(
+    navController: NavController,
+    scrollTo: String? = null,
+) {
+    val scrollState = rememberScrollState()
+    val preferencePositions = rememberPreferencePositions()
+    LaunchedEffect(scrollTo) {
+        preferencePositions.scrollToKey(scrollTo, scrollState)
+    }
     val playlistTagsViewModel: PlaylistTagsViewModel = hiltViewModel()
     val playlistTagsState by playlistTagsViewModel.screenState.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -546,7 +554,8 @@ fun AppearanceSettings(navController: NavController) {
             Modifier
                 .padding(top = topPadding)
                 .windowInsetsPadding(LocalPlayerAwareWindowInsets.current.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom))
-                .verticalScroll(rememberScrollState())
+                .then(preferencePositions.containerModifier())
+                .verticalScroll(scrollState)
                 .padding(bottom = SettingsDimensions.ScreenBottomPadding),
         ) {
             PreferenceGroup(title = stringResource(R.string.theme)) {
@@ -604,19 +613,23 @@ fun AppearanceSettings(navController: NavController) {
                 }
 
                 item {
-                    EnumListPreference(
-                        title = { Text(stringResource(R.string.dark_theme)) },
-                        icon = { Icon(painterResource(R.drawable.dark_mode), null) },
-                        selectedValue = darkMode,
-                        onValueSelected = onDarkModeChange,
-                        valueText = {
-                            when (it) {
-                                DarkMode.ON -> stringResource(R.string.dark_theme_on)
-                                DarkMode.OFF -> stringResource(R.string.dark_theme_off)
-                                DarkMode.AUTO -> stringResource(R.string.dark_theme_follow_system)
-                            }
-                        },
-                    )
+                    androidx.compose.foundation.layout.Box(
+                        modifier = preferencePositions.modifierFor("dark_theme"),
+                    ) {
+                        EnumListPreference(
+                            title = { Text(stringResource(R.string.dark_theme)) },
+                            icon = { Icon(painterResource(R.drawable.dark_mode), null) },
+                            selectedValue = darkMode,
+                            onValueSelected = onDarkModeChange,
+                            valueText = {
+                                when (it) {
+                                    DarkMode.ON -> stringResource(R.string.dark_theme_on)
+                                    DarkMode.OFF -> stringResource(R.string.dark_theme_off)
+                                    DarkMode.AUTO -> stringResource(R.string.dark_theme_follow_system)
+                                }
+                            },
+                        )
+                    }
                 }
 
                 item(visible = useDarkTheme) {
@@ -639,13 +652,17 @@ fun AppearanceSettings(navController: NavController) {
                 }
 
                 item {
-                    SwitchPreference(
-                        title = { Text(stringResource(R.string.disable_animations)) },
-                        description = stringResource(R.string.disable_animations_desc),
-                        icon = { Icon(painterResource(R.drawable.animation), null) },
-                        checked = disableAnimations,
-                        onCheckedChange = onDisableAnimationsChange,
-                    )
+                    androidx.compose.foundation.layout.Box(
+                        modifier = preferencePositions.modifierFor("disable_animations", "motion_profile"),
+                    ) {
+                        SwitchPreference(
+                            title = { Text(stringResource(R.string.disable_animations)) },
+                            description = stringResource(R.string.disable_animations_desc),
+                            icon = { Icon(painterResource(R.drawable.animation), null) },
+                            checked = disableAnimations,
+                            onCheckedChange = onDisableAnimationsChange,
+                        )
+                    }
                 }
 
                 item {
@@ -798,12 +815,13 @@ fun AppearanceSettings(navController: NavController) {
 
             PreferenceGroup(title = stringResource(R.string.player)) {
                 item {
-                    EnumListPreference(
-                        title = { Text(stringResource(R.string.player_design_style)) },
-                        icon = { Icon(painterResource(R.drawable.palette), null) },
-                        selectedValue = playerDesignStyle,
-                        onValueSelected = onPlayerDesignStyleChange,
-                        availableValues = SelectablePlayerDesignStyles,
+                    androidx.compose.foundation.layout.Box(modifier = preferencePositions.modifierFor("player_design_style")) {
+                        EnumListPreference(
+                            title = { Text(stringResource(R.string.player_design_style)) },
+                            icon = { Icon(painterResource(R.drawable.palette), null) },
+                            selectedValue = playerDesignStyle,
+                            onValueSelected = onPlayerDesignStyleChange,
+                            availableValues = SelectablePlayerDesignStyles,
                         valueText = {
                             when (it) {
                                 PlayerDesignStyle.V1 -> stringResource(R.string.player_design_v1)
@@ -824,7 +842,8 @@ fun AppearanceSettings(navController: NavController) {
                                 PlayerDesignStyle.LOOPER -> stringResource(R.string.player_design_looper)
                             }
                         },
-                    )
+                        )
+                    }
                 }
 
                 item {
@@ -844,8 +863,11 @@ fun AppearanceSettings(navController: NavController) {
                 }
 
                 item {
-                    EnumListPreference(
-                        title = { Text(stringResource(R.string.player_background_style)) },
+                    androidx.compose.foundation.layout.Box(
+                        modifier = preferencePositions.modifierFor("player_background_style"),
+                    ) {
+                        EnumListPreference(
+                            title = { Text(stringResource(R.string.player_background_style)) },
                         description =
                             if (isPlayerStyleCustomizationEnabled) {
                                 null
@@ -875,11 +897,12 @@ fun AppearanceSettings(navController: NavController) {
                                 PlayerBackgroundStyle.BLUR -> stringResource(R.string.player_background_blur)
                                 PlayerBackgroundStyle.COLORING -> stringResource(R.string.coloring)
                                 PlayerBackgroundStyle.BLUR_GRADIENT -> stringResource(R.string.blur_gradient)
-                                PlayerBackgroundStyle.GLOW -> stringResource(R.string.glow)
-                                PlayerBackgroundStyle.GLOW_ANIMATED -> "Glow Animated"
-                            }
-                        },
-                    )
+                                    PlayerBackgroundStyle.GLOW -> stringResource(R.string.glow)
+                                    PlayerBackgroundStyle.GLOW_ANIMATED -> "Glow Animated"
+                                }
+                            },
+                        )
+                    }
                 }
 
                 item {
@@ -945,13 +968,17 @@ fun AppearanceSettings(navController: NavController) {
                 }
 
                 item {
-                    SwitchPreference(
-                        title = { Text(stringResource(R.string.crop_thumbnail_to_square)) },
-                        description = stringResource(R.string.crop_thumbnail_to_square_desc),
-                        icon = { Icon(painterResource(R.drawable.image), null) },
-                        checked = cropThumbnailToSquare,
-                        onCheckedChange = onCropThumbnailToSquareChange,
-                    )
+                    androidx.compose.foundation.layout.Box(
+                        modifier = preferencePositions.modifierFor("crop_thumbnail_to_square"),
+                    ) {
+                        SwitchPreference(
+                            title = { Text(stringResource(R.string.crop_thumbnail_to_square)) },
+                            description = stringResource(R.string.crop_thumbnail_to_square_desc),
+                            icon = { Icon(painterResource(R.drawable.image), null) },
+                            checked = cropThumbnailToSquare,
+                            onCheckedChange = onCropThumbnailToSquareChange,
+                        )
+                    }
                 }
 
                 item {
@@ -1086,21 +1113,25 @@ fun AppearanceSettings(navController: NavController) {
 
             PreferenceGroup(title = stringResource(R.string.misc)) {
                 item {
-                    EnumListPreference(
-                        title = { Text(stringResource(R.string.home_feed_style)) },
-                        icon = { Icon(painterResource(R.drawable.home_outlined), null) },
-                        selectedValue = homeFeedStyle,
-                        onValueSelected = setHomeFeedStyle,
-                        valueText = {
-                            when (it) {
-                                HomeFeedStyle.STANDARD -> stringResource(R.string.home_feed_style_standard)
-                                HomeFeedStyle.COMPACT -> stringResource(R.string.home_feed_style_compact)
-                                HomeFeedStyle.GALLERY -> stringResource(R.string.home_feed_style_gallery)
-                                HomeFeedStyle.NOW -> stringResource(R.string.home_feed_style_compact)
-                                HomeFeedStyle.COVERS -> stringResource(R.string.home_feed_style_gallery)
-                            }
-                        },
-                    )
+                    androidx.compose.foundation.layout.Box(
+                        modifier = preferencePositions.modifierFor("home_feed_style"),
+                    ) {
+                        EnumListPreference(
+                            title = { Text(stringResource(R.string.home_feed_style)) },
+                            icon = { Icon(painterResource(R.drawable.home_outlined), null) },
+                            selectedValue = homeFeedStyle,
+                            onValueSelected = setHomeFeedStyle,
+                            valueText = {
+                                when (it) {
+                                    HomeFeedStyle.STANDARD -> stringResource(R.string.home_feed_style_standard)
+                                    HomeFeedStyle.COMPACT -> stringResource(R.string.home_feed_style_compact)
+                                    HomeFeedStyle.GALLERY -> stringResource(R.string.home_feed_style_gallery)
+                                    HomeFeedStyle.NOW -> stringResource(R.string.home_feed_style_now)
+                                    HomeFeedStyle.COVERS -> stringResource(R.string.home_feed_style_covers)
+                                }
+                            },
+                        )
+                    }
                 }
                 item {
                     EnumListPreference(
@@ -1381,5 +1412,5 @@ enum class LyricsPosition {
 
 // Legacy styles (Classic, Modern, Minimal, Little, Expressive) are hidden from the picker
 // and migrated to the default style on startup (see App.migrateRemovedPlayerStyles).
-private val SelectablePlayerDesignStyles: List<PlayerDesignStyle> =
+internal val SelectablePlayerDesignStyles: List<PlayerDesignStyle> =
     PlayerDesignStyle.entries.filterNot { it in RemovedPlayerDesignStyles }

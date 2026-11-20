@@ -91,8 +91,16 @@ import moe.rukamori.archivetune.viewmodels.SponsorBlockSettingsViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PlayerSettings(navController: NavController) {
+fun PlayerSettings(
+    navController: NavController,
+    scrollTo: String? = null,
+) {
     val (showCast, setShowCast) = rememberPreference(ShowCastInPlayerMenuKey, true)
+    val scrollState = rememberScrollState()
+    val preferencePositions = rememberPreferencePositions()
+    androidx.compose.runtime.LaunchedEffect(scrollTo) {
+        preferencePositions.scrollToKey(scrollTo, scrollState)
+    }
     val playbackPerformanceSettingsViewModel: PlaybackPerformanceSettingsViewModel =
         hiltViewModel()
     val playbackPerformanceSettingsState by
@@ -331,17 +339,22 @@ fun PlayerSettings(navController: NavController) {
             Modifier
                 .padding(top = topPadding)
                 .windowInsetsPadding(LocalPlayerAwareWindowInsets.current.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom))
-                .verticalScroll(rememberScrollState())
+                .then(preferencePositions.containerModifier())
+                .verticalScroll(scrollState)
                 .padding(bottom = SettingsDimensions.ScreenBottomPadding),
         ) {
             PreferenceGroup(title = stringResource(R.string.player)) {
                 if (moe.rukamori.archivetune.BuildConfig.FLAVOR.contains("gms", ignoreCase = true)) {
                     item {
-                        SwitchPreference(
-                            title = { Text(stringResource(R.string.show_cast_in_player_menu)) },
-                            checked = showCast,
-                            onCheckedChange = setShowCast,
-                        )
+                        androidx.compose.foundation.layout.Box(
+                            modifier = preferencePositions.modifierFor("show_cast_in_player_menu"),
+                        ) {
+                            SwitchPreference(
+                                title = { Text(stringResource(R.string.show_cast_in_player_menu)) },
+                                checked = showCast,
+                                onCheckedChange = setShowCast,
+                            )
+                        }
                     }
                 }
                 item {

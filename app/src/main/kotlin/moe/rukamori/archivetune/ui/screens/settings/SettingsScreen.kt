@@ -294,37 +294,44 @@ fun SettingsScreen(
                                 .padding(horizontal = SettingsDimensions.ScreenHorizontalPadding, vertical = 16.dp),
                     )
                 }
-            } else settingsGroups.forEachIndexed { groupIndex, group ->
-                if (groupIndex > 0) {
-                    item(
-                        key = "settings_group_spacing_$groupIndex",
-                        contentType = "settings_group_spacing",
-                    ) {
-                        Spacer(modifier = Modifier.height(SettingsDimensions.SectionSpacing))
+            } else {
+                val visibleGroups =
+                    settingsGroups.mapNotNull { group ->
+                        val visibleItems = group.items.filterNot { it.hidden }
+                        if (visibleItems.isEmpty()) null else group.copy(items = visibleItems)
                     }
-                }
+                visibleGroups.forEachIndexed { groupIndex, group ->
+                    if (groupIndex > 0) {
+                        item(
+                            key = "settings_group_spacing_${group.title}",
+                            contentType = "settings_group_spacing",
+                        ) {
+                            Spacer(modifier = Modifier.height(SettingsDimensions.SectionSpacing))
+                        }
+                    }
 
-                itemsIndexed(
-                    items = group.items,
-                    key = { _, item -> item.key },
-                    contentType = { _, _ -> "settings_segment" },
-                ) { index, settingsItem ->
-                    SettingsSegmentedItem(
-                        item = settingsItem,
-                        index = index,
-                        count = group.items.size,
-                        modifier =
-                            Modifier
-                                .padding(horizontal = SettingsDimensions.SegmentedGroupHorizontalPadding)
-                                .padding(
-                                    bottom =
-                                        if (index < group.items.lastIndex) {
-                                            SettingsDimensions.SegmentedItemGap
-                                        } else {
-                                            0.dp
-                                        },
-                                ),
-                    )
+                    itemsIndexed(
+                        items = group.items,
+                        key = { _, item -> item.key },
+                        contentType = { _, _ -> "settings_segment" },
+                    ) { index, settingsItem ->
+                        SettingsSegmentedItem(
+                            item = settingsItem,
+                            index = index,
+                            count = group.items.size,
+                            modifier =
+                                Modifier
+                                    .padding(horizontal = SettingsDimensions.SegmentedGroupHorizontalPadding)
+                                    .padding(
+                                        bottom =
+                                            if (index < group.items.lastIndex) {
+                                                SettingsDimensions.SegmentedItemGap
+                                            } else {
+                                                0.dp
+                                            },
+                                    ),
+                        )
+                    }
                 }
             }
         }
@@ -343,6 +350,8 @@ private fun searchableSettingsRoute(
             "account" -> "settings/account"
             "stats" -> "settings/account"
             "appearance" -> "settings/appearance"
+            "appearance_studio" -> "settings/appearance_studio"
+            "modified", "modified_settings" -> "settings/modified"
             "mascot" -> "settings/mascot"
             "appearance_extras" -> "settings/appearance/extras"
             "aod" -> "settings/appearance/aod_customized"
@@ -382,10 +391,24 @@ private fun searchableSettingsRoute(
     val supportsScroll =
         parentKey in
             setOf(
+                "account",
+                "stats",
+                "appearance",
+                "appearance_studio",
                 "appearance_extras",
+                "navigation_bar",
+                "playback",
+                "content",
+                "lyrics",
                 "lyrics_providers",
                 "lyrics_romanisation",
                 "downloads",
+                "sources",
+                "deezer",
+                "tidal",
+                "qobuz",
+                "jiosaavn",
+                "telegram",
             )
     return if (!supportsScroll || scrollKey.isNullOrBlank()) route else "$route?scrollTo=$scrollKey"
 }

@@ -8,35 +8,41 @@
 package moe.rukamori.archivetune.ui.screens.settings
 
 import androidx.compose.animation.core.animate
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.gestures.ScrollableState
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
+import moe.rukamori.archivetune.ui.motion.LocalMotionConfig
 import kotlin.math.abs
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 
 @Composable
 fun rememberPreferencePositions(): PreferencePositions {
-    val highlightColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
+    val highlightColor = MaterialTheme.colorScheme.primary
+    val motionConfig = LocalMotionConfig.current
     val positions = remember { PreferencePositions() }
 
-    positions.highlightColor = highlightColor
+    positions.highlightColor = highlightColor.copy(alpha = 0.18f)
+    positions.borderColor = highlightColor
+    positions.isStaticHighlight = motionConfig.highlightIsStatic
     return positions
 }
 
@@ -47,6 +53,8 @@ class PreferencePositions {
     private var viewportHeight: Float = 0f
 
     var highlightColor: Color = Color.Transparent
+    var borderColor: Color = Color.Transparent
+    var isStaticHighlight: Boolean by mutableStateOf(false)
 
     private var highlightedKey by mutableStateOf<String?>(null)
     private var highlightAlpha by mutableFloatStateOf(0f)
@@ -69,12 +77,30 @@ class PreferencePositions {
                 val progress = if (active != null && active in keys) highlightAlpha else 0f
                 if (progress <= 0f) return@drawWithContent
                 val inset = HighlightInset.toPx()
-                drawRoundRect(
-                    color = highlightColor.copy(alpha = highlightColor.alpha * progress),
-                    topLeft = Offset(inset, inset),
-                    size = Size(size.width - inset * 2, size.height - inset * 2),
-                    cornerRadius = CornerRadius(HighlightCornerRadius.toPx()),
-                )
+                val corner = CornerRadius(HighlightCornerRadius.toPx())
+                val rectSize = Size(size.width - inset * 2, size.height - inset * 2)
+                if (isStaticHighlight) {
+                    drawRoundRect(
+                        color = borderColor.copy(alpha = 0.22f),
+                        topLeft = Offset(inset, inset),
+                        size = rectSize,
+                        cornerRadius = corner,
+                    )
+                    drawRoundRect(
+                        color = borderColor.copy(alpha = 0.9f),
+                        topLeft = Offset(inset, inset),
+                        size = rectSize,
+                        cornerRadius = corner,
+                        style = Stroke(width = 1.5.dp.toPx()),
+                    )
+                } else {
+                    drawRoundRect(
+                        color = highlightColor.copy(alpha = highlightColor.alpha * progress),
+                        topLeft = Offset(inset, inset),
+                        size = rectSize,
+                        cornerRadius = corner,
+                    )
+                }
             }
 
     suspend fun scrollToKey(
@@ -88,13 +114,23 @@ class PreferencePositions {
             val rowTop = positions[key] ?: return@repeat
             val delta = rowTop - (viewportTop ?: 0f)
             if (abs(delta) < SETTLED_THRESHOLD_PX) return@repeat
-            scrollState.animateScrollBy(delta)
+            if (isStaticHighlight) {
+                scrollState.animateScrollBy(delta, snap())
+            } else {
+                scrollState.animateScrollBy(delta)
+            }
         }
 
         highlightedKey = key
-        animate(0f, 1f, animationSpec = tween(HighlightFadeInMs)) { value, _ -> highlightAlpha = value }
-        delay(HighlightHoldMs)
-        animate(1f, 0f, animationSpec = tween(HighlightFadeOutMs)) { value, _ -> highlightAlpha = value }
+        if (isStaticHighlight) {
+            highlightAlpha = 1f
+            delay(StaticHighlightHoldMs)
+            highlightAlpha = 0f
+        } else {
+            animate(0f, 1f, animationSpec = tween(HighlightFadeInMs)) { value, _ -> highlightAlpha = value }
+            delay(HighlightHoldMs)
+            animate(1f, 0f, animationSpec = tween(HighlightFadeOutMs)) { value, _ -> highlightAlpha = value }
+        }
         highlightedKey = null
     }
 
@@ -112,13 +148,24 @@ class PreferencePositions {
         var walked = 0f
         var steps = 0
         while (positions[key] == null && steps < SEARCH_STEPS && scrollState.canScrollForward) {
-            walked += scrollState.animateScrollBy(step)
+            walked +=
+                if (isStaticHighlight) {
+                    scrollState.animateScrollBy(step, snap())
+                } else {
+                    scrollState.animateScrollBy(step)
+                }
 
             delay(MEASURE_POLL_MS)
             steps++
         }
         if (positions[key] != null) return true
-        if (walked > 0f) scrollState.animateScrollBy(-walked)
+        if (walked > 0f) {
+            if (isStaticHighlight) {
+                scrollState.animateScrollBy(-walked, snap())
+            } else {
+                scrollState.animateScrollBy(-walked)
+            }
+        }
         return false
     }
 
@@ -139,4 +186,5 @@ private val HighlightCornerRadius = 18.dp
 private val HighlightInset = 1.dp
 private const val HighlightFadeInMs = 220
 private const val HighlightHoldMs = 1_100L
+private const val StaticHighlightHoldMs = 1_800L
 private const val HighlightFadeOutMs = 450

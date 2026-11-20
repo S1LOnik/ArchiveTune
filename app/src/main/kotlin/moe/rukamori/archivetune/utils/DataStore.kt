@@ -101,6 +101,8 @@ object PreferenceStore {
 
     fun <T> get(key: Preferences.Key<T>): T? = _prefs.value?.get(key)
 
+    fun currentPreferences(): Preferences? = _prefs.value
+
     fun launchEdit(
         dataStore: DataStore<Preferences>,
         block: MutablePreferences.() -> Unit,

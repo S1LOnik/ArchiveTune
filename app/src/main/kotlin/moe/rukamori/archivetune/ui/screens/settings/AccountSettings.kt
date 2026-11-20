@@ -139,10 +139,16 @@ fun AccountSettings(
     navController: NavController,
     latestVersionName: String,
     viewModel: HomeViewModel,
+    scrollTo: String? = null,
 ) {
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
     val scrollBehavior = appBarScrollBehavior()
+    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+    val preferencePositions = rememberPreferencePositions()
+    LaunchedEffect(scrollTo) {
+        preferencePositions.scrollToKey(scrollTo, listState)
+    }
 
     val accountLabel = stringResource(R.string.account)
     val generalLabel = stringResource(R.string.general)
@@ -310,12 +316,14 @@ fun AccountSettings(
                     ),
         ) {
             LazyColumn(
+                state = listState,
                 modifier =
                     Modifier
                         .fillMaxHeight()
                         .widthIn(max = AccountContentMaxWidth)
                         .fillMaxWidth()
-                        .align(Alignment.TopCenter),
+                        .align(Alignment.TopCenter)
+                        .then(preferencePositions.containerModifier()),
                 contentPadding =
                     PaddingValues(
                         start = 16.dp,
@@ -429,14 +437,16 @@ fun AccountSettings(
 
                 item {
                     ExpressiveSectionCard(title = miscLabel) {
-                        ExpressiveActionRow(
-                            icon = painterResource(R.drawable.visibility_off),
-                            title = stringResource(R.string.hidden_playlists),
-                            subtitle = stringResource(R.string.hidden_playlists_description),
-                            onClick = { navController.navigate("settings/hidden_playlists") },
-                            index = 0,
-                            count = 2,
-                        )
+                        Box(modifier = preferencePositions.modifierFor("hidden_playlists")) {
+                            ExpressiveActionRow(
+                                icon = painterResource(R.drawable.visibility_off),
+                                title = stringResource(R.string.hidden_playlists),
+                                subtitle = stringResource(R.string.hidden_playlists_description),
+                                onClick = { navController.navigate("settings/hidden_playlists") },
+                                index = 0,
+                                count = 2,
+                            )
+                        }
 
                         ExpressiveActionRow(
                             icon = painterResource(R.drawable.token),

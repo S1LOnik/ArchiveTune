@@ -352,7 +352,12 @@ fun NavigationBarSettings(navController: NavController, scrollTo: String? = null
                     SwitchPreference(
                         modifier = positions.modifierFor("sukisu_liquid_glass_nav_bar"),
                         title = { Text(stringResource(R.string.sukisu_liquid_glass_nav_bar)) },
-                        description = stringResource(R.string.sukisu_liquid_glass_nav_bar_desc),
+                        description =
+                            when {
+                                !glassSupported -> stringResource(R.string.liquid_glass_effects_unsupported)
+                                !liquidGlassEnabled -> stringResource(R.string.liquid_glass_nav_bar_disabled)
+                                else -> stringResource(R.string.sukisu_liquid_glass_nav_bar_desc)
+                            },
                         icon = { Icon(painterResource(R.drawable.blur_on), null) },
                         checked = sukisuLiquidGlassNavBar,
                         isEnabled = liquidGlassEnabled && glassSupported,
@@ -364,7 +369,12 @@ fun NavigationBarSettings(navController: NavController, scrollTo: String? = null
                     SwitchPreference(
                         modifier = positions.modifierFor("navigation_bar_glass_glow"),
                         title = { Text(stringResource(R.string.navigation_bar_glass_glow)) },
-                        description = stringResource(R.string.navigation_bar_glass_glow_desc),
+                        description =
+                            if (liquidGlassNavBarEnabled || sukisuLiquidGlassNavBar) {
+                                stringResource(R.string.navigation_bar_glass_glow_desc)
+                            } else {
+                                stringResource(R.string.dependency_nav_material_glow_bar)
+                            },
                         icon = { Icon(painterResource(R.drawable.solar_brightness_high_linear), null) },
                         checked = navigationBarGlassGlow,
                         onCheckedChange = onNavigationBarGlassGlowChange,
@@ -373,6 +383,7 @@ fun NavigationBarSettings(navController: NavController, scrollTo: String? = null
 
                 item {
                     SliderPreferenceRow(
+                        modifier = positions.modifierFor("navigation_bar_glass_glow_intensity"),
                         title = stringResource(R.string.navigation_bar_glass_glow_intensity),
                         description = stringResource(R.string.navigation_bar_glass_glow_intensity_desc),
                         iconRes = R.drawable.tune,
@@ -382,6 +393,7 @@ fun NavigationBarSettings(navController: NavController, scrollTo: String? = null
                         valueLabel = { "${(it * 100).roundToInt()}%" },
                         default = NAVIGATION_BAR_GLASS_GLOW_INTENSITY_DEFAULT,
                         enabled = navigationBarGlassGlow && (liquidGlassNavBarEnabled || sukisuLiquidGlassNavBar),
+                        disabledReason = stringResource(R.string.dependency_nav_material_glow),
                     )
                 }
 
@@ -403,6 +415,7 @@ fun NavigationBarSettings(navController: NavController, scrollTo: String? = null
             ) {
                 item {
                     SliderPreferenceRow(
+                        modifier = positions.modifierFor("navigation_bar_width"),
                         title = stringResource(R.string.navigation_bar_width),
                         description = stringResource(R.string.navigation_bar_width_desc),
                         iconRes = R.drawable.tune,
@@ -422,11 +435,13 @@ fun NavigationBarSettings(navController: NavController, scrollTo: String? = null
                             )
                         },
                         enabled = !sukisuLiquidGlassNavBar && !navigationBarBitchord,
+                        disabledReason = stringResource(R.string.dependency_nav_width),
                     )
                 }
 
                 item {
                     SliderPreferenceRow(
+                        modifier = positions.modifierFor("navigation_bar_height"),
                         title = stringResource(R.string.navigation_bar_height),
                         description = stringResource(R.string.navigation_bar_height_desc),
                         iconRes = R.drawable.tune,
@@ -446,11 +461,13 @@ fun NavigationBarSettings(navController: NavController, scrollTo: String? = null
                             )
                         },
                         enabled = !liquidGlassNavBarEnabled && !sukisuLiquidGlassNavBar,
+                        disabledReason = stringResource(R.string.dependency_nav_height),
                     )
                 }
 
                 item {
                     SliderPreferenceRow(
+                        modifier = positions.modifierFor("navigation_bar_opacity"),
                         title = stringResource(R.string.navigation_bar_opacity),
                         description = stringResource(R.string.navigation_bar_opacity_desc),
                         iconRes = R.drawable.tune,
@@ -470,11 +487,13 @@ fun NavigationBarSettings(navController: NavController, scrollTo: String? = null
                             )
                         },
                         enabled = !liquidGlassNavBarEnabled && !sukisuLiquidGlassNavBar && !navigationBarBitchord && !navigationBarFrostedBlur,
+                        disabledReason = stringResource(R.string.dependency_nav_material_tint),
                     )
                 }
 
                 item {
                     SliderPreferenceRow(
+                        modifier = positions.modifierFor("navigation_bar_transparency"),
                         title = stringResource(R.string.navigation_bar_transparency),
                         description = stringResource(R.string.navigation_bar_transparency_desc),
                         iconRes = R.drawable.tune,
@@ -494,11 +513,13 @@ fun NavigationBarSettings(navController: NavController, scrollTo: String? = null
                             )
                         },
                         enabled = !liquidGlassNavBarEnabled && !sukisuLiquidGlassNavBar && !navigationBarBitchord && !navigationBarFrostedBlur,
+                        disabledReason = stringResource(R.string.dependency_nav_material_tint),
                     )
                 }
 
                 item {
                     SliderPreferenceRow(
+                        modifier = positions.modifierFor("navigation_bar_label_spacing"),
                         title = stringResource(R.string.navigation_bar_label_spacing),
                         description = stringResource(R.string.navigation_bar_label_spacing_desc),
                         iconRes = R.drawable.tune,
@@ -518,11 +539,18 @@ fun NavigationBarSettings(navController: NavController, scrollTo: String? = null
                             )
                         },
                         enabled = !liquidGlassNavBarEnabled && !sukisuLiquidGlassNavBar && !navigationBarBitchord && !hideNavigationBarLabels,
+                        disabledReason =
+                            if (hideNavigationBarLabels) {
+                                stringResource(R.string.dependency_nav_labels_spacing)
+                            } else {
+                                stringResource(R.string.dependency_nav_labels_material)
+                            },
                     )
                 }
 
                 item {
                     SliderPreferenceRow(
+                        modifier = positions.modifierFor("navigation_bar_corner_radius"),
                         title = stringResource(R.string.navigation_bar_corner_radius),
                         description = stringResource(R.string.navigation_bar_corner_radius_desc),
                         iconRes = R.drawable.tune,
@@ -542,6 +570,7 @@ fun NavigationBarSettings(navController: NavController, scrollTo: String? = null
                             )
                         },
                         enabled = !liquidGlassNavBarEnabled && !sukisuLiquidGlassNavBar && !navigationBarBitchord,
+                        disabledReason = stringResource(R.string.dependency_nav_corner_radius),
                     )
                 }
 
@@ -599,8 +628,9 @@ private fun SliderPreferenceRow(
     valueLabel: (Float) -> String,
     default: Float? = null,
     preview: (@Composable (Float) -> Unit)? = null,
-
+    modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    disabledReason: String? = null,
 ) {
     var showDialog by rememberSaveable { mutableStateOf(false) }
 
@@ -688,13 +718,20 @@ private fun SliderPreferenceRow(
         }
     }
 
-    PreferenceEntry(
-        title = { Text(title) },
-        description = valueLabel(value),
-        icon = { Icon(painterResource(iconRes), null) },
-        onClick = { showDialog = true },
-        isEnabled = enabled,
-    )
+    Box(modifier = modifier) {
+        PreferenceEntry(
+            title = { Text(title) },
+            description =
+                if (!enabled && !disabledReason.isNullOrBlank()) {
+                    "${valueLabel(value)} · $disabledReason"
+                } else {
+                    valueLabel(value)
+                },
+            icon = { Icon(painterResource(iconRes), null) },
+            onClick = { showDialog = true },
+            isEnabled = enabled,
+        )
+    }
 }
 
 @Composable

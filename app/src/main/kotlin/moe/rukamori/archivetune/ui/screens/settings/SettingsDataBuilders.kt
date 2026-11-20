@@ -136,6 +136,15 @@ import moe.rukamori.archivetune.constants.SwipeThumbnailKey
 import moe.rukamori.archivetune.constants.TabletModeEnabledKey
 import moe.rukamori.archivetune.constants.TidalAccountFirstKey
 import moe.rukamori.archivetune.constants.ListenTogetherSyncVolumeKey
+import moe.rukamori.archivetune.constants.AiContentFilterEnabledKey
+import moe.rukamori.archivetune.constants.ShowCastInPlayerMenuKey
+import moe.rukamori.archivetune.constants.YouTubeLikesIncludePodcastsKey
+import moe.rukamori.archivetune.constants.YouTubeLikesIncludeVideosKey
+import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import moe.rukamori.archivetune.utils.isLowRamDevice
+import moe.rukamori.archivetune.utils.PreferenceStore
+import moe.rukamori.archivetune.utils.dataStore
 import moe.rukamori.archivetune.utils.rememberPreference
 
 internal object SettingsIconPalette {
@@ -212,7 +221,7 @@ fun buildSettingsGroups(
             onClick = { navController.navigate("settings/account") },
             children = listOf(
                 SettingsChild("Account switcher", "account_switcher", listOf("account switcher", "switch account", "multiple accounts", "saved accounts", "account channels")),
-                SettingsChild("Hidden playlists", "hidden_playlists", listOf("hidden", "hidden playlists", "hide playlist", "hidden music", "private playlist")),
+                SettingsChild("Hidden playlists", "hidden_playlists", listOf("hidden", "hidden playlists", "hide playlist", "hidden music", "private playlist", "скрытые", "плейлисты", "скрытые плейлисты", "скрытый плейлист")),
                 SettingsChild("Tap to show tokens", "tap_to_show_tokens", listOf("token", "tokens", "show token", "po token", "innertube", "visitor data", "datasync", "credentials", "advanced login")),
                 SettingsChild("Save current account", "save_current_account", listOf("save account", "remember account", "persist account")),
                 SettingsChild("Logout", "account_logout", listOf("logout", "log out", "sign out", "disconnect")),
@@ -228,6 +237,96 @@ fun buildSettingsGroups(
             keywords = listOf("stats", "statistics", "listening", "history", "top", "most played", "time"),
             onClick = { navController.navigate("stats") },
         )
+    val defaultDisableAnimations = context.isLowRamDevice()
+    val currentPrefs by
+        context.dataStore.data.collectAsStateWithLifecycle(
+            initialValue = PreferenceStore.currentPreferences(),
+        )
+    val modifiedCount = ModifiedSettingsRegistry.count(context, currentPrefs)
+    val appearanceStudio =
+        SettingsItem(
+            key = "appearance_studio",
+            icon = painterResource(R.drawable.ic_palette),
+            title = stringResource(R.string.appearance_studio),
+            subtitle = stringResource(R.string.appearance_studio_desc),
+            accentColor = SettingsIconPalette.Appearance,
+            keywords =
+                listOf(
+                    "appearance",
+                    "studio",
+                    "theme",
+                    "style",
+                    "design",
+                    "home",
+                    "navbar",
+                    "miniplayer",
+                    "player",
+                    "lyrics",
+                    "motion",
+                    "preset",
+                    "оформление",
+                    "студия",
+                    "тема",
+                    "стиль",
+                    "дизайн",
+                    "главная",
+                    "навигация",
+                    "плеер",
+                    "тексты",
+                    "движение",
+                ),
+            onClick = { navController.navigate("settings/appearance_studio") },
+            children =
+                listOf(
+                    SettingsChild(
+                        title = context.getString(R.string.motion_profile_title),
+                        scrollKey = "motion_profile",
+                        keywords = listOf("motion", "animation", "animations", "speed", "smooth", "fast", "reduced", "движение", "анимации", "анимаций", "плавность", "без анимаций"),
+                    ),
+                    SettingsChild(
+                        title = context.getString(R.string.haptic_intensity_title),
+                        scrollKey = "motion_profile",
+                        keywords = listOf("haptic", "haptics", "vibration", "intensity", "вибрация", "виброотклик"),
+                    ),
+                    SettingsChild(
+                        title = context.getString(R.string.mini_player_style_title),
+                        scrollKey = "navigation_mini_player",
+                        keywords = listOf("mini player", "miniplayer", "bar", "pill", "мини плеер", "строка", "капсула"),
+                    ),
+                    SettingsChild(
+                        title = context.getString(R.string.player_background_motion_policy_title),
+                        scrollKey = "color_background",
+                        keywords = listOf("background motion", "battery", "power saver", "движение фона", "статичный фон"),
+                    ),
+                ),
+        )
+    val modifiedSettings =
+        SettingsItem(
+            key = "modified_settings",
+            icon = painterResource(R.drawable.tune),
+            title = stringResource(R.string.modified_settings_title),
+            subtitle =
+                if (modifiedCount == 0) {
+                    stringResource(R.string.modified_settings_empty)
+                } else {
+                    stringResource(R.string.modified_settings_count, modifiedCount)
+                },
+            badge = modifiedCount.takeIf { it > 0 }?.toString(),
+            accentColor = SettingsIconPalette.Appearance,
+            keywords =
+                listOf(
+                    "modified",
+                    "changed",
+                    "custom",
+                    "reset",
+                    "defaults",
+                    "изменено",
+                    "изменено мной",
+                    "сбросить",
+                    "сброс",
+                ),
+            onClick = { navController.navigate("settings/modified") },
+        )
     val appearance =
         SettingsItem(
             key = "appearance",
@@ -235,34 +334,35 @@ fun buildSettingsGroups(
             title = stringResource(R.string.appearance),
             subtitle = stringResource(R.string.settings_appearance_subtitle),
             accentColor = SettingsIconPalette.Appearance,
-            keywords = listOf("appearance", "theme", "dark", "light", "color", "palette", "style", "design"),
+            keywords = listOf("appearance", "theme", "dark", "light", "color", "palette", "style", "design", "оформление", "внешний вид", "тема"),
             onClick = { navController.navigate("settings/appearance") },
+            hidden = true,
             children = listOf(
                 SettingsChild("Random theme on startup", "random_theme_on_startup", listOf("random theme", "random color", "shuffle theme")) { SearchResultSwitch(RandomThemeOnStartupKey, false) },
-                SettingsChild("Dark theme", "dark_theme", listOf("dark", "dark theme", "night", "amoled")),
-                SettingsChild("Color palette", "color_palette", listOf("color palette", "accent color", "theme color", "color")),
+                SettingsChild("Dark theme", "dark_theme", listOf("dark", "dark theme", "night", "amoled", "темная", "тема")),
+                SettingsChild("Color palette", "color_palette", listOf("color palette", "accent color", "theme color", "color", "палитра", "цвет")),
                 SettingsChild("Color source", "color_source", listOf("color source", "color", "dynamic color", "material you")),
-                SettingsChild("App icon", "app_icon", listOf("icon", "app icon", "icon pack", "launcher icon")),
-                SettingsChild("Disable blur", "disable_blur", listOf("blur", "disable blur", "no blur", "performance")) { SearchResultSwitch(DisableBlurKey, false) },
-                SettingsChild("Blur intensity", "blur_intensity", listOf("blur intensity", "blur amount", "blur level", "blur radius")) { SearchResultSwitch(BackdropEnabledKey, true) },
-                SettingsChild("Backdrop blur", "backdrop_blur", listOf("backdrop", "backdrop blur", "background blur", "frosted")) { SearchResultSwitch(BackdropEnabledKey, false) },
-                SettingsChild("Font preference", "font_preference", listOf("font", "font style", "typography")),
+                SettingsChild("App icon", "app_icon", listOf("icon", "app icon", "icon pack", "launcher icon", "иконка")),
+                SettingsChild("Disable blur", "disable_blur", listOf("blur", "disable blur", "no blur", "performance", "размытие")) { SearchResultSwitch(DisableBlurKey, false) },
+                SettingsChild("Blur intensity", "blur_intensity", listOf("blur intensity", "blur amount", "blur level", "blur radius")),
+                SettingsChild("Backdrop blur", "backdrop_blur", listOf("backdrop", "backdrop blur", "background blur", "frosted", "фон", "размытие")) { SearchResultSwitch(BackdropEnabledKey, true) },
+                SettingsChild("Font preference", "font_preference", listOf("font", "font style", "typography", "шрифт")),
                 SettingsChild("Use system font", "use_system_font", listOf("system font", "default font", "roboto")) { SearchResultSwitch(UseSystemFontKey, false) },
-                SettingsChild("Thumbnail corner radius", "thumbnail_corner_radius", listOf("thumbnail corner", "corner radius", "rounded thumbnail", "thumbnail shape")),
-                SettingsChild("Crop thumbnail to square", "crop_thumbnail_to_square", listOf("crop thumbnail", "square thumbnail", "thumbnail crop")) { SearchResultSwitch(CropThumbnailToSquareKey, false) },
+                SettingsChild("Thumbnail corner radius", "thumbnail_corner_radius", listOf("thumbnail corner", "corner radius", "rounded thumbnail", "thumbnail shape", "обложка", "скругление")),
+                SettingsChild("Crop thumbnail to square", "crop_thumbnail_to_square", listOf("crop thumbnail", "square thumbnail", "thumbnail crop", "обложка", "квадратная", "квадратная обложка")) { SearchResultSwitch(CropThumbnailToSquareKey, false) },
                 SettingsChild("Enable canvas in album, playlist and artist page", "album_canvas_enabled", listOf("album canvas", "playlist canvas", "artist canvas", "canvas in album", "canvas in playlist", "canvas in artist", "canvas page", "motion artwork", "animated cover", "album header video", "playlist header video", "artist header video")) { SearchResultSwitch(AlbumCanvasEnabledKey, true) },
-                SettingsChild("Player design style", "player_design_style", listOf("player design", "player layout", "player style")),
+                SettingsChild("Player design style", "player_design_style", listOf("player design", "player layout", "player style", "стиль плеера", "дизайн плеера")),
                 SettingsChild("Show lyrics on main player (TikTok)", "tiktok_main_lyrics", listOf("tiktok lyrics", "main player lyrics", "current line lyrics", "karaoke line", "tiktok player")) { SearchResultSwitch(TikTokMainLyricsEnabledKey, false) },
-                SettingsChild("Player background style", "player_background_style", listOf("player background", "player bg", "background style")),
-                SettingsChild("Lyrics background style", "lyrics_background_style", listOf("lyrics background", "lyrics bg")),
-                SettingsChild("Mini player background style", "mini_player_background_style", listOf("mini player", "mini player background")),
+                SettingsChild("Player background style", "player_background_style", listOf("player background", "player bg", "background style", "фон плеера")),
+                SettingsChild("Lyrics background style", "lyrics_background_style", listOf("lyrics background", "lyrics bg", "фон текста")),
+                SettingsChild("Mini player background style", "mini_player_background_style", listOf("mini player", "mini player background", "мини плеер")),
                 SettingsChild("Player buttons style", "player_buttons_style", listOf("player buttons", "button style", "controls style")),
                 SettingsChild("Player slider style", "player_slider_style", listOf("player slider", "slider style", "progress bar")),
-                SettingsChild("Show player volume bar", "show_player_volume_bar", listOf("volume bar", "player volume", "volume slider")) { SearchResultSwitch(ShowPlayerVolumeBarKey, false) },
-                SettingsChild("Hide player thumbnail", "hide_player_thumbnail", listOf("hide thumbnail", "player thumbnail", "hide artwork")) { SearchResultSwitch(HidePlayerThumbnailKey, false) },
+                SettingsChild("Show player volume bar", "show_player_volume_bar", listOf("volume bar", "player volume", "volume slider", "громкость")) { SearchResultSwitch(ShowPlayerVolumeBarKey, true) },
+                SettingsChild("Hide player thumbnail", "hide_player_thumbnail", listOf("hide thumbnail", "player thumbnail", "hide artwork", "скрыть обложку")) { SearchResultSwitch(HidePlayerThumbnailKey, false) },
                 SettingsChild("Swipe to song", "swipe_to_song", listOf("swipe to song", "swipe next", "swipe track")) { SearchResultSwitch(SwipeToSongKey, false) },
                 SettingsChild("Swipe sensitivity", "swipe_sensitivity", listOf("swipe", "gesture", "sensitivity")),
-                SettingsChild("Disable animations", "disable_animations", listOf("animation", "disable animations", "no animations", "performance")) { SearchResultSwitch(DisableAnimationsKey, false) },
+                SettingsChild("Disable animations", "disable_animations", listOf("animation", "disable animations", "no animations", "motion", "performance", "анимации", "анимаций", "без анимаций", "отключить анимации", "движение")) { SearchResultSwitch(DisableAnimationsKey, defaultDisableAnimations) },
                 SettingsChild("Hide status bar", "hide_status_bar", listOf("status bar", "hide status", "immersive", "fullscreen", "hide bar")) { SearchResultSwitch(HideStatusBarKey, false) },
                 SettingsChild("Force high refresh rate", "force_high_refresh_rate", listOf("refresh rate", "high refresh", "120hz", "90hz", "smooth")) { SearchResultSwitch(ForceHighRefreshRateKey, false) },
                 SettingsChild("Frosted navigation bar", "frosted_nav_bar", listOf("frosted nav", "frosted navigation", "frosted blur")) { SearchResultSwitch(NavigationBarFrostedBlurKey, false) },
@@ -273,19 +373,18 @@ fun buildSettingsGroups(
                 SettingsChild("3D depth effect", "glass_depth_3d", listOf("3d depth", "depth effect", "spatial refraction", "thick glass")) { SearchResultSwitch(LiquidGlassDepth3DKey, true) },
                 SettingsChild("Backdrop vibrancy", "glass_backdrop_vibrancy", listOf("vibrancy", "saturation", "color boost")) { SearchResultSwitch(LiquidGlassBackdropVibrancyKey, true) },
                 SettingsChild("Adaptive luminance", "glass_adaptive_luminance", listOf("adaptive luminance", "brightness balance", "contrast balance")) { SearchResultSwitch(LiquidGlassAdaptiveLuminanceKey, true) },
-                SettingsChild("Hide labels in navigation bar", "hide_navigation_bar_labels", listOf("hide labels", "navigation labels", "nav labels", "icons only")) { SearchResultSwitch(HideNavigationBarLabelsKey, false) },
-                SettingsChild("Navigation bar customization", "navigation_bar_settings", listOf("navigation bar", "nav bar dimensions", "nav bar opacity", "nav bar width", "nav bar height", "nav bar corner radius", "nav bar label spacing")),
                 SettingsChild("Hide scrollbar", "hide_scrollbar", listOf("scrollbar", "scroll bar", "hide scroll", "no scrollbar")) { SearchResultSwitch(HideScrollbarKey, false) },
-                SettingsChild("Back animation style", "back_animation_style", listOf("back gesture", "predictive back", "back animation", "gesture animation")),
+                SettingsChild("Back animation style", "back_animation_style", listOf("back gesture", "predictive back", "back animation", "gesture animation", "движение")),
                 SettingsChild("Default open tab", "default_open_tab", listOf("default tab", "home tab", "start page", "open tab")),
-                SettingsChild("Show home category chips", "show_home_category_chips", listOf("home chips", "category chips", "home category", "chips")) { SearchResultSwitch(ShowHomeCategoryChipsKey, false) },
-                SettingsChild("Language", "app_language", listOf("language", "app language", "locale")),
+                SettingsChild("Show home category chips", "show_home_category_chips", listOf("home chips", "category chips", "home category", "chips")) { SearchResultSwitch(ShowHomeCategoryChipsKey, true) },
+                SettingsChild("Language", "app_language", listOf("language", "app language", "locale", "язык")),
                 SettingsChild("UI scale", "ui_scale", listOf("ui scale", "scale", "zoom", "interface size", "display size", "bigger", "smaller")),
                 SettingsChild("Custom font", "custom_font", listOf("custom font", "font file", "typeface", "own font")),
                 SettingsChild("Backdrop blur amount", "backdrop_blur_amount", listOf("backdrop blur amount", "backdrop intensity", "background blur amount")),
                 SettingsChild("Customized background", "customized_background", listOf("customized background", "custom background", "background image", "wallpaper")),
                 SettingsChild("Tablet mode", "tablet_mode", listOf("tablet mode", "tablet", "large screen", "landscape layout")) { SearchResultSwitch(TabletModeEnabledKey, false) },
                 SettingsChild("Minimal mode", "minimal_home_mode", listOf("minimal mode", "minimal home", "simple home", "clean home")) { SearchResultSwitch(MinimalHomeModeKey, false) },
+                SettingsChild("Home layout", "home_feed_style", listOf("home layout", "home feed", "now", "covers", "главная", "оформление главной")),
                 SettingsChild("Liquid Glass effects", "liquid_glass_effects", listOf("liquid glass", "glass effects", "header glass", "mini player glass")),
                 SettingsChild("Theme creator", "theme_creator", listOf("theme creator", "create theme", "custom theme", "make theme")),
                 SettingsChild("Palette picker", "palette_picker", listOf("palette picker", "pick palette", "choose palette", "custom palette")),
@@ -304,8 +403,8 @@ fun buildSettingsGroups(
             onClick = { navController.navigate("settings/appearance/extras") },
             hidden = true,
             children = listOf(
-                SettingsChild("Show home category chips", "show_home_category_chips", listOf("home chips", "category chips", "home category", "chips")) { SearchResultSwitch(ShowHomeCategoryChipsKey, false) },
-                SettingsChild("Show tags in library", "show_tags_in_library", listOf("tags", "library tags", "show tags")) { SearchResultSwitch(ShowTagsInLibraryKey, false) },
+                SettingsChild("Show home category chips", "show_home_category_chips", listOf("home chips", "category chips", "home category", "chips")) { SearchResultSwitch(ShowHomeCategoryChipsKey, true) },
+                SettingsChild("Show tags in library", "show_tags_in_library", listOf("tags", "library tags", "show tags")) { SearchResultSwitch(ShowTagsInLibraryKey, true) },
                 SettingsChild("Hide Liked songs card", "hide_liked_songs_card", listOf("hide liked songs", "liked songs card", "favourites card", "hide card")) { SearchResultSwitch(HideLikedSongsCardKey, false) },
                 SettingsChild("Hide Offline card", "hide_offline_card", listOf("hide offline", "offline card", "downloaded card", "hide card")) { SearchResultSwitch(HideOfflineCardKey, false) },
                 SettingsChild("Hide Cached card", "hide_cached_card", listOf("hide cached", "cached card", "cache card", "hide card")) { SearchResultSwitch(HideCachedCardKey, false) },
@@ -351,16 +450,16 @@ fun buildSettingsGroups(
             title = "Navigation bar",
             subtitle = "Navigation bar style and dimensions",
             accentColor = SettingsIconPalette.NavigationBar,
-            keywords = listOf("navigation bar", "nav bar", "bottom bar", "tab bar", "navbar"),
+            keywords = listOf("navigation bar", "nav bar", "bottom bar", "tab bar", "navbar", "нижняя панель", "навбар", "панель навигации", "навигация"),
             onClick = { navController.navigate("settings/appearance/navigation_bar") },
             hidden = true,
             children = listOf(
-                SettingsChild("Frosted navigation bar", "navigation_bar_frosted_blur", listOf("frosted nav", "frosted navigation", "frosted blur")) { SearchResultSwitch(NavigationBarFrostedBlurKey, false) },
-                SettingsChild("Tint frosted navigation bar", "navigation_bar_tint_frosted_blur", listOf("tint frosted", "tint nav bar", "frosted tint", "coloured nav bar")) { SearchResultSwitch(NavigationBarTintFrostedBlurKey, false) },
-                SettingsChild("Liquid Glass navigation bar", "liquid_glass_nav_bar", listOf("liquid glass nav", "glass navigation", "liquid nav")) { SearchResultSwitch(LiquidGlassNavBarEnabledKey, false) },
-                SettingsChild("SukiSU liquid glass navigation bar", "sukisu_liquid_glass_nav_bar", listOf("sukisu nav", "sukisu liquid glass", "floating glass bar", "refraction nav")) { SearchResultSwitch(SukisuLiquidGlassNavBarKey, false) },
-                SettingsChild("Hide labels in navigation bar", "hide_navigation_bar_labels", listOf("hide labels", "navigation labels", "nav labels", "icons only")) { SearchResultSwitch(HideNavigationBarLabelsKey, false) },
-                SettingsChild("Navigation bar dimensions", "navigation_bar_dimensions", listOf("nav bar height", "nav bar width", "nav bar opacity", "nav bar corner radius", "nav bar label spacing", "nav bar size")),
+                SettingsChild("Frosted navigation bar", "navigation_bar_frosted_blur", listOf("frosted nav", "frosted navigation", "frosted blur", "навбар", "нижняя панель")) { SearchResultSwitch(NavigationBarFrostedBlurKey, false) },
+                SettingsChild("Tint frosted navigation bar", "navigation_bar_tint_frosted_blur", listOf("tint frosted", "tint nav bar", "frosted tint", "coloured nav bar", "нижняя панель")) { SearchResultSwitch(NavigationBarTintFrostedBlurKey, false) },
+                SettingsChild("Liquid Glass navigation bar", "liquid_glass_nav_bar", listOf("liquid glass nav", "glass navigation", "liquid nav", "навбар", "нижняя панель")) { SearchResultSwitch(LiquidGlassNavBarEnabledKey, false) },
+                SettingsChild("SukiSU liquid glass navigation bar", "sukisu_liquid_glass_nav_bar", listOf("sukisu nav", "sukisu liquid glass", "floating glass bar", "refraction nav", "навбар", "нижняя панель")) { SearchResultSwitch(SukisuLiquidGlassNavBarKey, false) },
+                SettingsChild("Hide labels in navigation bar", "hide_navigation_bar_labels", listOf("hide labels", "navigation labels", "nav labels", "icons only", "убрать подписи", "скрыть подписи", "подписи", "ярлыки", "нижняя панель", "навбар")) { SearchResultSwitch(HideNavigationBarLabelsKey, false) },
+                SettingsChild("Navigation bar dimensions", "navigation_bar_dimensions", listOf("nav bar height", "nav bar width", "nav bar opacity", "nav bar corner radius", "nav bar label spacing", "nav bar size", "нижняя панель", "навбар")),
             ),
         )
 
@@ -389,8 +488,47 @@ fun buildSettingsGroups(
             accentColor = SettingsIconPalette.Playback,
             keywords = listOf("playback", "player", "audio", "quality", "equalizer", "eq", "volume", "crossfade", "gapless", "flac", "lossless", "hi-res", "sample rate", "bitrate", "video", "music video", "video playback", "pip", "picture in picture", "floating", "minimize"),
             onClick = { navController.navigate("settings/player") },
-            children = listOf(
-                SettingsChild("Low data mode", "low_data_mode", listOf("data", "data saver", "low quality", "data mode")) { SearchResultSwitch(LowDataModeKey, true) },
+            children =
+                buildList {
+                    if (BuildConfig.FLAVOR.contains("gms", ignoreCase = true)) {
+                        add(
+                            SettingsChild(
+                                title = context.getString(R.string.show_cast_in_player_menu),
+                                scrollKey = "show_cast_in_player_menu",
+                                keywords =
+                                    listOf(
+                                        "cast",
+                                        "chromecast",
+                                        "route",
+                                        "hide cast",
+                                        "remove cast",
+                                        "каст",
+                                        "трансляция",
+                                        "трансляцию",
+                                        "убрать каст",
+                                        "скрыть трансляцию",
+                                        "показывать трансляцию",
+                                    ),
+                            ) { SearchResultSwitch(ShowCastInPlayerMenuKey, true) },
+                        )
+                    }
+                    add(
+                        SettingsChild(
+                            title = context.getString(R.string.other_sources),
+                            scrollKey = "other_sources",
+                            keywords = listOf("other sources", "sources", "providers", "fallback", "другие источники", "источники", "поиск"),
+                        ),
+                    )
+                    add(
+                        SettingsChild(
+                            title = context.getString(R.string.player_menu_pinned_actions_title),
+                            scrollKey = "player_menu_pinned",
+                            keywords = listOf("player menu", "pinned actions", "quick actions", "меню плеера", "быстрые действия"),
+                        ),
+                    )
+                    addAll(
+                        listOf(
+                            SettingsChild("Low data mode", "low_data_mode", listOf("data", "data saver", "low quality", "data mode")) { SearchResultSwitch(LowDataModeKey, true) },
                 SettingsChild("Enable video playback", "enable_video_playback", listOf("video", "music video", "mv", "video playback", "captions", "subtitles")) { SearchResultSwitch(EnableVideoPlaybackKey, true) },
                 SettingsChild("Enable PiP mode", "enable_pip_mode", listOf("pip", "picture in picture", "floating video", "minimize", "pop out", "overlay")) { SearchResultSwitch(EnablePipModeKey, false) },
                 SettingsChild("History duration", "history_duration", listOf("history", "duration", "recent", "queue length")),
@@ -454,7 +592,9 @@ fun buildSettingsGroups(
                 SettingsChild("SoundCloud OAuth token", "soundcloud_auth_token", listOf("soundcloud token", "soundcloud oauth", "soundcloud login", "soundcloud cookie")),
                 SettingsChild("Enable Spotify direct streaming", "spotify_direct_enable", listOf("spotify direct", "direct spotify", "spotify streaming", "spotify servers")) { SearchResultSwitch(SpotifyDirectEnabledKey, false) },
                 SettingsChild("Spotify direct quality", "spotify_direct_quality", listOf("spotify direct quality", "spotify bitrate", "spotify aac")),
-            ),
+                        ),
+                    )
+                },
         )
 
     val jioSaavn =
@@ -528,13 +668,15 @@ fun buildSettingsGroups(
                 SettingsChild("Enable translator", "enable_translator", listOf("translator", "translation engine", "lyrics translator")) { SearchResultSwitch(EnableTranslatorKey, false) },
                 SettingsChild("Lyrics font size", "lyrics_font_size", listOf("font size", "lyrics size", "text size", "lyrics text size")),
                 SettingsChild("Lyrics line spacing", "lyrics_line_spacing", listOf("line spacing", "lyrics spacing", "lyrics line gap", "lyrics padding")),
-                SettingsChild("Lyrics line blur", "lyrics_line_blur", listOf("lyrics blur", "line blur", "focus blur")) { SearchResultSwitch(LyricsLineBlurKey, false) },
-                SettingsChild("Lyrics romanize Japanese", "lyrics_romanize_japanese", listOf("romanize", "japanese", "romaji", "furigana")) { SearchResultSwitch(LyricsRomanizeJapaneseKey, false) },
+                SettingsChild("Lyrics line blur", "lyrics_line_blur", listOf("lyrics blur", "line blur", "focus blur", "размытие строк", "слова песни")) { SearchResultSwitch(LyricsLineBlurKey, true) },
+                SettingsChild("Lyrics romanize Japanese", "lyrics_romanize_japanese", listOf("romanize", "japanese", "romaji", "furigana")) { SearchResultSwitch(LyricsRomanizeJapaneseKey, true) },
                 SettingsChild("Lyrics romanize Korean", "lyrics_romanize_korean", listOf("romanize", "korean", "romanization")) { SearchResultSwitch(LyricsRomanizeKoreanKey, true) },
                 SettingsChild("Lyrics romanize Chinese", "lyrics_romanize_chinese", listOf("romanize", "chinese", "pinyin")) { SearchResultSwitch(LyricsRomanizeChineseKey, true) },
                 SettingsChild("Lyrics romanize Hindi", "lyrics_romanize_hindi", listOf("romanize", "hindi", "devanagari")) { SearchResultSwitch(LyricsRomanizeHindiKey, true) },
                 SettingsChild("Lyrics romanize other languages", "lyrics_romanize_other", listOf("romanize", "other languages", "arabic", "thai", "cyrillic")),
-                SettingsChild("Lyrics click to seek", "lyrics_click", listOf("click lyrics", "tap lyrics", "seek lyrics")) { SearchResultSwitch(LyricsClickKey, false) },
+                SettingsChild("Lyrics click to seek", "lyrics_click", listOf("click lyrics", "tap lyrics", "seek lyrics")) { SearchResultSwitch(LyricsClickKey, true) },
+                SettingsChild(context.getString(R.string.lyrics_mode), "lyrics_mode", listOf("lyrics mode", "enhanced", "v2", "слова песни", "режим текста", "текст песни")),
+                SettingsChild(context.getString(R.string.lyrics_display_character_title), "lyrics_display_character", listOf("lyrics style", "reading", "focus", "stage", "слова песни", "стиль текста")),
                 SettingsChild("Lyrics auto-scroll", "lyrics_scroll", listOf("scroll", "auto scroll", "lyrics scroll")) { SearchResultSwitch(LyricsScrollKey, true) },
 
                 SettingsChild("Show lyrics player controls", "show_lyrics_player_controls", listOf("player controls", "lyrics controls")) { SearchResultSwitch(ShowLyricsPlayerControlsKey, true) },
@@ -594,7 +736,7 @@ fun buildSettingsGroups(
             onClick = { navController.navigate("settings/lyrics/romanisation") },
             hidden = true,
             children = listOf(
-                SettingsChild("Romanize japanese lyrics", "lyrics_romanize_japanese", listOf("romanize japanese", "romaji", "furigana", "japanese lyrics")) { SearchResultSwitch(LyricsRomanizeJapaneseKey, false) },
+                SettingsChild("Romanize japanese lyrics", "lyrics_romanize_japanese", listOf("romanize japanese", "romaji", "furigana", "japanese lyrics")) { SearchResultSwitch(LyricsRomanizeJapaneseKey, true) },
                 SettingsChild("Romanize korean lyrics", "lyrics_romanize_korean", listOf("romanize korean", "hangul", "korean lyrics")) { SearchResultSwitch(LyricsRomanizeKoreanKey, true) },
                 SettingsChild("Romanize chinese lyrics", "lyrics_romanize_chinese", listOf("romanize chinese", "pinyin", "chinese lyrics")) { SearchResultSwitch(LyricsRomanizeChineseKey, true) },
                 SettingsChild("Romanize hindi lyrics", "lyrics_romanize_hindi", listOf("romanize hindi", "devanagari", "hindi lyrics")) { SearchResultSwitch(LyricsRomanizeHindiKey, true) },
@@ -619,11 +761,9 @@ fun buildSettingsGroups(
                 SettingsChild("Quick picks", "quick_picks", listOf("quick picks", "quick mix", "smart mix", "recommendations")),
                 SettingsChild("Allow age-restricted content", "allow_age_restricted", listOf("age restricted", "allow age restricted", "mature content", "18+", "restricted")) { SearchResultSwitch(AllowAgeRestrictedKey, false) },
                 SettingsChild("Playlist recommendation source", "you_might_like_source", listOf("recommendation source", "you might like", "playlist recommendation", "suggestions source")),
-                SettingsChild("AI content filter", "ai_content_filter", listOf("ai content filter", "ai filter", "ai generated", "aislist", "filter ai music")),
-                SettingsChild("Hide AI-generated content", "ai_content_filter_hide", listOf("hide ai generated", "hide ai music", "ai content hide", "block ai")),
-                SettingsChild("Include moderate-confidence channels", "ai_content_filter_moderate", listOf("moderate confidence", "ai filter moderate", "ai channels")),
-                SettingsChild("Update channel lists", "ai_content_filter_update", listOf("update channel lists", "refresh ai list", "aislist update")),
-                SettingsChild("About AiSList", "ai_content_filter_source", listOf("aislist", "about aislist", "ai list source")),
+                SettingsChild(context.getString(R.string.ai_music_filter_enable), "ai_content_filter", listOf("ai content filter", "ai filter", "ai generated", "filter ai music", "ии", "фильтр ии", "ии-исполнители", "исполнители", "авторы", "нейросеть")) { SearchResultSwitch(AiContentFilterEnabledKey, false) },
+                SettingsChild(context.getString(R.string.ai_music_authors), "ai_music_authors", listOf("ai music authors", "ai artists", "ai authors", "block artist", "ии", "ии-исполнители", "авторы ии музыки", "исполнители")),
+                SettingsChild(context.getString(R.string.youtube_likes_filter), "youtube_likes", listOf("youtube likes", "liked videos", "liked podcasts", "понравившееся", "клипы", "подкасты")),
             ),
         )
     val languagePacks =
@@ -654,7 +794,7 @@ fun buildSettingsGroups(
                 SettingsChild("Clear search history", "clear_search_history", listOf("clear search", "delete search", "reset search")),
                 SettingsChild("Haptics", "haptics", listOf("haptic", "vibration", "haptic feedback", "vibrate")) { SearchResultSwitch(EnableHapticFeedbackKey, true) },
                 SettingsChild("Disable screenshot", "disable_screenshot", listOf("screenshot", "screen capture", "privacy", "no screenshot")) { SearchResultSwitch(DisableScreenshotKey, false) },
-                SettingsChild("Show tags in library", "show_tags_in_library", listOf("tags", "library tags", "show tags")) { SearchResultSwitch(ShowTagsInLibraryKey, false) },
+                SettingsChild("Show tags in library", "show_tags_in_library", listOf("tags", "library tags", "show tags")) { SearchResultSwitch(ShowTagsInLibraryKey, true) },
                 SettingsChild("Low data mode", "low_data_mode", listOf("low data", "data saver", "save data", "metered", "data mode")) { SearchResultSwitch(LowDataModeKey, true) },
                 SettingsChild("Force high refresh rate", "force_high_refresh_rate", listOf("refresh rate", "high refresh", "120hz", "90hz", "smooth")) { SearchResultSwitch(ForceHighRefreshRateKey, false) },
                 SettingsChild("Overscroll style", "overscroll_style", listOf("overscroll", "rubber band", "bounce", "stretch", "scroll physics")),
@@ -706,7 +846,7 @@ fun buildSettingsGroups(
                 SettingsChild("ListenBrainz token", "listenbrainz_token", listOf("listenbrainz token", "listenbrainz api key", "listenbrainz credential")),
                 SettingsChild("Listen Together", "listen_together", listOf("listen together", "listen together settings", "room", "shared playback", "sync playback", "listen party", "group listening", "chat", "together")) { SearchResultSwitch(ListenTogetherSyncVolumeKey, false) },
                 SettingsChild("Listen Together screen", "listen_together_screen", listOf("listen together screen", "create room", "join room", "room code", "share room", "invite friends")),
-                SettingsChild("Spotify", "spotify", listOf("spotify", "spotify connect", "spotify playlists")) { SearchResultSwitch(ShowSpotifyPlaylistsKey, false) },
+                SettingsChild("Spotify", "spotify", listOf("spotify", "spotify connect", "spotify playlists")) { SearchResultSwitch(ShowSpotifyPlaylistsKey, true) },
                 SettingsChild("Tidal", "tidal", listOf("tidal", "hifi", "master", "mqa", "lossless", "flac")) { SearchResultSwitch(TidalEnabledKey, false) },
                 SettingsChild("Tidal account", "tidal_account", listOf("tidal account", "tidal login", "tidal token", "tidal session")),
                 SettingsChild("Tidal instances", "tidal_instances", listOf("tidal instance", "tidal server", "tidal url", "tidal endpoint")),
@@ -1102,6 +1242,8 @@ fun buildSettingsGroups(
             title = stringResource(R.string.settings_section_player_content),
             items =
                 listOf(
+                    appearanceStudio,
+                    modifiedSettings,
                     appearance,
                     appearanceExtras,
                     aodCustomization,

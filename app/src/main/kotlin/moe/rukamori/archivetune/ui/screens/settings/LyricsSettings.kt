@@ -122,7 +122,13 @@ import kotlin.math.roundToInt
 fun LyricsSettings(
     navController: NavController,
     viewModel: ContentSettingsViewModel = hiltViewModel(),
+    scrollTo: String? = null,
 ) {
+    val scrollState = rememberScrollState()
+    val preferencePositions = rememberPreferencePositions()
+    LaunchedEffect(scrollTo) {
+        preferencePositions.scrollToKey(scrollTo, scrollState)
+    }
     var showClearLyricsDialog by remember { mutableStateOf(false) }
     var showPaxsenixStatsDialog by remember { mutableStateOf(false) }
     var showPaxsenixApiKeyDialog by rememberSaveable { mutableStateOf(false) }
@@ -252,7 +258,8 @@ fun LyricsSettings(
     Column(
         Modifier
             .windowInsetsPadding(LocalPlayerAwareWindowInsets.current)
-            .verticalScroll(rememberScrollState())
+            .then(preferencePositions.containerModifier())
+            .verticalScroll(scrollState)
             .padding(bottom = SettingsDimensions.ScreenBottomPadding),
     ) {
         var showLyricsTextSizeDialog by rememberSaveable { mutableStateOf(false) }
@@ -391,19 +398,21 @@ fun LyricsSettings(
 
         PreferenceGroup(title = stringResource(R.string.display)) {
             item {
-                EnumListPreference(
-                    title = { Text(stringResource(R.string.lyrics_mode)) },
-                    icon = { Icon(painterResource(R.drawable.lyrics), null) },
-                    selectedValue = lyricsMode,
-                    onValueSelected = onLyricsModeChange,
-                    valueText = {
-                        when (it) {
-                            LyricsMode.V2 -> stringResource(R.string.lyrics_mode_v2)
-                            LyricsMode.ENHANCED -> stringResource(R.string.lyrics_mode_enhanced)
-                            LyricsMode.SPOTIFY -> stringResource(R.string.lyrics_mode_spotify)
-                        }
-                    },
-                )
+                Box(modifier = preferencePositions.modifierFor("lyrics_mode")) {
+                    EnumListPreference(
+                        title = { Text(stringResource(R.string.lyrics_mode)) },
+                        icon = { Icon(painterResource(R.drawable.lyrics), null) },
+                        selectedValue = lyricsMode,
+                        onValueSelected = onLyricsModeChange,
+                        valueText = {
+                            when (it) {
+                                LyricsMode.V2 -> stringResource(R.string.lyrics_mode_v2)
+                                LyricsMode.ENHANCED -> stringResource(R.string.lyrics_mode_enhanced)
+                                LyricsMode.SPOTIFY -> stringResource(R.string.lyrics_mode_spotify)
+                            }
+                        },
+                    )
+                }
             }
 
             item {
@@ -437,12 +446,14 @@ fun LyricsSettings(
             }
 
             item {
-                SwitchPreference(
-                    title = { Text(stringResource(R.string.lyrics_line_blur)) },
-                    icon = { Icon(painterResource(R.drawable.lyrics), null) },
-                    checked = lyricsLineBlur,
-                    onCheckedChange = onLyricsLineBlurChange,
-                )
+                Box(modifier = preferencePositions.modifierFor("lyrics_line_blur")) {
+                    SwitchPreference(
+                        title = { Text(stringResource(R.string.lyrics_line_blur)) },
+                        icon = { Icon(painterResource(R.drawable.lyrics), null) },
+                        checked = lyricsLineBlur,
+                        onCheckedChange = onLyricsLineBlurChange,
+                    )
+                }
             }
 
             item {
