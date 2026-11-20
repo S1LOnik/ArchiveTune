@@ -2572,4 +2572,7 @@
     <string name="other_sources_settings_desc">Configure audio providers and fallback priority used by Other sources</string>
     <string name="smart_dj_automix_title">Smart DJ Automix</string>
     <string name="smart_dj_automix_desc">Silence trimming, beat matching, and harmonic phrase crossfade</string>
+    <string name="playlist_mix_albums">Albums in playlist list</string>
+    <string name="playlist_mix_albums_empty">Save an album in your library to add it here.</string>
+    <string name="playlist_reorder_item">Reorder item</string>
 </resources>

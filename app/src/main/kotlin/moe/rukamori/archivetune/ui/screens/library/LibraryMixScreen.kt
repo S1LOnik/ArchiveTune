@@ -11,7 +11,6 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -22,7 +21,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -33,7 +31,6 @@ import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -317,40 +314,6 @@ fun LibraryMixScreen(
                         SupportArchiveTuneSection(
                             onMessage = showMessage,
                             modifier = Modifier.padding(horizontal = 24.dp),
-                        )
-                    }
-                }
-
-                item(key = "free_internet_meme") {
-                    Column(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp)
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(MaterialTheme.colorScheme.surfaceContainer),
-                    ) {
-                        Box(
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                                    .padding(start = 12.dp, end = 12.dp, top = 12.dp),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Image(
-                                painter = painterResource(R.drawable.free_internet_meme),
-                                contentDescription = stringResource(R.string.free_internet_meme_caption),
-                                contentScale = ContentScale.Fit,
-                                modifier =
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .widthIn(max = 260.dp)
-                                        .aspectRatio(384f / 358f)
-                                        .clip(RoundedCornerShape(14.dp)),
-                            )
-                        }
-                        Text(
-                            text = stringResource(R.string.free_internet_meme_caption),
-                            style = MaterialTheme.typography.titleSmall,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
                         )
                     }
                 }

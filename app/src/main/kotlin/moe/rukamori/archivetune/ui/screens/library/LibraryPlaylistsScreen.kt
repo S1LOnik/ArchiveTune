@@ -63,6 +63,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SnackbarDuration
@@ -100,6 +101,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.ColorUtils
+import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
@@ -121,6 +124,8 @@ import moe.rukamori.archivetune.constants.PlaylistSortDescendingKey
 import moe.rukamori.archivetune.constants.PlaylistSortType
 import moe.rukamori.archivetune.constants.PlaylistSortTypeKey
 import moe.rukamori.archivetune.constants.PureBlackKey
+import moe.rukamori.archivetune.db.entities.Album
+import moe.rukamori.archivetune.db.entities.LocalItem
 import moe.rukamori.archivetune.db.entities.Playlist
 import moe.rukamori.archivetune.extensions.move
 import moe.rukamori.archivetune.extensions.toMediaItem
@@ -130,6 +135,7 @@ import moe.rukamori.archivetune.playback.queues.ListQueue
 import moe.rukamori.archivetune.ui.component.CreatePlaylistDialog
 import moe.rukamori.archivetune.ui.component.ItemThumbnail
 import moe.rukamori.archivetune.ui.component.LocalMenuState
+import moe.rukamori.archivetune.ui.menu.AlbumMenu
 import moe.rukamori.archivetune.ui.menu.PlaylistMenu
 import moe.rukamori.archivetune.ui.menu.YouTubePlaylistMenu
 import moe.rukamori.archivetune.ui.theme.PlayerColorExtractor
@@ -138,6 +144,12 @@ import moe.rukamori.archivetune.utils.rememberPreference
 import moe.rukamori.archivetune.viewmodels.LibraryPlaylistsViewModel
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
+
+private val MixedPlaylistAlbumsKey = stringSetPreferencesKey("mixedPlaylistAlbums")
+private val MixedPlaylistOrderKey = stringPreferencesKey("mixedPlaylistOrder")
+
+private val LocalItem.mixedLibraryKey: String
+    get() = if (this is Album) "album:$id" else "playlist:$id"
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -291,40 +303,78 @@ fun LibraryPlaylistsScreen(
         selectedPlaylistIds = ArrayList(togglePlaylistSelection(selectedSet, playlistId))
         triggerHaptic(ArchiveTuneHapticKind.SELECTION)
     }
-    val mutablePlaylists = remember { mutableStateListOf<Playlist>() }
-
     var isGridView by rememberSaveable { mutableStateOf(false) }
     var showCreatePlaylistDialog by rememberSaveable { mutableStateOf(false) }
     val refreshState by viewModel.refreshState.collectAsStateWithLifecycle()
     val refreshLibrary = remember(viewModel) { { viewModel.sync() } }
     val onRefreshErrorShown = remember(viewModel) { { viewModel.onRefreshErrorShown() } }
     val lazyListState = rememberLazyListState()
-    var pendingPlaylistOrderUpdate by remember { mutableStateOf(false) }
-    val reorderableState =
-        rememberReorderableLazyListState(
-            lazyListState = lazyListState,
-            scrollThresholdPadding = LocalPlayerAwareWindowInsets.current.asPaddingValues(),
-        ) { from, to ->
-            if (from.index in mutablePlaylists.indices && to.index in mutablePlaylists.indices) {
-                mutablePlaylists.move(from.index, to.index)
-                pendingPlaylistOrderUpdate = true
-            }
-        }
-
-    LaunchedEffect(visiblePlaylists) {
-        mutablePlaylists.clear()
-        mutablePlaylists.addAll(visiblePlaylists)
+    val (includedAlbumIds, setIncludedAlbumIds) = rememberPreference(MixedPlaylistAlbumsKey, emptySet<String>())
+    val (mixedOrder, setMixedOrder) = rememberPreference(MixedPlaylistOrderKey, "")
+    val savedAlbums by remember(database) { database.albumsLikedByCreateDateAsc() }
+        .collectAsStateWithLifecycle(initialValue = emptyList())
+    val includedAlbums = remember(savedAlbums, includedAlbumIds) {
+        savedAlbums.filter { it.id in includedAlbumIds }
+    }
+    var showAlbumPicker by rememberSaveable { mutableStateOf(false) }
+    if (showAlbumPicker) {
+        MixedLibraryAlbumPicker(
+            albums = savedAlbums,
+            initialSelection = includedAlbumIds,
+            onDismiss = { showAlbumPicker = false },
+            onApply = {
+                setIncludedAlbumIds(it)
+                showAlbumPicker = false
+            },
+        )
     }
 
-    LaunchedEffect(reorderableState.isAnyItemDragging) {
-        if (!reorderableState.isAnyItemDragging && pendingPlaylistOrderUpdate) {
-            viewModel.updateCustomPlaylistOrder(
-                mergeVisiblePlaylistOrder(
-                    currentOrder = playlists,
-                    visibleOrder = mutablePlaylists,
-                ),
-            )
-            pendingPlaylistOrderUpdate = false
+    val customList = sortType == PlaylistSortType.CUSTOM && !isGridView && !selectionMode
+    val allMixedKeys = remember(playlists, includedAlbums, mixedOrder) {
+        val available = (playlists + includedAlbums).map { it.mixedLibraryKey }
+        val availableSet = available.toSet()
+        (mixedOrder.lineSequence().filter { it in availableSet }.toList() + available).distinct()
+    }
+    val customRows = remember(visiblePlaylists, includedAlbums, allMixedKeys) {
+        if (includedAlbums.isEmpty()) {
+            visiblePlaylists
+        } else {
+            val visibleRows = (visiblePlaylists + includedAlbums).associateBy { it.mixedLibraryKey }
+            allMixedKeys.mapNotNull(visibleRows::get)
+        }
+    }
+    val mutableRows = remember { mutableStateListOf<LocalItem>() }
+    var pendingOrderUpdate by remember { mutableStateOf(false) }
+    val reorderableState = rememberReorderableLazyListState(
+        lazyListState = lazyListState,
+        scrollThresholdPadding = LocalPlayerAwareWindowInsets.current.asPaddingValues(),
+    ) { from, to ->
+        val fromIndex = mutableRows.indexOfFirst { it.mixedLibraryKey == from.key }
+        val toIndex = mutableRows.indexOfFirst { it.mixedLibraryKey == to.key }
+        if (fromIndex >= 0 && toIndex >= 0) {
+            mutableRows.move(fromIndex, toIndex)
+            pendingOrderUpdate = true
+        }
+    }
+
+    LaunchedEffect(customRows, reorderableState.isAnyItemDragging) {
+        if (reorderableState.isAnyItemDragging) return@LaunchedEffect
+        if (pendingOrderUpdate) {
+            val reorderedKeys = mutableRows.map { it.mixedLibraryKey }
+            if (includedAlbums.isNotEmpty()) {
+                val visibleKeys = reorderedKeys.toSet()
+                val surviving = reorderedKeys.filter { it in allMixedKeys }.iterator()
+                setMixedOrder(allMixedKeys.map { key ->
+                    if (key in visibleKeys) surviving.next() else key
+                }.joinToString("\n"))
+            }
+            val currentPlaylists = playlists.associateBy { it.id }
+            val reorderedPlaylists = mutableRows.filterIsInstance<Playlist>().mapNotNull { currentPlaylists[it.id] }
+            viewModel.updateCustomPlaylistOrder(mergeVisiblePlaylistOrder(playlists, reorderedPlaylists))
+            pendingOrderUpdate = false
+        } else {
+            mutableRows.clear()
+            mutableRows.addAll(customRows)
         }
     }
 
@@ -674,7 +724,7 @@ fun LibraryPlaylistsScreen(
                 }
                 }
 
-            if (hiddenCount > 0 || showHidden) {
+            if (hiddenCount > 0 || showHidden || customList) {
                 Row(
                     modifier =
                         Modifier
@@ -682,34 +732,44 @@ fun LibraryPlaylistsScreen(
                             .padding(horizontal = 24.dp, vertical = 2.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    FilterChip(
-                        selected = showHidden,
-                        onClick = { showHidden = !showHidden },
-                        leadingIcon = {
-                            Icon(
-                                painter = painterResource(R.drawable.visibility_off),
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp),
-                            )
-                        },
-                        label = {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            ) {
-                                Text(
-                                    text = stringResource(R.string.hidden_playlists),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
+                    if (hiddenCount > 0 || showHidden) {
+                        FilterChip(
+                            selected = showHidden,
+                            onClick = { showHidden = !showHidden },
+                            leadingIcon = {
+                                Icon(
+                                    painter = painterResource(R.drawable.visibility_off),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
                                 )
-                                if (hiddenCount > 0) {
-                                    Badge {
-                                        Text(hiddenCount.toString())
+                            },
+                            label = {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                ) {
+                                    Text(
+                                        text = stringResource(R.string.hidden_playlists),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    if (hiddenCount > 0) {
+                                        Badge {
+                                            Text(hiddenCount.toString())
+                                        }
                                     }
                                 }
-                            }
-                        },
-                    )
+                            },
+                        )
+                    }
+                    if (customList) {
+                        FilterChip(
+                            selected = includedAlbumIds.isNotEmpty(),
+                            onClick = { showAlbumPicker = true },
+                            modifier = Modifier.padding(start = if (hiddenCount > 0 || showHidden) 8.dp else 0.dp),
+                            label = { Text(stringResource(R.string.playlist_mix_albums)) },
+                        )
+                    }
                 }
             }
 
@@ -795,8 +855,8 @@ fun LibraryPlaylistsScreen(
                 }
             } else {
                 val listPlaylists =
-                    if (sortType == PlaylistSortType.CUSTOM && !selectionMode) mutablePlaylists else displayedPlaylists
-                val showDragHandles = sortType == PlaylistSortType.CUSTOM && !locked && !selectionMode
+                    if (customList) mutableRows else displayedPlaylists
+                val showDragHandles = customList && !locked
                 LazyColumn(
                     state = lazyListState,
                     contentPadding = PaddingValues(start = 24.dp, end = 24.dp, bottom = listBottomPadding),
@@ -828,13 +888,47 @@ fun LibraryPlaylistsScreen(
 
                     itemsIndexed(
                         items = listPlaylists,
-                        key = { _, playlist -> playlist.id },
-                        contentType = { _, _ -> "playlist_list" },
-                    ) { _, playlist ->
+                        key = { _, entry -> entry.mixedLibraryKey },
+                        contentType = { _, entry -> if (entry is Album) "mixed_album" else "playlist_list" },
+                    ) { _, entry ->
+                        if (entry is Album) {
+                            ReorderableItem(state = reorderableState, key = entry.mixedLibraryKey) {
+                                ListItem(
+                                    headlineContent = { Text(entry.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                                    supportingContent = { Text(entry.artists.joinToString { it.name }) },
+                                    leadingContent = {
+                                        ItemThumbnail(
+                                            thumbnailUrl = entry.thumbnailUrl,
+                                            isActive = false,
+                                            isPlaying = false,
+                                            shape = RoundedCornerShape(12.dp),
+                                            modifier = Modifier.size(56.dp),
+                                        )
+                                    },
+                                    trailingContent = {
+                                        if (showDragHandles) {
+                                            Icon(
+                                                painter = painterResource(R.drawable.drag_handle),
+                                                contentDescription = stringResource(R.string.playlist_reorder_item),
+                                                modifier = Modifier.size(40.dp).draggableHandle().padding(8.dp),
+                                            )
+                                        }
+                                    },
+                                    modifier = Modifier.clip(RoundedCornerShape(24.dp)).combinedClickable(
+                                        onClick = { navController.navigate("album/${entry.id}") },
+                                        onLongClick = {
+                                            menuState.show { AlbumMenu(entry, navController, menuState::dismiss) }
+                                        },
+                                    ),
+                                )
+                            }
+                            return@itemsIndexed
+                        }
+                        val playlist = entry as Playlist
                         val isSelected = playlist.id in selectedSet
                         ReorderableItem(
                             state = reorderableState,
-                            key = playlist.id,
+                            key = playlist.mixedLibraryKey,
                             modifier =
                                 Modifier.graphicsLayer {
                                     compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen
@@ -963,6 +1057,49 @@ fun LibraryPlaylistsScreen(
                     .padding(bottom = playerAwareBottomPadding + if (selectionMode) 80.dp else 0.dp),
         )
     }
+}
+
+@Composable
+private fun MixedLibraryAlbumPicker(
+    albums: List<Album>,
+    initialSelection: Set<String>,
+    onDismiss: () -> Unit,
+    onApply: (Set<String>) -> Unit,
+) {
+    var selection by rememberSaveable { mutableStateOf(ArrayList(initialSelection)) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.playlist_mix_albums)) },
+        text = {
+            if (albums.isEmpty()) {
+                Text(stringResource(R.string.playlist_mix_albums_empty))
+            } else {
+                LazyColumn(modifier = Modifier.heightIn(max = 360.dp)) {
+                    items(albums, key = { it.id }) { album ->
+                        val selected = album.id in selection
+                        Row(
+                            modifier = Modifier.fillMaxWidth()
+                                .toggleable(selected, role = Role.Checkbox) { checked ->
+                                    selection = ArrayList(if (checked) selection + album.id else selection - album.id)
+                                }
+                                .padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            Checkbox(checked = selected, onCheckedChange = null)
+                            Text(album.title, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onApply(selection.toSet()) }) { Text(stringResource(android.R.string.ok)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(android.R.string.cancel)) }
+        },
+    )
 }
 
 private fun mergeVisiblePlaylistOrder(

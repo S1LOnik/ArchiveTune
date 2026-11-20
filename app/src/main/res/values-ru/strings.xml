@@ -1098,4 +1098,7 @@
     <string name="lyrics_mode_v2">V2 (классический)</string>
     <string name="settings_lyrics_providers_subtitle">Выбор активных источников текста и их приоритета</string>
     <string name="settings_lyrics_romanisation_subtitle">Транслитерация текстов на японском, корейском, китайском, хинди и других языках</string>
+    <string name="playlist_mix_albums">Альбомы в списке плейлистов</string>
+    <string name="playlist_mix_albums_empty">Сохраните альбом в медиатеке, чтобы добавить его сюда.</string>
+    <string name="playlist_reorder_item">Изменить порядок</string>
 </resources>

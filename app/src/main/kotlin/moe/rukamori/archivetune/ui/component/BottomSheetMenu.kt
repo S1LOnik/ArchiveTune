@@ -205,7 +205,7 @@ fun BottomSheetMenu(
                 if (animationsEnabled) {
                     enterProgress.animateTo(
                         targetValue = 0f,
-                        animationSpec = motionConfig.microTween(200),
+                        animationSpec = motionConfig.microTween(170),
                     )
                 } else {
                     enterProgress.snapTo(0f)
@@ -329,38 +329,38 @@ fun BottomSheetMenu(
 
     var expanded by remember(immersive) { mutableStateOf(false) }
     var handleDrag by remember(immersive) { mutableFloatStateOf(0f) }
+    LaunchedEffect(state.isVisible) {
+        if (state.isVisible) handleDrag = 0f
+    }
     val dragReturn = remember { Animatable(0f) }
     val threshold = with(density) { 32.dp.toPx() }
     val flingThreshold = with(density) { 420.dp.toPx() }
-    // The immersive list scrolls at either height. Its handle owns sheet gestures.
-    val floatingDismissGesture = remember(state, threshold, state.isVisible) {
+    val dismissDistance = with(density) { 72.dp.toPx() }
+    val dismissVelocity = with(density) { 900.dp.toPx() }
+    val contentDismissGesture = remember(state, state.isVisible, immersive, dismissDistance, dismissVelocity, motionConfig, animationsEnabled) {
         object : NestedScrollConnection {
-            private var dragDistance = 0f
-
             override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
-                if (source != NestedScrollSource.UserInput || available.y <= 0f) {
-                    if (consumed.y != 0f) {
-                        dragDistance = 0f
-                        handleDrag = 0f
-                    }
+                if (!state.isVisible || source != NestedScrollSource.UserInput) return Offset.Zero
+                if (available.y <= 0f) {
+                    if (consumed.y != 0f) handleDrag = 0f
                     return Offset.Zero
                 }
-                dragDistance += available.y
-                handleDrag = dragDistance
-                if (dragDistance > threshold * 1.4f) {
-                    state.dismiss()
-                    dragDistance = 0f
-                    handleDrag = 0f
-                }
+                handleDrag = (handleDrag + available.y).coerceAtMost(dismissDistance * 2f)
                 return Offset(0f, available.y)
             }
 
             override suspend fun onPreFling(available: Velocity): Velocity {
-                val shouldDismiss = dragDistance > threshold
-                dragDistance = 0f
-                handleDrag = 0f
-                if (shouldDismiss) state.dismiss()
-                return if (shouldDismiss) available else Velocity.Zero
+                if (handleDrag <= 0f || !state.isVisible) return Velocity.Zero
+                val distance = if (immersive) dismissDistance else threshold
+                if (handleDrag >= distance || (handleDrag >= threshold * 0.5f && available.y >= dismissVelocity)) {
+                    state.dismiss()
+                    return Velocity(0f, available.y.coerceAtLeast(0f))
+                }
+                dragReturn.snapTo(handleDrag)
+                dragReturn.animateTo(0f, if (animationsEnabled) motionConfig.microTween(120) else snap()) {
+                    handleDrag = value
+                }
+                return Velocity(0f, available.y.coerceAtLeast(0f))
             }
         }
     }
@@ -427,7 +427,7 @@ fun BottomSheetMenu(
                             progress = progress,
                             style = motionConfig.menuTransitionStyle,
                             backProgress = back,
-                            dragOffset = if (immersive && expanded) 0f else handleDrag.coerceAtLeast(0f) * 0.35f,
+                            dragOffset = handleDrag.coerceAtLeast(0f) * 0.55f,
                         )
                         renderEffect = blurEffects.effectAt(1f - progress)
                     }
@@ -447,7 +447,7 @@ fun BottomSheetMenu(
                         },
                     )
                     .clip(menuShape)
-                    .then(if (immersive) Modifier else Modifier.nestedScroll(floatingDismissGesture))
+                    .nestedScroll(contentDismissGesture)
                     .then(
                         if (state.isVisible) {
                             Modifier.clickable(
@@ -506,6 +506,7 @@ fun BottomSheetMenu(
                                             expanded = false
                                         } else {
                                             state.dismiss()
+                                            return@draggable
                                         }
                                     }
                                     dragReturn.snapTo(handleDrag)
