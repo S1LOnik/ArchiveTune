@@ -33,8 +33,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import moe.rukamori.archivetune.ui.motion.rememberDecorativeMotionActive
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
@@ -279,6 +281,9 @@ private fun FlamingoKenBurnsImage(
     val random = remember { Random(System.currentTimeMillis()) }
     var currentRect by remember { mutableStateOf<FlamingoKenBurnsRect?>(null) }
 
+    val decorativeMotionActive = rememberDecorativeMotionActive(isPlaying = isPlaying(), isVisible = true)
+    val latestDecorativeMotionActive by rememberUpdatedState(decorativeMotionActive)
+
     BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
@@ -287,7 +292,7 @@ private fun FlamingoKenBurnsImage(
         val viewportW = constraints.maxWidth.toFloat()
         val viewportH = constraints.maxHeight.toFloat()
 
-        LaunchedEffect(bitmap, viewportW, viewportH) {
+        LaunchedEffect(bitmap, viewportW, viewportH, decorativeMotionActive) {
             if (viewportW <= 0f || viewportH <= 0f) return@LaunchedEffect
             val drawableW = bitmap.width.toFloat()
             val drawableH = bitmap.height.toFloat()
@@ -310,8 +315,8 @@ private fun FlamingoKenBurnsImage(
             var lastFrameMs = 0L
             var lastWriteMs = 0L
             while (true) {
-                if (!isPlaying() || motionSuspended()) {
-                    snapshotFlow { isPlaying() && !motionSuspended() }.first { it }
+                if (!isPlaying() || motionSuspended() || !latestDecorativeMotionActive) {
+                    snapshotFlow { isPlaying() && !motionSuspended() && latestDecorativeMotionActive }.first { it }
                     lastFrameMs = 0L
                     lastWriteMs = 0L
                     continue

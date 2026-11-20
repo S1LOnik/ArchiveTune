@@ -851,17 +851,28 @@ private fun SpatialFlowInterludeItem(
         label = "InterludeProgress",
     )
 
-    val infiniteTransition = rememberInfiniteTransition(label = "InterludeBreathing")
-    val breatheScale by infiniteTransition.animateFloat(
-        initialValue = 0.82f,
-        targetValue = 1.18f,
-        animationSpec =
-            infiniteRepeatable(
-                animation = tween(durationMillis = 1400, easing = FastOutSlowInEasing),
-                repeatMode = RepeatMode.Reverse,
-            ),
-        label = "BreathScale",
-    )
+    val breatheMotionActive =
+        moe.rukamori.archivetune.ui.motion.rememberDecorativeMotionActive(
+            isPlaying = isActive,
+            isVisible = true,
+        )
+    val breatheScale =
+        if (breatheMotionActive) {
+            val infiniteTransition = rememberInfiniteTransition(label = "InterludeBreathing")
+            val animatedScale by infiniteTransition.animateFloat(
+                initialValue = 0.82f,
+                targetValue = 1.18f,
+                animationSpec =
+                    infiniteRepeatable(
+                        animation = tween(durationMillis = 1400, easing = FastOutSlowInEasing),
+                        repeatMode = RepeatMode.Reverse,
+                    ),
+                label = "BreathScale",
+            )
+            animatedScale
+        } else {
+            1f
+        }
     val iconAlpha by animateFloatAsState(
         targetValue = if (isActive) 0.85f else 0.25f,
         animationSpec = spring(stiffness = Spring.StiffnessLow),
@@ -979,7 +990,12 @@ private fun SpatialFlowLyricsMovingBlur(
                 .clipToBounds(),
     ) {
         val wanderMaxDrift = movingBlurWanderMaxDriftDp(maxWidth, maxHeight)
-        val blurWander = rememberBlurWanderDrift(active = isPlaying, maxDriftDp = wanderMaxDrift)
+        val blurMotionActive =
+            moe.rukamori.archivetune.ui.motion.rememberDecorativeMotionActive(
+                isPlaying = isPlaying,
+                isVisible = true,
+            )
+        val blurWander = rememberBlurWanderDrift(active = blurMotionActive, maxDriftDp = wanderMaxDrift)
         val driftFootprint =
             remember(maxWidth, maxHeight) {
                 blurBackdropFootprint(

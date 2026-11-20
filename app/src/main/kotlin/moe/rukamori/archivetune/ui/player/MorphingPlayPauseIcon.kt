@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import moe.rukamori.archivetune.ui.motion.LocalMotionConfig
 
 // [FIX-ZCODE] Restored fork feature: true morphing Play/Pause icon. The original
 // declaration was lost when PlayerComponents.kt got overwritten with the donor
@@ -36,8 +37,9 @@ fun MorphingPlayPauseIcon(
     modifier: Modifier = Modifier,
     size: Dp = 48.dp,
 ) {
+    val motionConfig = LocalMotionConfig.current
     // 0f = play (triangle), 1f = pause (two bars)
-    val morph by animateFloatAsState(
+    val animatedMorph by animateFloatAsState(
         targetValue = if (isPlaying) 1f else 0f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
@@ -45,6 +47,7 @@ fun MorphingPlayPauseIcon(
         ),
         label = "playPauseMorph",
     )
+    val morph = if (motionConfig.animationsEnabled) animatedMorph else if (isPlaying) 1f else 0f
 
     Canvas(modifier = modifier.size(size)) {
         val w = this.size.width

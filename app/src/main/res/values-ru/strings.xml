@@ -880,4 +880,17 @@
     <string name="home_section_more_recommendations">Ещё рекомендации</string>
     <string name="home_offline_saved_badge">Доступно оффлайн</string>
     <string name="home_quick_tracks_title">Личный подбор</string>
+
+    <string name="player_mini_expand_action">Открыть плеер</string>
+    <string name="player_mini_toggle_playback">Воспроизведение или пауза</string>
+    <string name="player_mini_previous_action">Предыдущий трек</string>
+    <string name="player_mini_next_action">Следующий трек</string>
+    <string name="player_landscape_queue_tab">Очередь</string>
+    <string name="player_landscape_lyrics_tab">Текст</string>
+    <string name="player_landscape_collapse">Свернуть плеер</string>
+    <string name="player_landscape_jump_current">К текущему</string>
+    <string name="player_landscape_move_up">Поднять в очереди</string>
+    <string name="player_landscape_move_down">Опустить в очереди</string>
+    <string name="player_landscape_remove_queue">Убрать из очереди</string>
+    <string name="player_landscape_queue_empty">Очередь пуста</string>
 </resources>

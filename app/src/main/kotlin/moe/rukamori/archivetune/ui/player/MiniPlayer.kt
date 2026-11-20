@@ -46,6 +46,9 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
@@ -60,12 +63,16 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import moe.rukamori.archivetune.LocalPlayerConnection
+import moe.rukamori.archivetune.constants.MINI_PLAYER_BAR_HEIGHT_DP
 import moe.rukamori.archivetune.constants.MiniPlayerBackgroundStyle
 import moe.rukamori.archivetune.constants.MiniPlayerBackgroundStyleKey
 import moe.rukamori.archivetune.constants.MiniPlayerCompactHeight
 import moe.rukamori.archivetune.constants.MiniPlayerHeight
+import moe.rukamori.archivetune.constants.MiniPlayerStyle
+import moe.rukamori.archivetune.constants.MiniPlayerStyleKey
 import moe.rukamori.archivetune.constants.NavigationBarMaxWidth
 import moe.rukamori.archivetune.constants.SwipeSensitivityKey
+import moe.rukamori.archivetune.extensions.togglePlayPause
 import moe.rukamori.archivetune.ui.component.CompactControlGap
 import moe.rukamori.archivetune.ui.component.CompactControlSize
 import moe.rukamori.archivetune.playback.artwork.PlayerPaletteCacheKey
@@ -98,6 +105,10 @@ fun MiniPlayer(
     onExpand: (() -> Unit)? = null,
 ) {
     val compactFraction = compactFractionState.value
+    val miniPlayerStyle by rememberEnumPreference(
+        key = MiniPlayerStyleKey,
+        defaultValue = MiniPlayerStyle.STANDARD,
+    )
 
     val compactStartInset = compactHorizontalPadding + CompactControlSize + CompactControlGap
 
@@ -108,16 +119,21 @@ fun MiniPlayer(
             compactHorizontalPadding
         }
     val compactModifier =
-        modifier.padding(
-            start = lerp(0.dp, compactStartInset, compactFraction),
-            end = lerp(0.dp, compactEndInset, compactFraction),
-        )
+        if (miniPlayerStyle == MiniPlayerStyle.BAR) {
+            modifier
+        } else {
+            modifier.padding(
+                start = lerp(0.dp, compactStartInset, compactFraction),
+                end = lerp(0.dp, compactEndInset, compactFraction),
+            )
+        }
     NewMiniPlayer(
         positionProvider = positionProvider,
         durationProvider = durationProvider,
         modifier = compactModifier,
         pureBlack = pureBlack,
         isPairedWithNavigation = isPairedWithNavigation,
+        miniPlayerStyle = miniPlayerStyle,
         compactFraction = compactFraction,
 
         compactShowTransportControls = !compactReserveEndControl,
@@ -133,6 +149,7 @@ private fun NewMiniPlayer(
     modifier: Modifier = Modifier,
     pureBlack: Boolean,
     isPairedWithNavigation: Boolean,
+    miniPlayerStyle: MiniPlayerStyle = MiniPlayerStyle.STANDARD,
     compactFraction: Float = 0f,
     compactShowTransportControls: Boolean = false,
     onArtworkSlotPositioned: ((androidx.compose.ui.geometry.Rect) -> Unit)? = null,
@@ -149,11 +166,13 @@ private fun NewMiniPlayer(
         defaultValue = MiniPlayerBackgroundStyle.THEME,
     )
     val mediaMetadata by playerConnection.mediaMetadata.collectAsStateWithLifecycle()
+    val canSkipPrevious by playerConnection.canSkipPrevious.collectAsStateWithLifecycle()
+    val canSkipNext by playerConnection.canSkipNext.collectAsStateWithLifecycle()
 
     var gradientColors by remember {
         mutableStateOf<List<Color>>(emptyList())
     }
-    var hasValidPalette by remember { mutableStateOf(false) }
+    var paletteTrackState by remember { mutableStateOf(PlayerPaletteTrackState()) }
     val fallbackColor = MaterialTheme.colorScheme.surface.toArgb()
 
     val shouldUseArtworkBackground =
@@ -170,14 +189,20 @@ private fun NewMiniPlayer(
     ) {
         if (!shouldUseArtworkBackground) {
             gradientColors = emptyList()
-            hasValidPalette = false
+            paletteTrackState = PlayerPaletteTrackState()
             return@LaunchedEffect
         }
 
         val currentMetadata = mediaMetadata
         val thumbnailUrl = currentMetadata?.thumbnailUrl
         if (currentMetadata == null || thumbnailUrl.isNullOrBlank()) {
-            if (!hasValidPalette) gradientColors = emptyList()
+            paletteTrackState =
+                resolvePaletteTransitionOnMissingOrFailedArtwork(
+                    previousState = paletteTrackState,
+                    currentMediaId = currentMetadata?.id,
+                    currentArtworkUrl = null,
+                )
+            gradientColors = emptyList()
             return@LaunchedEffect
         }
 
@@ -191,8 +216,24 @@ private fun NewMiniPlayer(
             )
         PlayerPaletteCache.get(cacheKey)?.let { cachedColors ->
             gradientColors = cachedColors
-            hasValidPalette = true
+            paletteTrackState =
+                PlayerPaletteTrackState(
+                    mediaId = currentMetadata.id,
+                    artworkUrl = thumbnailUrl,
+                    hasValidPalette = true,
+                )
             return@LaunchedEffect
+        }
+
+        val preState =
+            resolvePaletteTransitionOnMissingOrFailedArtwork(
+                previousState = paletteTrackState,
+                currentMediaId = currentMetadata.id,
+                currentArtworkUrl = thumbnailUrl,
+            )
+        paletteTrackState = preState
+        if (!preState.hasValidPalette) {
+            gradientColors = emptyList()
         }
 
         val request =
@@ -243,10 +284,25 @@ private fun NewMiniPlayer(
             if (stillCurrent) {
                 PlayerPaletteCache.put(cacheKey, extractedColors)
                 gradientColors = extractedColors
-                hasValidPalette = true
+                paletteTrackState =
+                    PlayerPaletteTrackState(
+                        mediaId = currentMetadata.id,
+                        artworkUrl = thumbnailUrl,
+                        hasValidPalette = true,
+                    )
             }
-        } else if (!hasValidPalette) {
-            gradientColors = emptyList()
+        } else {
+            val failedState =
+                resolvePaletteTransitionOnMissingOrFailedArtwork(
+                    previousState = paletteTrackState,
+                    currentMediaId = currentMetadata.id,
+                    currentArtworkUrl = thumbnailUrl,
+                    fetchFailed = true,
+                )
+            paletteTrackState = failedState
+            if (!failedState.hasValidPalette) {
+                gradientColors = emptyList()
+            }
         }
     }
 
@@ -280,8 +336,10 @@ private fun NewMiniPlayer(
             useLiquidGlass = effectiveBackgroundStyle == MiniPlayerBackgroundStyle.LIQUID_GLASS,
         )
     val miniPlayerShape =
-        remember(isPairedWithNavigation, compactFraction) {
-            if (compactFraction > 0.5f) {
+        remember(isPairedWithNavigation, compactFraction, miniPlayerStyle) {
+            if (miniPlayerStyle == MiniPlayerStyle.BAR) {
+                RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)
+            } else if (compactFraction > 0.5f) {
                 RoundedCornerShape(percent = 50)
             } else if (isPairedWithNavigation) {
                 RoundedCornerShape(
@@ -295,9 +353,19 @@ private fun NewMiniPlayer(
             }
         } ?: MaterialTheme.shapes.extraLarge
 
+    val expandActionLabel = stringResource(R.string.player_mini_expand_action)
+    val togglePlaybackActionLabel = stringResource(R.string.player_mini_toggle_playback)
+    val previousActionLabel = stringResource(R.string.player_mini_previous_action)
+    val nextActionLabel = stringResource(R.string.player_mini_next_action)
+
     SwipeableMiniPlayerBox(
         modifier = modifier,
-        contentMaxWidth = if (isPairedWithNavigation) NavigationBarMaxWidth else null,
+        contentMaxWidth =
+            if (isPairedWithNavigation && miniPlayerStyle != MiniPlayerStyle.BAR) {
+                NavigationBarMaxWidth
+            } else {
+                null
+            },
         swipeSensitivity = swipeSensitivity,
         swipeThumbnail = swipeThumbnail,
         playerConnection = playerConnection,
@@ -305,19 +373,61 @@ private fun NewMiniPlayer(
         coroutineScope = coroutineScope,
         pureBlack = pureBlack,
         useLegacyBackground = false,
+        miniPlayerStyle = miniPlayerStyle,
         compactFraction = compactFraction,
     ) { offsetX ->
         val expandLabel = stringResource(R.string.player_menu_expand)
+        val containerHeight =
+            if (miniPlayerStyle == MiniPlayerStyle.BAR) {
+                MINI_PLAYER_BAR_HEIGHT_DP.dp
+            } else {
+                lerp(MiniPlayerHeight, MiniPlayerCompactHeight, compactFraction)
+            }
         Box(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .height(lerp(MiniPlayerHeight, MiniPlayerCompactHeight, compactFraction))
+                    .height(containerHeight)
 
                     .graphicsLayer {
                         translationX = offsetX
                     }
                     .clip(miniPlayerShape)
+                    .semantics {
+                        customActions =
+                            buildList {
+                                if (onExpand != null) {
+                                    add(
+                                        CustomAccessibilityAction(expandActionLabel) {
+                                            onExpand()
+                                            true
+                                        },
+                                    )
+                                }
+                                add(
+                                    CustomAccessibilityAction(togglePlaybackActionLabel) {
+                                        playerConnection.player.togglePlayPause()
+                                        true
+                                    },
+                                )
+                                if (canSkipPrevious) {
+                                    add(
+                                        CustomAccessibilityAction(previousActionLabel) {
+                                            playerConnection.seekToPrevious()
+                                            true
+                                        },
+                                    )
+                                }
+                                if (canSkipNext) {
+                                    add(
+                                        CustomAccessibilityAction(nextActionLabel) {
+                                            playerConnection.seekToNext()
+                                            true
+                                        },
+                                    )
+                                }
+                            }
+                    }
                     .then(
                         if (onExpand != null) {
                             Modifier.clickable(
@@ -341,6 +451,7 @@ private fun NewMiniPlayer(
                 durationProvider = durationProvider,
                 playerConnection = playerConnection,
                 colors = contentColors,
+                miniPlayerStyle = miniPlayerStyle,
                 compactFraction = compactFraction,
                 compactShowTransportControls = compactShowTransportControls,
                 onArtworkSlotPositioned = onArtworkSlotPositioned,

@@ -61,7 +61,9 @@ internal fun LooperExpressiveSlider(
     val displayPosition = (scrubPosition ?: position).coerceIn(0L, safeDuration)
     val progress = (displayPosition.toFloat() / safeDuration.toFloat()).coerceIn(0f, 1f)
 
-    val enableWave = isPlaying && progress > 0.12f
+    val animationsEnabled = moe.rukamori.archivetune.ui.motion.LocalMotionConfig.current.animationsEnabled
+    val wavePlaying = isPlaying && animationsEnabled
+    val enableWave = wavePlaying && progress > 0.12f
     val waveBlend by animateFloatAsState(
         targetValue = if (enableWave) 1f else 0f,
         animationSpec = tween(durationMillis = 350),
@@ -70,9 +72,9 @@ internal fun LooperExpressiveSlider(
 
     var trackWidthPx by remember { mutableFloatStateOf(0f) }
     var wavePhase by remember { mutableFloatStateOf(0f) }
-    LaunchedEffect(isPlaying) {
+    LaunchedEffect(wavePlaying) {
         var lastNanos = 0L
-        while (isPlaying) {
+        while (wavePlaying) {
             withFrameNanos { frameNanos ->
                 if (lastNanos != 0L) {
                     val advance = (frameNanos - lastNanos) / 1_000_000_000f * 0.05f

@@ -308,21 +308,20 @@ fun Thumbnail(
         }
     }
 
-    LaunchedEffect(mediaMetadata, currentMediaItem?.mediaId, canSkipPrevious, canSkipNext) {
-        val index = maxOf(0, currentMediaIndex)
-        if (index >= 0 && index < thumbnailPages.size) {
+    val motionConfig = moe.rukamori.archivetune.ui.motion.LocalMotionConfig.current
+
+    LaunchedEffect(currentMediaIndex, mediaMetadata?.id, currentMediaItem?.mediaId) {
+        val index = currentMediaIndex
+        if (index >= 0 && index < thumbnailPages.size && index != currentItem) {
             try {
-                thumbnailLazyGridState.animateScrollToItem(index)
-            } catch (e: Exception) {
+                if (!motionConfig.animationsEnabled || kotlin.math.abs(index - currentItem) > 1) {
+                    thumbnailLazyGridState.scrollToItem(index)
+                } else {
+                    thumbnailLazyGridState.animateScrollToItem(index)
+                }
+            } catch (_: Exception) {
                 thumbnailLazyGridState.scrollToItem(index)
             }
-        }
-    }
-
-    LaunchedEffect(playerConnection.player.currentMediaItemIndex, currentMediaItem?.mediaId) {
-        val index = currentMediaIndex
-        if (index >= 0 && index != currentItem) {
-            thumbnailLazyGridState.scrollToItem(index)
         }
     }
 
@@ -549,20 +548,10 @@ fun Thumbnail(
                                         .clip(RoundedCornerShape(thumbnailCornerRadius.dp)),
                             ) {
                                 if (hidePlayerThumbnail) {
-                                    Box(
-                                        modifier =
-                                            Modifier
-                                                .fillMaxSize()
-                                                .background(MaterialTheme.colorScheme.surfaceVariant),
-                                        contentAlignment = Alignment.Center,
-                                    ) {
-                                        Icon(
-                                            painter = painterResource(R.drawable.about_splash),
-                                            contentDescription = stringResource(R.string.hide_player_thumbnail),
-                                            tint = textBackgroundColor.copy(alpha = 0.7f),
-                                            modifier = Modifier.size(120.dp),
-                                        )
-                                    }
+                                    LocalArtworkFallback(
+                                        contentDescription = stringResource(R.string.hide_player_thumbnail),
+                                        modifier = Modifier.fillMaxSize(),
+                                    )
                                 } else {
                                     val primaryCanvasUrl = canvasArtwork?.animated
                                     val fallbackCanvasUrl = canvasArtwork?.videoUrl
@@ -631,15 +620,26 @@ fun Thumbnail(
                                             item.mediaId == currentMediaItem?.mediaId &&
                                             !item.mediaId.isLocalMediaId()
 
-                                    AsyncImage(
-                                        model = thumbnailArtworkRequest,
-                                        contentDescription = null,
-                                        contentScale = if (shouldCropArtwork) ContentScale.Crop else ContentScale.Fit,
-                                        modifier =
-                                            Modifier
-                                                .fillMaxSize()
-                                                .let { if (shouldCropArtwork) it.aspectRatio(1f) else it },
-                                    )
+                                    var artworkLoadFailed by remember(displayUrl) { mutableStateOf(false) }
+                                    if (displayUrl.isNullOrBlank() || artworkLoadFailed) {
+                                        LocalArtworkFallback(
+                                            modifier =
+                                                Modifier
+                                                    .fillMaxSize()
+                                                    .let { if (shouldCropArtwork) it.aspectRatio(1f) else it },
+                                        )
+                                    } else {
+                                        AsyncImage(
+                                            model = thumbnailArtworkRequest,
+                                            contentDescription = null,
+                                            contentScale = if (shouldCropArtwork) ContentScale.Crop else ContentScale.Fit,
+                                            onError = { artworkLoadFailed = true },
+                                            modifier =
+                                                Modifier
+                                                    .fillMaxSize()
+                                                    .let { if (shouldCropArtwork) it.aspectRatio(1f) else it },
+                                        )
+                                    }
 
                                     if (!isCurrentMusicVideo &&
                                         shouldUseCanvas &&

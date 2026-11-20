@@ -4471,6 +4471,21 @@ private fun FlamingoTrack(
 
 @Composable
 private fun FlamingoMixSheen(height: Dp, color: Color) {
+    val sheenActive = moe.rukamori.archivetune.ui.motion.rememberDecorativeMotionActive(isPlaying = true, isVisible = true)
+    if (!sheenActive) {
+        Canvas(
+            Modifier
+                .fillMaxWidth()
+                .height(height),
+        ) {
+            drawRoundRect(
+                color = color.copy(alpha = 0.26f),
+                size = Size(size.width, size.height),
+                cornerRadius = CornerRadius(size.height / 2f),
+            )
+        }
+        return
+    }
     val transition = rememberInfiniteTransition(label = "flamingoMixSheen")
     val phase by transition.animateFloat(
         initialValue = -FlamingoSheenBandFraction,

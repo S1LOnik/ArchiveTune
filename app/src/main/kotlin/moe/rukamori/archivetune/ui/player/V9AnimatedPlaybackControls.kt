@@ -38,17 +38,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import moe.rukamori.archivetune.R
+import moe.rukamori.archivetune.ui.motion.ArchiveTuneHapticKind
+import moe.rukamori.archivetune.ui.motion.LocalMotionConfig
+import moe.rukamori.archivetune.ui.motion.rememberArchiveTuneHapticTrigger
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.delay
 
 private enum class V9PlaybackButtonType { NONE, PREVIOUS, PLAY_PAUSE, NEXT }
 
@@ -80,51 +80,21 @@ fun V9AnimatedPlaybackControls(
     iconSize: Dp = 32.dp,
 ) {
     val isPlaying = isPlayingProvider()
+    val motionConfig = LocalMotionConfig.current
     var lastClicked by remember { mutableStateOf<V9PlaybackButtonType?>(null) }
     var clickTrigger by remember { mutableStateOf(0) }
-    val latestIsPlayingProvider by rememberUpdatedState(newValue = isPlayingProvider)
-    val latestLastClicked by rememberUpdatedState(newValue = lastClicked)
-    val isPlayPauseLocked =
-        lastClicked == V9PlaybackButtonType.NEXT || lastClicked == V9PlaybackButtonType.PREVIOUS
-    var playPauseVisualState by remember { mutableStateOf(isPlaying) }
-    var pendingPlayPauseState by remember { mutableStateOf<Boolean?>(null) }
-    val hapticFeedback = LocalHapticFeedback.current
-    val coroutineScope = rememberCoroutineScope()
+    val triggerHaptic = rememberArchiveTuneHapticTrigger()
 
     val motionScheme = remember { MotionScheme.standard() }
     val defaultSpatialDpSpec = remember { motionScheme.defaultSpatialSpec<Dp>() }
 
-    LaunchedEffect(lastClicked, clickTrigger) {
+    LaunchedEffect(lastClicked, clickTrigger, motionConfig.animationsEnabled) {
         if (lastClicked != null) {
-            val delayTime = when (lastClicked) {
-                V9PlaybackButtonType.NEXT, V9PlaybackButtonType.PREVIOUS -> 600L
-                else -> releaseDelay
-            }
-            delay(delayTime)
-            lastClicked = null
-        }
-    }
-
-    LaunchedEffect(isPlaying) {
-        if (isPlaying) {
-            pendingPlayPauseState = true
-            return@LaunchedEffect
-        }
-
-        val shouldDelay = latestLastClicked != V9PlaybackButtonType.PLAY_PAUSE
-        if (shouldDelay) {
-            delay(releaseDelay)
-        }
-        if (!latestIsPlayingProvider()) {
-            pendingPlayPauseState = false
-        }
-    }
-
-    LaunchedEffect(isPlayPauseLocked, pendingPlayPauseState) {
-        if (!isPlayPauseLocked) {
-            pendingPlayPauseState?.let {
-                playPauseVisualState = it
-                pendingPlayPauseState = null
+            if (!motionConfig.animationsEnabled) {
+                lastClicked = null
+            } else {
+                delay(releaseDelay)
+                lastClicked = null
             }
         }
     }
@@ -145,11 +115,12 @@ fun V9AnimatedPlaybackControls(
                 else -> compressionWeight
             }
 
-            val prevWeight by animateFloatAsState(
+            val animatedPrevWeight by animateFloatAsState(
                 targetValue = weightFor(V9PlaybackButtonType.PREVIOUS),
                 animationSpec = pressAnimationSpec,
                 label = "prevWeight"
             )
+            val prevWeight = if (motionConfig.animationsEnabled) animatedPrevWeight else baseWeight
             Box(
                 modifier = Modifier
                     .weight(prevWeight)
@@ -157,12 +128,12 @@ fun V9AnimatedPlaybackControls(
                     .clip(CircleShape)
                     .background(colorPreviousButton)
                     .clickable {
-                        lastClicked = V9PlaybackButtonType.PREVIOUS
-                        clickTrigger++
-                        coroutineScope.launch {
-                            delay(180)
-                            onPrevious()
+                        triggerHaptic(ArchiveTuneHapticKind.SKIP)
+                        if (motionConfig.animationsEnabled) {
+                            lastClicked = V9PlaybackButtonType.PREVIOUS
+                            clickTrigger++
                         }
+                        onPrevious()
                     },
                 contentAlignment = Alignment.Center
             ) {
@@ -174,16 +145,20 @@ fun V9AnimatedPlaybackControls(
                 )
             }
 
-            val playWeight by animateFloatAsState(
+            val animatedPlayWeight by animateFloatAsState(
                 targetValue = weightFor(V9PlaybackButtonType.PLAY_PAUSE),
                 animationSpec = pressAnimationSpec,
                 label = "playWeight"
             )
-            val playCorner by animateDpAsState(
-                targetValue = if (!playPauseVisualState) playPauseCornerPlaying else playPauseCornerPaused,
+            val playWeight = if (motionConfig.animationsEnabled) animatedPlayWeight else baseWeight
+            val animatedPlayCorner by animateDpAsState(
+                targetValue = if (!isPlaying) playPauseCornerPlaying else playPauseCornerPaused,
                 animationSpec = defaultSpatialDpSpec,
                 label = "playCorner"
             )
+            val playCorner =
+                if (motionConfig.animationsEnabled) animatedPlayCorner
+                else if (!isPlaying) playPauseCornerPlaying else playPauseCornerPaused
             Box(
                 modifier = Modifier
                     .weight(playWeight)
@@ -194,26 +169,28 @@ fun V9AnimatedPlaybackControls(
                     }
                     .background(colorPlayPause)
                     .clickable {
-                        lastClicked = V9PlaybackButtonType.PLAY_PAUSE
-                        clickTrigger++
-                        hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        triggerHaptic(ArchiveTuneHapticKind.PLAY_PAUSE)
+                        if (motionConfig.animationsEnabled) {
+                            lastClicked = V9PlaybackButtonType.PLAY_PAUSE
+                            clickTrigger++
+                        }
                         onPlayPause()
                     },
                 contentAlignment = Alignment.Center
             ) {
-                V9MorphingPlayPauseIcon(
-                    isPlaying = playPauseVisualState,
+                MorphingPlayPauseIcon(
+                    isPlaying = isPlaying,
                     tint = tintPlayPauseIcon,
                     size = playPauseIconSize,
-                    motionScheme = motionScheme
                 )
             }
 
-            val nextWeight by animateFloatAsState(
+            val animatedNextWeight by animateFloatAsState(
                 targetValue = weightFor(V9PlaybackButtonType.NEXT),
                 animationSpec = pressAnimationSpec,
                 label = "nextWeight"
             )
+            val nextWeight = if (motionConfig.animationsEnabled) animatedNextWeight else baseWeight
             Box(
                 modifier = Modifier
                     .weight(nextWeight)
@@ -221,12 +198,12 @@ fun V9AnimatedPlaybackControls(
                     .clip(CircleShape)
                     .background(colorNextButton)
                     .clickable {
-                        lastClicked = V9PlaybackButtonType.NEXT
-                        clickTrigger++
-                        coroutineScope.launch {
-                            delay(180)
-                            onNext()
+                        triggerHaptic(ArchiveTuneHapticKind.SKIP)
+                        if (motionConfig.animationsEnabled) {
+                            lastClicked = V9PlaybackButtonType.NEXT
+                            clickTrigger++
                         }
+                        onNext()
                     },
                 contentAlignment = Alignment.Center
             ) {
@@ -238,30 +215,5 @@ fun V9AnimatedPlaybackControls(
                 )
             }
         }
-    }
-}
-
-@Composable
-private fun V9MorphingPlayPauseIcon(
-    isPlaying: Boolean,
-    tint: Color,
-    size: Dp,
-    motionScheme: MotionScheme
-) {
-    Crossfade(
-        targetState = isPlaying,
-        animationSpec = motionScheme.fastEffectsSpec(),
-        label = "v9PlayPauseCrossfade"
-    ) { playing ->
-        Icon(
-            painter = painterResource(if (playing) R.drawable.pause else R.drawable.play),
-            contentDescription = if (playing) {
-                stringResource(R.string.widget_pause)
-            } else {
-                stringResource(R.string.play)
-            },
-            tint = tint,
-            modifier = Modifier.size(size)
-        )
     }
 }

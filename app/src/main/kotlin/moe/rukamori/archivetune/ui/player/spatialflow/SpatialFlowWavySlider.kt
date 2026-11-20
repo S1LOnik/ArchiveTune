@@ -97,7 +97,8 @@ fun WavyMusicSlider(
         label = "ThumbInteractionAnim",
     )
 
-    val shouldShowWave = isWaveEligible && isPlaying && !isInteracting
+    val animationsEnabled = moe.rukamori.archivetune.ui.motion.LocalMotionConfig.current.animationsEnabled
+    val shouldShowWave = isWaveEligible && isPlaying && !isInteracting && animationsEnabled
 
     val animatedWaveAmplitude by animateDpAsState(
         targetValue = if (shouldShowWave) waveAmplitudeWhenPlaying else 0.dp,

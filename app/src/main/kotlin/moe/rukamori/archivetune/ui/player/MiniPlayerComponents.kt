@@ -12,6 +12,9 @@ package moe.rukamori.archivetune.ui.player
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.unit.lerp
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Animatable
@@ -85,11 +88,15 @@ import kotlinx.coroutines.launch
 
 import moe.rukamori.archivetune.R
 import moe.rukamori.archivetune.constants.EnableHapticFeedbackKey
+import moe.rukamori.archivetune.constants.MINI_PLAYER_BAR_HEIGHT_DP
 import moe.rukamori.archivetune.constants.MiniPlayerHeight
+import moe.rukamori.archivetune.constants.MiniPlayerStyle
 import moe.rukamori.archivetune.constants.NavigationBarHorizontalPadding
 import moe.rukamori.archivetune.extensions.togglePlayPause
 import moe.rukamori.archivetune.models.MediaMetadata
 import moe.rukamori.archivetune.playback.PlayerConnection
+import moe.rukamori.archivetune.ui.motion.ArchiveTuneHapticKind
+import moe.rukamori.archivetune.ui.motion.rememberArchiveTuneHapticTrigger
 import moe.rukamori.archivetune.ui.utils.getNextFallbackUrl
 import moe.rukamori.archivetune.utils.rememberLowDataModeActive
 import moe.rukamori.archivetune.utils.rememberPreference
@@ -127,6 +134,7 @@ fun SwipeableMiniPlayerBox(
     coroutineScope: CoroutineScope,
     pureBlack: Boolean = false,
     useLegacyBackground: Boolean = false,
+    miniPlayerStyle: MiniPlayerStyle = MiniPlayerStyle.STANDARD,
     compactFraction: Float = 0f,
     content: @Composable (Float) -> Unit,
 ) {
@@ -134,8 +142,8 @@ fun SwipeableMiniPlayerBox(
     var dragStartTime by remember { mutableLongStateOf(0L) }
     var totalDragDistance by remember { mutableFloatStateOf(0f) }
 
-    val view = LocalView.current
     val (enableHapticFeedback) = rememberPreference(EnableHapticFeedbackKey, true)
+    val triggerHaptic = rememberArchiveTuneHapticTrigger()
 
     val animationSpec =
         spring<Float>(
@@ -146,8 +154,9 @@ fun SwipeableMiniPlayerBox(
     fun calculateAutoSwipeThreshold(swipeSensitivity: Float): Int =
         (600 / (1f + kotlin.math.exp(-(-11.44748 * swipeSensitivity + 9.04945)))).roundToInt()
     val autoSwipeThreshold = calculateAutoSwipeThreshold(swipeSensitivity)
+    val boxHeight = if (miniPlayerStyle == MiniPlayerStyle.BAR) MINI_PLAYER_BAR_HEIGHT_DP.dp else MiniPlayerHeight
     val containerMaxWidth =
-        if (useLegacyBackground) {
+        if (useLegacyBackground || miniPlayerStyle == MiniPlayerStyle.BAR) {
             null
         } else {
             contentMaxWidth?.let {
@@ -159,7 +168,7 @@ fun SwipeableMiniPlayerBox(
         modifier =
             modifier
                 .fillMaxWidth()
-                .height(MiniPlayerHeight)
+                .height(boxHeight)
                 .windowInsetsPadding(WindowInsets.systemBars.only(WindowInsetsSides.Horizontal)),
         contentAlignment = Alignment.Center,
     ) {
@@ -174,7 +183,7 @@ fun SwipeableMiniPlayerBox(
                                 .widthIn(max = containerMaxWidth)
                                 .fillMaxWidth()
                         }
-                    }.height(MiniPlayerHeight)
+                    }.height(boxHeight)
                     .let { baseModifier ->
                         if (useLegacyBackground) {
                             baseModifier.background(
@@ -184,6 +193,8 @@ fun SwipeableMiniPlayerBox(
                                     MaterialTheme.colorScheme.surfaceContainer
                                 },
                             )
+                        } else if (miniPlayerStyle == MiniPlayerStyle.BAR) {
+                            baseModifier
                         } else {
                             baseModifier.padding(
                                 horizontal = lerp(NavigationBarHorizontalPadding, 0.dp, compactFraction),
@@ -191,7 +202,12 @@ fun SwipeableMiniPlayerBox(
                         }
                     }.let { baseModifier ->
                         if (swipeThumbnail) {
-                            baseModifier.pointerInput(Unit) {
+                            baseModifier.pointerInput(
+                                swipeSensitivity,
+                                layoutDirection,
+                                enableHapticFeedback,
+                                playerConnection,
+                            ) {
                                 detectHorizontalDragGestures(
                                     onDragStart = {
                                         dragStartTime = System.currentTimeMillis()
@@ -240,18 +256,12 @@ fun SwipeableMiniPlayerBox(
 
                                             if (isRightSwipe && canSkipPrevious) {
                                                 if (enableHapticFeedback) {
-                                                    view.performHapticFeedback(
-                                                        android.view.HapticFeedbackConstants.CONTEXT_CLICK,
-                                                        android.view.HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING,
-                                                    )
+                                                    triggerHaptic(ArchiveTuneHapticKind.SKIP)
                                                 }
                                                 playerConnection.player.seekToPreviousMediaItem()
                                             } else if (!isRightSwipe && canSkipNext) {
                                                 if (enableHapticFeedback) {
-                                                    view.performHapticFeedback(
-                                                        android.view.HapticFeedbackConstants.CONTEXT_CLICK,
-                                                        android.view.HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING,
-                                                    )
+                                                    triggerHaptic(ArchiveTuneHapticKind.SKIP)
                                                 }
                                                 playerConnection.player.seekToNext()
                                             }
@@ -381,20 +391,23 @@ private fun MiniPlayerArtwork(
     mediaMetadata: MediaMetadata?,
     colors: MiniPlayerContentColors,
     onArtworkSlotPositioned: ((androidx.compose.ui.geometry.Rect) -> Unit)? = null,
+    artworkSize: Dp = 48.dp,
+    cornerRadius: Dp = 10.dp,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
+    val shape = remember(cornerRadius) { RoundedCornerShape(cornerRadius) }
     Box(
         contentAlignment = Alignment.Center,
         modifier =
             modifier
-                .size(52.dp),
+                .size(artworkSize + 4.dp),
     ) {
         Box(
             contentAlignment = Alignment.Center,
             modifier =
                 Modifier
-                    .size(48.dp)
+                    .size(artworkSize)
                     .onGloballyPositioned { coordinates ->
                         if (onArtworkSlotPositioned != null) {
                             onArtworkSlotPositioned(
@@ -409,16 +422,16 @@ private fun MiniPlayerArtwork(
                             )
                         }
                     }
-                    .clip(MiniPlayerArtworkShape)
+                    .clip(shape)
                     .background(colors.artworkContainer)
                     .border(
                         width = 1.dp,
                         color = colors.artworkBorder,
-                        shape = MiniPlayerArtworkShape,
+                        shape = shape,
                     ),
         ) {
             val baseThumbnailUrl = mediaMetadata?.thumbnailUrl
-            if (baseThumbnailUrl != null) {
+            if (!baseThumbnailUrl.isNullOrBlank()) {
                 val thumbnailSwapState =
                     rememberThumbnailSwapState(
                         videoId = mediaMetadata.id,
@@ -429,6 +442,9 @@ private fun MiniPlayerArtwork(
 
                 var displayUrl by remember(thumbnailSwapState.displayUrl) {
                     mutableStateOf(thumbnailSwapState.displayUrl)
+                }
+                var loadFailed by remember(thumbnailSwapState.displayUrl) {
+                    mutableStateOf(false)
                 }
                 val artworkRequest =
                     remember(displayUrl) {
@@ -441,22 +457,37 @@ private fun MiniPlayerArtwork(
                             .networkCachePolicy(CachePolicy.ENABLED)
                             .build()
                     }
-                AsyncImage(
-                    model = artworkRequest,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    onState = { state ->
-                        if (state is AsyncImagePainter.State.Error) {
-                            getNextFallbackUrl(displayUrl)?.let { displayUrl = it }
-                        }
-                    },
-                    modifier = Modifier.fillMaxSize(),
-                )
+                if (loadFailed) {
+                    LocalArtworkFallback(
+                        iconTint = colors.buttonIcon,
+                        minIconSize = 18.dp,
+                        maxIconSize = 26.dp,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                } else {
+                    AsyncImage(
+                        model = artworkRequest,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        onState = { state ->
+                            if (state is AsyncImagePainter.State.Error) {
+                                val nextFallback = getNextFallbackUrl(displayUrl)
+                                if (nextFallback != null) {
+                                    displayUrl = nextFallback
+                                } else {
+                                    loadFailed = true
+                                }
+                            }
+                        },
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
             } else {
-                Image(
-                    painter = painterResource(R.drawable.about_splash),
-                    contentDescription = null,
-                    modifier = Modifier.size(24.dp),
+                LocalArtworkFallback(
+                    iconTint = colors.buttonIcon,
+                    minIconSize = 18.dp,
+                    maxIconSize = 26.dp,
+                    modifier = Modifier.fillMaxSize(),
                 )
             }
         }
@@ -472,19 +503,18 @@ private fun MiniPlayerTransportButton(
     enabled: Boolean = true,
     isPrimary: Boolean = false,
     compact: Boolean = false,
+    hapticKind: ArchiveTuneHapticKind = if (isPrimary) ArchiveTuneHapticKind.PLAY_PAUSE else ArchiveTuneHapticKind.SKIP,
+    morphingPlayState: Boolean? = null,
     colors: MiniPlayerContentColors,
 ) {
-    val view = LocalView.current
     val (enableHapticFeedback) = rememberPreference(EnableHapticFeedbackKey, true)
+    val triggerHaptic = rememberArchiveTuneHapticTrigger()
 
     val handleClick =
-        remember(enableHapticFeedback, onClick, view) {
+        remember(enableHapticFeedback, onClick, triggerHaptic, hapticKind) {
             {
                 if (enableHapticFeedback) {
-                    view.performHapticFeedback(
-                        android.view.HapticFeedbackConstants.CONTEXT_CLICK,
-                        android.view.HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING,
-                    )
+                    triggerHaptic(hapticKind)
                 }
                 onClick()
             }
@@ -505,7 +535,7 @@ private fun MiniPlayerTransportButton(
         contentAlignment = Alignment.Center,
         modifier =
             modifier
-                .size(if (compact) 40.dp else 44.dp)
+                .size(if (compact) 38.dp else 44.dp)
                 .clip(CircleShape)
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
@@ -514,12 +544,20 @@ private fun MiniPlayerTransportButton(
                     onClick = handleClick,
                 ),
     ) {
-        Icon(
-            painter = painterResource(iconResId),
-            contentDescription = contentDescription,
-            tint = if (enabled) tint else colors.disabledButtonIcon,
-            modifier = Modifier.size(iconSize),
-        )
+        if (morphingPlayState != null) {
+            MorphingPlayPauseIcon(
+                isPlaying = morphingPlayState,
+                tint = if (enabled) tint else colors.disabledButtonIcon,
+                size = iconSize,
+            )
+        } else {
+            Icon(
+                painter = painterResource(iconResId),
+                contentDescription = contentDescription,
+                tint = if (enabled) tint else colors.disabledButtonIcon,
+                modifier = Modifier.size(iconSize),
+            )
+        }
     }
 }
 
@@ -573,6 +611,7 @@ private fun MiniPlayerTransportControls(
                 ),
             onClick = onPlayPause,
             isPrimary = true,
+            morphingPlayState = if (playbackState == Player.STATE_ENDED) null else isPlaying,
             colors = colors,
         )
 
@@ -592,10 +631,21 @@ fun NewMiniPlayerContent(
     durationProvider: () -> Long,
     playerConnection: PlayerConnection,
     colors: MiniPlayerContentColors,
+    miniPlayerStyle: MiniPlayerStyle = MiniPlayerStyle.STANDARD,
     compactFraction: Float = 0f,
     compactShowTransportControls: Boolean = false,
     onArtworkSlotPositioned: ((androidx.compose.ui.geometry.Rect) -> Unit)? = null,
 ) {
+    if (miniPlayerStyle == MiniPlayerStyle.BAR) {
+        MiniPlayerBarContent(
+            positionProvider = positionProvider,
+            durationProvider = durationProvider,
+            playerConnection = playerConnection,
+            colors = colors,
+            onArtworkSlotPositioned = onArtworkSlotPositioned,
+        )
+        return
+    }
     val isPlaying by playerConnection.isPlaying.collectAsStateWithLifecycle()
     val playbackState by playerConnection.playbackState.collectAsStateWithLifecycle()
     val mediaMetadata by playerConnection.mediaMetadata.collectAsStateWithLifecycle()
@@ -749,5 +799,107 @@ fun CompactMiniPlayerContent(
                 colors = colors,
             )
         }
+    }
+}
+
+@Composable
+private fun MiniPlayerBarContent(
+    positionProvider: () -> Long,
+    durationProvider: () -> Long,
+    playerConnection: PlayerConnection,
+    colors: MiniPlayerContentColors,
+    onArtworkSlotPositioned: ((androidx.compose.ui.geometry.Rect) -> Unit)? = null,
+) {
+    val isPlaying by playerConnection.isPlaying.collectAsStateWithLifecycle()
+    val playbackState by playerConnection.playbackState.collectAsStateWithLifecycle()
+    val mediaMetadata by playerConnection.mediaMetadata.collectAsStateWithLifecycle()
+    val canSkipNext by playerConnection.canSkipNext.collectAsStateWithLifecycle()
+
+    val onPlayPause =
+        remember(playbackState, playerConnection) {
+            {
+                if (playbackState == Player.STATE_ENDED) {
+                    playerConnection.player.seekTo(0, 0)
+                    playerConnection.player.playWhenReady = true
+                } else {
+                    playerConnection.player.togglePlayPause()
+                }
+            }
+        }
+    val onNext = remember(playerConnection) { { playerConnection.seekToNext() } }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .padding(horizontal = 10.dp),
+        ) {
+            MiniPlayerArtwork(
+                mediaMetadata = mediaMetadata,
+                colors = colors,
+                artworkSize = 36.dp,
+                cornerRadius = 8.dp,
+                onArtworkSlotPositioned = onArtworkSlotPositioned,
+            )
+
+            mediaMetadata?.let {
+                MiniPlayerInfo(
+                    mediaMetadata = it,
+                    colors = colors,
+                )
+            } ?: Spacer(Modifier.weight(1f))
+
+            MiniPlayerTransportButton(
+                iconResId =
+                    when {
+                        playbackState == Player.STATE_ENDED -> R.drawable.solar_replay_linear
+                        isPlaying -> R.drawable.pause_applemusic
+                        else -> R.drawable.play_applemusic
+                    },
+                contentDescription =
+                    stringResource(
+                        if (playbackState == Player.STATE_ENDED || !isPlaying) R.string.play else R.string.widget_pause,
+                    ),
+                onClick = onPlayPause,
+                isPrimary = true,
+                compact = true,
+                morphingPlayState = if (playbackState == Player.STATE_ENDED) null else isPlaying,
+                colors = colors,
+            )
+
+            MiniPlayerTransportButton(
+                iconResId = R.drawable.apple_skip_next,
+                contentDescription = stringResource(R.string.next),
+                onClick = onNext,
+                enabled = canSkipNext,
+                compact = true,
+                colors = colors,
+            )
+        }
+
+        // Isolated progress bar: reads position/duration only in draw phase so parent Row never recomposes per tick.
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(2.dp)
+                    .drawBehind {
+                        drawRect(color = colors.progressTrack)
+                        val durationMs = durationProvider().coerceAtLeast(1L)
+                        val positionMs = positionProvider().coerceIn(0L, durationMs)
+                        val fraction = (positionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
+                        if (fraction > 0f) {
+                            drawRect(
+                                color = colors.progress,
+                                topLeft = Offset.Zero,
+                                size = Size(width = size.width * fraction, height = size.height),
+                            )
+                        }
+                    },
+        )
     }
 }

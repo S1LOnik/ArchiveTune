@@ -2434,4 +2434,17 @@
     <string name="home_section_more_recommendations">More recommendations</string>
     <string name="home_offline_saved_badge">Available offline</string>
     <string name="home_quick_tracks_title">For this moment</string>
+
+    <string name="player_mini_expand_action">Open player</string>
+    <string name="player_mini_toggle_playback">Toggle play or pause</string>
+    <string name="player_mini_previous_action">Previous track</string>
+    <string name="player_mini_next_action">Next track</string>
+    <string name="player_landscape_queue_tab">Queue</string>
+    <string name="player_landscape_lyrics_tab">Lyrics</string>
+    <string name="player_landscape_collapse">Collapse player</string>
+    <string name="player_landscape_jump_current">Jump to current</string>
+    <string name="player_landscape_move_up">Move up in queue</string>
+    <string name="player_landscape_move_down">Move down in queue</string>
+    <string name="player_landscape_remove_queue">Remove from queue</string>
+    <string name="player_landscape_queue_empty">Queue is empty</string>
 </resources>

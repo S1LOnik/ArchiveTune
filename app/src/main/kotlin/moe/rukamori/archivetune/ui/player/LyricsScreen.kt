@@ -379,7 +379,7 @@ fun LyricsScreen(
     var sliderPosition by remember(mediaMetadata.id) { mutableStateOf<Long?>(null) }
 
     var gradientColors by remember { mutableStateOf(AppleMusicFallbackGradient) }
-    var hasValidPalette by remember { mutableStateOf(false) }
+    var paletteTrackState by remember { mutableStateOf(PlayerPaletteTrackState()) }
 
     val fallbackColor = remember { Color.Black.toArgb() }
     val darkTheme = isSystemInDarkTheme()
@@ -391,12 +391,18 @@ fun LyricsScreen(
             lyricsBackground != LyricsBackgroundStyle.MOVING_BLUR
         ) {
             gradientColors = AppleMusicFallbackGradient
-            hasValidPalette = false
+            paletteTrackState = PlayerPaletteTrackState(mediaId = mediaMetadata.id, artworkUrl = mediaMetadata.thumbnailUrl, hasValidPalette = false)
             return@LaunchedEffect
         }
         val thumbnailUrl = mediaMetadata.thumbnailUrl
-        if (thumbnailUrl == null) {
-            if (!hasValidPalette) gradientColors = AppleMusicFallbackGradient
+        if (thumbnailUrl.isNullOrBlank()) {
+            paletteTrackState =
+                resolvePaletteTransitionOnMissingOrFailedArtwork(
+                    previousState = paletteTrackState,
+                    currentMediaId = mediaMetadata.id,
+                    currentArtworkUrl = null,
+                )
+            gradientColors = AppleMusicFallbackGradient
             return@LaunchedEffect
         }
 
@@ -410,8 +416,19 @@ fun LyricsScreen(
             )
         PlayerPaletteCache.get(cacheKey)?.let {
             gradientColors = it
-            hasValidPalette = true
+            paletteTrackState = PlayerPaletteTrackState(mediaId = mediaMetadata.id, artworkUrl = thumbnailUrl, hasValidPalette = true)
             return@LaunchedEffect
+        }
+
+        val preState =
+            resolvePaletteTransitionOnMissingOrFailedArtwork(
+                previousState = paletteTrackState,
+                currentMediaId = mediaMetadata.id,
+                currentArtworkUrl = thumbnailUrl,
+            )
+        paletteTrackState = preState
+        if (!preState.hasValidPalette) {
+            gradientColors = AppleMusicFallbackGradient
         }
 
         val request =
@@ -461,10 +478,20 @@ fun LyricsScreen(
             if (stillCurrent) {
                 PlayerPaletteCache.put(cacheKey, extractedColors)
                 gradientColors = extractedColors
-                hasValidPalette = true
+                paletteTrackState = PlayerPaletteTrackState(mediaId = mediaMetadata.id, artworkUrl = thumbnailUrl, hasValidPalette = true)
             }
-        } else if (!hasValidPalette) {
-            gradientColors = AppleMusicFallbackGradient
+        } else {
+            val failedState =
+                resolvePaletteTransitionOnMissingOrFailedArtwork(
+                    previousState = paletteTrackState,
+                    currentMediaId = mediaMetadata.id,
+                    currentArtworkUrl = thumbnailUrl,
+                    fetchFailed = true,
+                )
+            paletteTrackState = failedState
+            if (!failedState.hasValidPalette) {
+                gradientColors = AppleMusicFallbackGradient
+            }
         }
     }
 
@@ -854,7 +881,12 @@ internal fun MovingBlurBackground(
                 .background(AppleMusicFallbackGradient.last()),
     ) {
         val wanderMaxDrift = movingBlurWanderMaxDriftDp(maxWidth, maxHeight)
-        val blurWander = rememberBlurWanderDrift(active = isPlaying, maxDriftDp = wanderMaxDrift)
+        val blurWanderActive =
+            moe.rukamori.archivetune.ui.motion.rememberDecorativeMotionActive(
+                isPlaying = isPlaying,
+                isVisible = true,
+            )
+        val blurWander = rememberBlurWanderDrift(active = blurWanderActive, maxDriftDp = wanderMaxDrift)
         val preSDriftScale =
             if (isPreS) {
                 val safetyMargin = 48.dp

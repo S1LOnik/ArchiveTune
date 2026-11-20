@@ -1233,26 +1233,55 @@ internal fun SpatialFlowArtworkPager(
     onPlaySongAtWindow: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val motionConfig = moe.rukamori.archivetune.ui.motion.LocalMotionConfig.current
     val pagerState =
         rememberPagerState(initialPage = currentWindowIndex.coerceAtLeast(0)) {
             queueWindows.size.coerceAtLeast(1)
         }
+    val latestWindowIndex by androidx.compose.runtime.rememberUpdatedState(currentWindowIndex)
+    var isProgrammaticScroll by remember { mutableStateOf(false) }
+    var programmaticTargetPage by remember { mutableStateOf<Int?>(null) }
 
-    LaunchedEffect(currentWindowIndex) {
-        if (currentWindowIndex >= 0 &&
-            currentWindowIndex < pagerState.pageCount &&
-            pagerState.currentPage != currentWindowIndex
-        ) {
-            pagerState.animateScrollToPage(currentWindowIndex)
+    LaunchedEffect(currentWindowIndex, pagerState.pageCount, motionConfig.animationsEnabled) {
+        if (currentWindowIndex < 0 || currentWindowIndex >= pagerState.pageCount) return@LaunchedEffect
+        if (pagerState.currentPage == currentWindowIndex) {
+            isProgrammaticScroll = false
+            programmaticTargetPage = null
+            return@LaunchedEffect
+        }
+        isProgrammaticScroll = true
+        programmaticTargetPage = currentWindowIndex
+        try {
+            if (!motionConfig.animationsEnabled ||
+                kotlin.math.abs(currentWindowIndex - pagerState.currentPage) > 1
+            ) {
+                pagerState.scrollToPage(currentWindowIndex)
+            } else {
+                pagerState.animateScrollToPage(currentWindowIndex)
+            }
+        } finally {
+            if (programmaticTargetPage == currentWindowIndex) {
+                isProgrammaticScroll = false
+                programmaticTargetPage = null
+            }
         }
     }
 
-    LaunchedEffect(pagerState.currentPage, pagerState.isScrollInProgress) {
-        if (!pagerState.isScrollInProgress &&
-            currentWindowIndex >= 0 &&
-            pagerState.currentPage != currentWindowIndex
-        ) {
-            onPlaySongAtWindow(pagerState.currentPage)
+    LaunchedEffect(pagerState) {
+        androidx.compose.runtime.snapshotFlow {
+            Triple(pagerState.settledPage, pagerState.currentPage, pagerState.isScrollInProgress)
+        }.collect { (settledPage, currentPage, isScrolling) ->
+            if (
+                moe.rukamori.archivetune.ui.player.shouldCommitPagerTrackChange(
+                    settledPage = settledPage,
+                    currentPage = currentPage,
+                    isScrollInProgress = isScrolling,
+                    isProgrammaticScroll = isProgrammaticScroll,
+                    activeWindowIndex = latestWindowIndex,
+                )
+            ) {
+                onPlaySongAtWindow(settledPage)
+            }
         }
     }
 
@@ -1292,28 +1321,9 @@ internal fun SpatialFlowArtworkPager(
                         modifier = Modifier.fillMaxSize(),
                     )
                 } else {
-                    Box(
-                        modifier =
-                            Modifier
-                                .fillMaxSize()
-                                .background(
-                                    androidx.compose.ui.graphics.Brush.verticalGradient(
-                                        colors =
-                                            listOf(
-                                                MaterialTheme.colorScheme.surfaceVariant,
-                                                MaterialTheme.colorScheme.surfaceContainerHighest,
-                                            ),
-                                    ),
-                                ),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.spatialflow_ic_music_note),
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                            modifier = Modifier.size(96.dp),
-                        )
-                    }
+                    moe.rukamori.archivetune.ui.player.LocalArtworkFallback(
+                        modifier = Modifier.fillMaxSize(),
+                    )
                 }
             }
         }

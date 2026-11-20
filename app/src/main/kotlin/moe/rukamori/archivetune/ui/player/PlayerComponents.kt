@@ -2733,6 +2733,8 @@ fun PlayerBackground(
     playerCustomBlur: Float,
     playerCustomContrast: Float,
     playerCustomBrightness: Float,
+    isPlaying: Boolean = true,
+    isVisible: Boolean = true,
 ) {
     val effectiveBlurRadius = blurRadius.coerceIn(0f, PlayerBackgroundMaxBlurRadius)
     val shouldApplyBlur = !disableBlur && effectiveBlurRadius > 0f
@@ -3090,19 +3092,27 @@ fun PlayerBackground(
                     label = "GlowAnimatedContent",
                 ) { colors ->
                     if (colors.isNotEmpty()) {
-                        val infiniteTransition = rememberInfiniteTransition(label = "GlowAnimation")
-
-                        val progressState =
-                            infiniteTransition.animateFloat(
-                                initialValue = 0f,
-                                targetValue = 1f,
-                                animationSpec =
-                                    infiniteRepeatable(
-                                        animation = tween(20000, easing = LinearEasing),
-                                        repeatMode = RepeatMode.Restart,
-                                    ),
-                                label = "glowProgress",
+                        val decorativeMotionActive =
+                            moe.rukamori.archivetune.ui.motion.rememberDecorativeMotionActive(
+                                isPlaying = isPlaying,
+                                isVisible = isVisible,
                             )
+                        val progressState =
+                            if (decorativeMotionActive) {
+                                val infiniteTransition = rememberInfiniteTransition(label = "GlowAnimation")
+                                infiniteTransition.animateFloat(
+                                    initialValue = 0f,
+                                    targetValue = 1f,
+                                    animationSpec =
+                                        infiniteRepeatable(
+                                            animation = tween(20000, easing = LinearEasing),
+                                            repeatMode = RepeatMode.Restart,
+                                        ),
+                                    label = "glowProgress",
+                                )
+                            } else {
+                                remember { mutableStateOf(0.18f) }
+                            }
 
                         Box(
                             modifier =

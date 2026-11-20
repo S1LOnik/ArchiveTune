@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.isActive
+import moe.rukamori.archivetune.ui.motion.rememberDecorativeMotionActive
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.hypot
@@ -142,11 +143,13 @@ private const val BlurBackdropCoverSafety = 1.02f
 @Composable
 internal fun rememberBlurWanderDrift(
     active: Boolean,
+    isVisible: Boolean = true,
     maxDriftDp: Float = BlurWanderDrift.DefaultWanderRadiusDp,
     speedDpPerSecond: Float = BlurWanderDrift.WanderSpeedDpPerSecond,
     minLegDurationMs: Float = BlurWanderDrift.MinLegDurationMs,
     maxLegDurationMs: Float = BlurWanderDrift.MaxLegDurationMs,
 ): BlurWanderDrift {
+    val effectiveActive = rememberDecorativeMotionActive(isPlaying = active, isVisible = isVisible)
     val drift =
         remember(maxDriftDp, speedDpPerSecond, minLegDurationMs, maxLegDurationMs) {
             BlurWanderDrift(
@@ -157,8 +160,8 @@ internal fun rememberBlurWanderDrift(
             )
         }
 
-    LaunchedEffect(active, maxDriftDp, speedDpPerSecond) {
-        if (!active) return@LaunchedEffect
+    LaunchedEffect(effectiveActive, maxDriftDp, speedDpPerSecond) {
+        if (!effectiveActive) return@LaunchedEffect
         var lastFrameNanos = 0L
         var unappliedMs = 0f
         while (isActive) {

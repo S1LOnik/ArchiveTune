@@ -1387,31 +1387,41 @@ private fun VideoAmbientBackdrop(
 ) {
     val context = LocalContext.current
     val isPreS = Build.VERSION.SDK_INT < Build.VERSION_CODES.S
+    val driftActive =
+        moe.rukamori.archivetune.ui.motion.rememberDecorativeMotionActive(
+            isPlaying = true,
+            isVisible = true,
+        ) && !isPreS
 
-    val transition = rememberInfiniteTransition(label = "video-ambient-drift")
-    val animatedDriftX by transition.animateFloat(
-        initialValue = -90f,
-        targetValue = 90f,
-        animationSpec =
-            infiniteRepeatable(
-                animation = tween(durationMillis = 19_000, easing = FastOutSlowInEasing),
-                repeatMode = RepeatMode.Reverse,
-            ),
-        label = "video-ambient-x",
-    )
-    val animatedDriftY by transition.animateFloat(
-        initialValue = -60f,
-        targetValue = 60f,
-        animationSpec =
-            infiniteRepeatable(
-                animation = tween(durationMillis = 27_000, easing = FastOutSlowInEasing),
-                repeatMode = RepeatMode.Reverse,
-            ),
-        label = "video-ambient-y",
-    )
-    val preSDriftOff = isPreS
+    val (animatedDriftX, animatedDriftY) =
+        if (driftActive) {
+            val transition = rememberInfiniteTransition(label = "video-ambient-drift")
+            val x by transition.animateFloat(
+                initialValue = -90f,
+                targetValue = 90f,
+                animationSpec =
+                    infiniteRepeatable(
+                        animation = tween(durationMillis = 19_000, easing = FastOutSlowInEasing),
+                        repeatMode = RepeatMode.Reverse,
+                    ),
+                label = "video-ambient-x",
+            )
+            val y by transition.animateFloat(
+                initialValue = -60f,
+                targetValue = 60f,
+                animationSpec =
+                    infiniteRepeatable(
+                        animation = tween(durationMillis = 27_000, easing = FastOutSlowInEasing),
+                        repeatMode = RepeatMode.Reverse,
+                    ),
+                label = "video-ambient-y",
+            )
+            x to y
+        } else {
+            0f to 0f
+        }
     fun currentDrift(): Pair<Float, Float> =
-        if (preSDriftOff) 0f to 0f else animatedDriftX to animatedDriftY
+        if (!driftActive) 0f to 0f else animatedDriftX to animatedDriftY
 
     val blurredBitmap by produceState<Bitmap?>(null, thumbnailUrl) {
         value =

@@ -38,6 +38,7 @@ import moe.rukamori.archivetune.R
 import moe.rukamori.archivetune.db.entities.FormatEntity
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import moe.rukamori.archivetune.ui.motion.rememberDecorativeMotionActive
 
 @Composable
 fun LosslessOrStats(
@@ -115,6 +116,20 @@ private fun LosslessLabel(
 
 @Composable
 private fun ShimmerText(text: String) {
+    val shimmerActive = rememberDecorativeMotionActive(isPlaying = true, isVisible = true)
+    if (!shimmerActive) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelMedium.copy(
+                color = Color.White.copy(alpha = 0.72f),
+                fontWeight = FontWeight.SemiBold,
+                fontSize = (MaterialTheme.typography.labelMedium.fontSize.value + 1).sp,
+            ),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        return
+    }
     var widthPx by remember { mutableIntStateOf(0) }
     val transition = rememberInfiniteTransition(label = "lossless-shimmer")
     val progress by transition.animateFloat(
