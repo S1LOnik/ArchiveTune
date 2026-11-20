@@ -372,9 +372,14 @@ private fun LogcatTopBar(
                         ),
                 )
             }
+            val menuToggle =
+                moe.rukamori.archivetune.ui.component.rememberDropdownMenuToggle(
+                    anchorVisible = model != null,
+                )
+            val isMenuExpanded = model?.isMenuExpanded == true
             Box {
                 IconButton(
-                    onClick = { onSetMenuExpanded(true) },
+                    onClick = { menuToggle.onExternalTriggerClick(isMenuExpanded, onSetMenuExpanded) },
                     enabled = model != null,
                 ) {
                     Icon(
@@ -383,12 +388,15 @@ private fun LogcatTopBar(
                     )
                 }
                 DropdownMenu(
-                    expanded = model?.isMenuExpanded == true,
-                    onDismissRequest = { onSetMenuExpanded(false) },
+                    expanded = isMenuExpanded,
+                    onDismissRequest = { menuToggle.onExternalDismissRequest(onSetMenuExpanded) },
                 ) {
                     DropdownMenuItem(
                         text = { Text(stringResource(R.string.share)) },
-                        onClick = onShare,
+                        onClick = {
+                            menuToggle.onExternalItemSelection(onSetMenuExpanded)
+                            onShare()
+                        },
                         enabled = model?.entries?.isNotEmpty() == true,
                         leadingIcon = {
                             Icon(
@@ -399,7 +407,10 @@ private fun LogcatTopBar(
                     )
                     DropdownMenuItem(
                         text = { Text(stringResource(R.string.export)) },
-                        onClick = onExport,
+                        onClick = {
+                            menuToggle.onExternalItemSelection(onSetMenuExpanded)
+                            onExport()
+                        },
                         enabled =
                             model?.let { currentModel ->
                                 currentModel.entries.isNotEmpty() && !currentModel.isExporting
@@ -413,7 +424,10 @@ private fun LogcatTopBar(
                     )
                     DropdownMenuItem(
                         text = { Text(stringResource(R.string.clear)) },
-                        onClick = onClear,
+                        onClick = {
+                            menuToggle.onExternalItemSelection(onSetMenuExpanded)
+                            onClear()
+                        },
                         enabled = model?.hasLogs == true,
                         leadingIcon = {
                             Icon(

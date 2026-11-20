@@ -70,6 +70,7 @@ import moe.rukamori.archivetune.constants.MiniPlayerCompactHeight
 import moe.rukamori.archivetune.constants.MiniPlayerHeight
 import moe.rukamori.archivetune.constants.MiniPlayerStyle
 import moe.rukamori.archivetune.constants.MiniPlayerStyleKey
+import moe.rukamori.archivetune.constants.NavigationBarHorizontalPadding
 import moe.rukamori.archivetune.constants.NavigationBarMaxWidth
 import moe.rukamori.archivetune.constants.SwipeSensitivityKey
 import moe.rukamori.archivetune.extensions.togglePlayPause
@@ -89,6 +90,74 @@ import moe.rukamori.archivetune.utils.rememberPreference
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 
+@Immutable
+internal data class MiniPlayerSpringGeometry(
+    val compactFraction: Float,
+    val outerStartPadding: Dp,
+    val outerEndPadding: Dp,
+    val innerHorizontalPadding: Dp,
+    val barTopCorner: Dp,
+    val barBottomCorner: Dp,
+    val containerHeight: Dp,
+    val standardExpandedAlpha: Float,
+    val standardCompactAlpha: Float,
+)
+
+internal fun resolveMiniPlayerSpringGeometry(
+    rawCompactFraction: Float,
+    miniPlayerStyle: MiniPlayerStyle,
+    compactHorizontalPadding: Dp = 16.dp,
+    compactReserveEndControl: Boolean = true,
+): MiniPlayerSpringGeometry {
+    val safeFraction =
+        if (rawCompactFraction.isFinite()) {
+            rawCompactFraction.coerceIn(0f, 1f)
+        } else {
+            0f
+        }
+    val safeCompactHorizontalPadding = compactHorizontalPadding.coerceAtLeast(0.dp)
+    val compactStartInset =
+        (safeCompactHorizontalPadding + CompactControlSize + CompactControlGap).coerceAtLeast(0.dp)
+    val compactEndInset =
+        (
+            if (compactReserveEndControl) {
+                safeCompactHorizontalPadding + CompactControlSize + CompactControlGap
+            } else {
+                safeCompactHorizontalPadding
+            }
+            ).coerceAtLeast(0.dp)
+    val outerStartPadding = lerp(0.dp, compactStartInset, safeFraction).coerceAtLeast(0.dp)
+    val outerEndPadding = lerp(0.dp, compactEndInset, safeFraction).coerceAtLeast(0.dp)
+    val innerHorizontalPadding =
+        if (miniPlayerStyle == MiniPlayerStyle.BAR) {
+            0.dp
+        } else {
+            lerp(NavigationBarHorizontalPadding, 0.dp, safeFraction).coerceAtLeast(0.dp)
+        }
+    val barTopCorner = lerp(12.dp, 26.dp, safeFraction).coerceAtLeast(0.dp)
+    val barBottomCorner = lerp(0.dp, 26.dp, safeFraction).coerceAtLeast(0.dp)
+    val containerHeight =
+        if (miniPlayerStyle == MiniPlayerStyle.BAR) {
+            MINI_PLAYER_BAR_HEIGHT_DP.dp.coerceAtLeast(0.dp)
+        } else {
+            lerp(MiniPlayerHeight, MiniPlayerCompactHeight, safeFraction).coerceAtLeast(0.dp)
+        }
+    val standardExpandedAlpha = (1f - safeFraction).coerceIn(0f, 1f)
+    val standardCompactAlpha = safeFraction.coerceIn(0f, 1f)
+
+    return MiniPlayerSpringGeometry(
+        compactFraction = safeFraction,
+        outerStartPadding = outerStartPadding,
+        outerEndPadding = outerEndPadding,
+        innerHorizontalPadding = innerHorizontalPadding,
+        barTopCorner = barTopCorner,
+        barBottomCorner = barBottomCorner,
+        containerHeight = containerHeight,
+        standardExpandedAlpha = standardExpandedAlpha,
+        standardCompactAlpha = standardCompactAlpha,
+    )
+}
+
 @Composable
 fun MiniPlayer(
     positionProvider: () -> Long,
@@ -104,24 +173,22 @@ fun MiniPlayer(
     miniPlayerProximityProvider: (() -> Float)? = null,
     onExpand: (() -> Unit)? = null,
 ) {
-    val compactFraction = compactFractionState.value
+    val compactFraction = compactFractionState.value.coerceIn(0f, 1f)
     val miniPlayerStyle by rememberEnumPreference(
         key = MiniPlayerStyleKey,
         defaultValue = MiniPlayerStyle.STANDARD,
     )
-
-    val compactStartInset = compactHorizontalPadding + CompactControlSize + CompactControlGap
-
-    val compactEndInset =
-        if (compactReserveEndControl) {
-            compactHorizontalPadding + CompactControlSize + CompactControlGap
-        } else {
-            compactHorizontalPadding
-        }
+    val springGeometry =
+        resolveMiniPlayerSpringGeometry(
+            rawCompactFraction = compactFraction,
+            miniPlayerStyle = miniPlayerStyle,
+            compactHorizontalPadding = compactHorizontalPadding,
+            compactReserveEndControl = compactReserveEndControl,
+        )
     val compactModifier =
         modifier.padding(
-            start = lerp(0.dp, compactStartInset, compactFraction),
-            end = lerp(0.dp, compactEndInset, compactFraction),
+            start = springGeometry.outerStartPadding,
+            end = springGeometry.outerEndPadding,
         )
     NewMiniPlayer(
         positionProvider = positionProvider,
@@ -130,7 +197,7 @@ fun MiniPlayer(
         pureBlack = pureBlack,
         isPairedWithNavigation = isPairedWithNavigation,
         miniPlayerStyle = miniPlayerStyle,
-        compactFraction = compactFraction,
+        compactFraction = springGeometry.compactFraction,
 
         compactShowTransportControls = !compactReserveEndControl,
         onArtworkSlotPositioned = onArtworkSlotPositioned,
@@ -331,18 +398,24 @@ private fun NewMiniPlayer(
 
             useLiquidGlass = effectiveBackgroundStyle == MiniPlayerBackgroundStyle.LIQUID_GLASS,
         )
+    val safeCompactFraction = compactFraction.coerceIn(0f, 1f)
+    val springGeometry =
+        remember(safeCompactFraction, miniPlayerStyle) {
+            resolveMiniPlayerSpringGeometry(
+                rawCompactFraction = safeCompactFraction,
+                miniPlayerStyle = miniPlayerStyle,
+            )
+        }
     val miniPlayerShape =
-        remember(isPairedWithNavigation, compactFraction, miniPlayerStyle) {
+        remember(isPairedWithNavigation, safeCompactFraction, miniPlayerStyle, springGeometry) {
             if (miniPlayerStyle == MiniPlayerStyle.BAR) {
-                val topCorner = lerp(12.dp, 26.dp, compactFraction)
-                val bottomCorner = lerp(0.dp, 26.dp, compactFraction)
                 RoundedCornerShape(
-                    topStart = topCorner,
-                    topEnd = topCorner,
-                    bottomStart = bottomCorner,
-                    bottomEnd = bottomCorner,
+                    topStart = springGeometry.barTopCorner,
+                    topEnd = springGeometry.barTopCorner,
+                    bottomStart = springGeometry.barBottomCorner,
+                    bottomEnd = springGeometry.barBottomCorner,
                 )
-            } else if (compactFraction > 0.5f) {
+            } else if (safeCompactFraction > 0.5f) {
                 RoundedCornerShape(percent = 50)
             } else if (isPairedWithNavigation) {
                 RoundedCornerShape(
@@ -377,15 +450,10 @@ private fun NewMiniPlayer(
         pureBlack = pureBlack,
         useLegacyBackground = false,
         miniPlayerStyle = miniPlayerStyle,
-        compactFraction = compactFraction,
+        compactFraction = safeCompactFraction,
     ) { offsetX ->
         val expandLabel = stringResource(R.string.player_menu_expand)
-        val containerHeight =
-            if (miniPlayerStyle == MiniPlayerStyle.BAR) {
-                MINI_PLAYER_BAR_HEIGHT_DP.dp
-            } else {
-                lerp(MiniPlayerHeight, MiniPlayerCompactHeight, compactFraction)
-            }
+        val containerHeight = springGeometry.containerHeight
         Box(
             modifier =
                 Modifier

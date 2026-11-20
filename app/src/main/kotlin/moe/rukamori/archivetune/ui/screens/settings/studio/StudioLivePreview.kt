@@ -786,11 +786,12 @@ private fun UnifiedNavAndMiniPlayerBarOverlay(
     onMiniPlayerClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val compactFraction by animateFloatAsState(
+    val animatedCompactFraction by animateFloatAsState(
         targetValue = if (collapsed) 1f else 0f,
         animationSpec = if (reducedMotion) snap() else spring(dampingRatio = 0.88f, stiffness = 420f),
         label = "studioNavCompactFraction",
     )
+    val compactFraction = animatedCompactFraction.coerceIn(0f, 1f)
 
     val effectiveWidthFraction =
         when (navigation.material) {
@@ -841,21 +842,23 @@ private fun UnifiedNavAndMiniPlayerBarOverlay(
         }
 
     val miniHeight =
-        if (navigation.miniPlayerStyle == MiniPlayerStyle.BAR) {
-            (MINI_PLAYER_BAR_HEIGHT_DP * previewScale).dp
-        } else {
-            androidx.compose.ui.unit.lerp(
-                MiniPlayerHeight * previewScale,
-                MiniPlayerCompactHeight * previewScale,
-                compactFraction,
-            )
-        }
-    val visibleBarHeight = androidx.compose.ui.unit.lerp(realBarHeight, 0.dp, compactFraction)
+        (
+            if (navigation.miniPlayerStyle == MiniPlayerStyle.BAR) {
+                (MINI_PLAYER_BAR_HEIGHT_DP * previewScale).dp
+            } else {
+                androidx.compose.ui.unit.lerp(
+                    MiniPlayerHeight * previewScale,
+                    MiniPlayerCompactHeight * previewScale,
+                    compactFraction,
+                )
+            }
+            ).coerceAtLeast(0.dp)
+    val visibleBarHeight = androidx.compose.ui.unit.lerp(realBarHeight, 0.dp, compactFraction).coerceAtLeast(0.dp)
     val visibleBarBottomPad =
         if (navigation.miniPlayerStyle == MiniPlayerStyle.BAR && effectiveWidthFraction >= 0.99f) {
             0.dp
         } else {
-            androidx.compose.ui.unit.lerp(8.dp, 0.dp, compactFraction)
+            androidx.compose.ui.unit.lerp(8.dp, 0.dp, compactFraction).coerceAtLeast(0.dp)
         }
 
     Column(

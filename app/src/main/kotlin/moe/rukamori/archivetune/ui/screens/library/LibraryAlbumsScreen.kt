@@ -173,7 +173,7 @@ fun LibraryAlbumsScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                var showSortMenu by remember { mutableStateOf(false) }
+                val sortMenuToggle = moe.rukamori.archivetune.ui.component.rememberDropdownMenuToggle()
                 val currentSortLabel =
                     if (filter == AlbumFilter.DOWNLOADED_FULL) {
                         stringResource(R.string.filter_downloaded)
@@ -237,7 +237,7 @@ fun LibraryAlbumsScreen(
                                 Modifier
                                     .clip(CircleShape)
                                     .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                                    .clickable { showSortMenu = true }
+                                    .clickable(onClick = sortMenuToggle::toggle)
                                     .padding(horizontal = 14.dp, vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
@@ -256,8 +256,8 @@ fun LibraryAlbumsScreen(
                         }
 
                         DropdownMenu(
-                            expanded = showSortMenu,
-                            onDismissRequest = { showSortMenu = false },
+                            expanded = sortMenuToggle.expanded,
+                            onDismissRequest = sortMenuToggle::onDismissRequest,
                         ) {
                             AlbumSortType.entries.forEach { type ->
                                 val label =
@@ -277,7 +277,7 @@ fun LibraryAlbumsScreen(
                                         onSortTypeChange(type)
                                         // Issue 4: A-Z sort defaults to ascending
                                         if (type == AlbumSortType.NAME) onSortDescendingChange(false)
-                                        showSortMenu = false
+                                        sortMenuToggle.closeFromItemSelection()
                                     },
                                 )
                             }
@@ -285,7 +285,7 @@ fun LibraryAlbumsScreen(
                                 text = { Text(stringResource(R.string.filter_downloaded)) },
                                 onClick = {
                                     filter = AlbumFilter.DOWNLOADED_FULL
-                                    showSortMenu = false
+                                    sortMenuToggle.closeFromItemSelection()
                                 },
                                 leadingIcon = {
                                     Icon(

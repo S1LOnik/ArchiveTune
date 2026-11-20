@@ -146,7 +146,7 @@ fun BitChordNavBar(
         }
     val tabWidthDp =
         if (tabStepPx > 0f) {
-            with(density) { ((rowWidthPx - tabSpacingPx * (itemCount - 1)) / itemCount).toDp() }
+            with(density) { ((rowWidthPx - tabSpacingPx * (itemCount - 1)) / itemCount).toDp().coerceAtLeast(0.dp) }
         } else {
             0.dp
         }

@@ -139,6 +139,14 @@ fun CurrentSongHeader(
             modifier =
                 Modifier
                     .fillMaxWidth()
+                    .clickable(
+                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                        indication = null,
+                    ) {
+                        if (sheetState.isExpandedOrExpanding) {
+                            sheetState.collapseSoft()
+                        }
+                    }
                     .padding(bottom = 16.dp),
             contentAlignment = Alignment.Center,
         ) {

@@ -192,12 +192,13 @@ fun SimpMusicPlayerContent(
         snapshotFlow { scrollState.value > 0 }.first { it }
         hasScrolled = true
     }
+    val rootOverlayActive = moe.rukamori.archivetune.ui.player.LocalRootOverlayActive.current
     var queueOpen by rememberSaveable { mutableStateOf(false) }
-    BackHandler(enabled = queueOpen) { queueOpen = false }
+    BackHandler(enabled = state.isExpandedOrExpanding && queueOpen && !rootOverlayActive) { queueOpen = false }
 
     var lyricsFullscreenOpen by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(mediaMetadata.id) { lyricsFullscreenOpen = false }
-    BackHandler(enabled = lyricsFullscreenOpen) { lyricsFullscreenOpen = false }
+    BackHandler(enabled = state.isExpandedOrExpanding && lyricsFullscreenOpen && !rootOverlayActive) { lyricsFullscreenOpen = false }
 
     LaunchedEffect(state.isExpandedOrExpanding) {
         if (!state.isExpandedOrExpanding && (queueOpen || lyricsFullscreenOpen)) {
@@ -303,7 +304,7 @@ fun SimpMusicPlayerContent(
                             mediaMetadata = mediaMetadata,
                             playerConnection = playerConnection,
                             bottomSheetPageState = bottomSheetPageState,
-                            onOpenQueue = { queueOpen = true },
+                            onOpenQueue = { queueOpen = !queueOpen },
                             modifier = Modifier.fillMaxWidth().padding(horizontal = Gutter),
                         )
                     }
@@ -318,6 +319,7 @@ fun SimpMusicPlayerContent(
                                 mediaMetadata = mediaMetadata,
                                 navController = navController,
                                 playerBottomSheetState = state,
+                                onQueueClick = { queueOpen = !queueOpen },
                                 onShowDetailsDialog = {
                                     bottomSheetPageState.show { ShowMediaInfo(mediaMetadata.id) }
                                 },

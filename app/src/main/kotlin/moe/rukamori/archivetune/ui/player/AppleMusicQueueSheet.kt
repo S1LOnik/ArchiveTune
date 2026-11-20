@@ -641,7 +641,7 @@ fun AppleMusicQueueSheet(
                                         modifier =
                                             Modifier
                                                 .padding(end = 16.dp)
-                                                .alpha(iconAlpha),
+                                                .alpha(iconAlpha.coerceIn(0f, 1f)),
                                         tint = MaterialTheme.colorScheme.onError,
                                     )
                                 }

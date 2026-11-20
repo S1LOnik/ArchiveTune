@@ -121,7 +121,8 @@ fun BottomSheetPage(
                         }
                     }.graphicsLayer {
                         if (predictiveBackStyle) {
-                            alpha = 1f - 0.35f * predictiveBack.progress.value
+                            val p = predictiveBack.progress.value.coerceIn(0f, 1f)
+                            alpha = (1f - 0.35f * p).coerceIn(0f, 1f)
                         }
                     }.background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.5f))
                     .fillMaxSize(),

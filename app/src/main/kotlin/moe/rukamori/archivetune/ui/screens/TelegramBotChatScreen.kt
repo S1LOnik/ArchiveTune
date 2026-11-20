@@ -143,7 +143,7 @@ fun TelegramBotChatScreen(
     var addToPlaylistTrack by remember { mutableStateOf<TelegramTrack?>(null) }
 
     var botCommands by remember { mutableStateOf<List<TelegramBotCommand>>(emptyList()) }
-    var showCommandMenu by remember { mutableStateOf(false) }
+    val commandMenuToggle = moe.rukamori.archivetune.ui.component.rememberDropdownMenuToggle(anchorVisible = !sending)
     var commandsFetchedForChatId by remember { mutableLongStateOf(0L) }
 
     LaunchedEffect(bot?.chatId) {
@@ -402,7 +402,7 @@ fun TelegramBotChatScreen(
                     leadingIcon = {
                         Box {
                             IconButton(
-                                onClick = { showCommandMenu = true },
+                                onClick = commandMenuToggle::toggle,
                                 enabled = !sending,
                             ) {
                                 Text(
@@ -412,8 +412,8 @@ fun TelegramBotChatScreen(
                                 )
                             }
                             DropdownMenu(
-                                expanded = showCommandMenu,
-                                onDismissRequest = { showCommandMenu = false },
+                                expanded = commandMenuToggle.expanded,
+                                onDismissRequest = commandMenuToggle::onDismissRequest,
                             ) {
                                 if (botCommands.isNotEmpty()) {
                                     botCommands.forEach { cmd ->
@@ -436,7 +436,7 @@ fun TelegramBotChatScreen(
                                             },
                                             onClick = {
                                                 songLink = "${cmd.withSlash} "
-                                                showCommandMenu = false
+                                                commandMenuToggle.closeFromItemSelection()
                                             },
                                         )
                                     }
@@ -464,7 +464,7 @@ fun TelegramBotChatScreen(
                                         },
                                         onClick = {
                                             songLink = "${cmd.withSlash} "
-                                            showCommandMenu = false
+                                            commandMenuToggle.closeFromItemSelection()
                                         },
                                     )
                                 }

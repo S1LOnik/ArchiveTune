@@ -551,7 +551,8 @@ fun LyricsScreen(
         playerConnection.seekToNext()
     }
 
-    BackHandler(enabled = backHandlerEnabled, onBack = onBackClick)
+    val rootOverlayActive = LocalRootOverlayActive.current
+    BackHandler(enabled = backHandlerEnabled && !rootOverlayActive, onBack = onBackClick)
 
     Box(
         modifier =

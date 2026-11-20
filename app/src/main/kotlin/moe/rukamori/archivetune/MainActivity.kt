@@ -1349,7 +1349,7 @@ class MainActivity : ComponentActivity() {
                             }
                         }
 
-                    val bottomUiCompactFractionState =
+                    val rawBottomUiCompactFractionState =
                         animateFloatAsState(
                             targetValue = if (isBottomUiCompact) 1f else 0f,
                             animationSpec =
@@ -1360,6 +1360,10 @@ class MainActivity : ComponentActivity() {
                                 },
                             label = "bottomUiCompactFraction",
                         )
+                    val bottomUiCompactFractionState =
+                        remember(rawBottomUiCompactFractionState) {
+                            derivedStateOf { rawBottomUiCompactFractionState.value.coerceIn(0f, 1f) }
+                        }
 
                     val compactLeftCircleIsLibrary =
                         remember(navBackStackEntry?.destination?.route) {
@@ -1405,7 +1409,8 @@ class MainActivity : ComponentActivity() {
                         animationSpec = if (disableAnimations) snap() else motionConfig.navSpring(),
                         label = "",
                     )
-                    val bottomNavigationBarHeight by bottomNavigationBarHeightState
+                    val rawBottomNavigationBarHeight by bottomNavigationBarHeightState
+                    val bottomNavigationBarHeight = rawBottomNavigationBarHeight.coerceIn(0.dp, navVisibleHeight)
                     val miniPlayerStyle by rememberEnumPreference(MiniPlayerStyleKey, MiniPlayerStyle.STANDARD)
                     val miniPlayerCollapsedHeight =
                         if (miniPlayerStyle == MiniPlayerStyle.BAR) {
@@ -1708,6 +1713,15 @@ class MainActivity : ComponentActivity() {
                             topAppBarScrollBehavior.state.contentOffset = 0f
                         }
 
+                        if (previousRoute != null && previousRoute != currentRoute) {
+                            if (menuState.isVisible) {
+                                menuState.dismiss()
+                            }
+                            if (bottomSheetPageState.isVisible) {
+                                bottomSheetPageState.dismiss()
+                            }
+                        }
+
                         previousRoute = currentRoute
 
                         if ((
@@ -2003,6 +2017,13 @@ class MainActivity : ComponentActivity() {
                         moe.rukamori.archivetune.ui.component.LocalBottomSheetPageState provides bottomSheetPageState,
                         moe.rukamori.archivetune.ui.component.LocalMenuState provides menuState,
                         moe.rukamori.archivetune.ui.component.LocalBackAnimationStyle provides backAnimationStyle,
+                        moe.rukamori.archivetune.ui.player.LocalRootOverlayActive provides (
+                            menuState.isVisible ||
+                                menuState.dialogContent != null ||
+                                bottomSheetPageState.isVisible ||
+                                bottomSheetPageState.contentOnScreen ||
+                                sharedSong != null
+                            ),
                     ) {
                         Row {
                             AnimatedVisibility(
@@ -2497,11 +2518,13 @@ class MainActivity : ComponentActivity() {
                                         val navigationProximityProvider: () -> Float =
                                             remember(playerBottomSheetState, bottomNavigationBarHeightState, navVisibleHeight, miniPlayerCollapsedHeight) {
                                                 {
+                                                    val safeNavHeight =
+                                                        bottomNavigationBarHeightState.value.coerceIn(0.dp, navVisibleHeight)
                                                     val navRatio =
-                                                        (bottomNavigationBarHeightState.value / navVisibleHeight).coerceIn(0f, 1f)
+                                                        (safeNavHeight / navVisibleHeight).coerceIn(0f, 1f)
                                                     val isNavTransitioning =
-                                                        bottomNavigationBarHeightState.value > 0.dp &&
-                                                            bottomNavigationBarHeightState.value < navVisibleHeight
+                                                        safeNavHeight > 0.dp &&
+                                                            safeNavHeight < navVisibleHeight
                                                     val morphThreshold = miniPlayerCollapsedHeight + MiniPlayerBottomSpacing
                                                     val swipeDeviation =
                                                         if (isNavTransitioning && playerBottomSheetState.targetAnchor == COLLAPSED_ANCHOR) {
@@ -2532,11 +2555,13 @@ class MainActivity : ComponentActivity() {
                                             navbarHiddenOffset = {
                                                 if (shouldShowNavigationBar && !useRail) {
                                                     val hideFraction =
-                                                        1f -
-                                                            (
-                                                                bottomNavigationBarHeight.coerceAtMost(navVisibleHeight) /
-                                                                    navVisibleHeight
-                                                                )
+                                                        (
+                                                            1f -
+                                                                (
+                                                                    bottomNavigationBarHeight.coerceIn(0.dp, navVisibleHeight) /
+                                                                        navVisibleHeight
+                                                                    )
+                                                            ).coerceIn(0f, 1f)
 
                                                     val compactEffectiveHeight =
                                                         if (miniPlayerStyle == MiniPlayerStyle.BAR) {
@@ -2568,10 +2593,14 @@ class MainActivity : ComponentActivity() {
                                                     .align(Alignment.BottomCenter)
                                                     .height(navSlideDistance)
                                                     .graphicsLayer {
-                                                        alpha = 1f - bottomUiCompactFractionState.value * 0.9f
+                                                        val safeCompactFraction =
+                                                            bottomUiCompactFractionState.value.coerceIn(0f, 1f)
+                                                        alpha = (1f - safeCompactFraction * 0.9f).coerceIn(0f, 1f)
                                                     }
                                                     .offset {
-                                                        if (bottomNavigationBarHeight == 0.dp) {
+                                                        val clampedNavHeight =
+                                                            bottomNavigationBarHeight.coerceIn(0.dp, navVisibleHeight)
+                                                        if (clampedNavHeight <= 0.dp) {
                                                             IntOffset(
                                                                 x = 0,
                                                                 y = navSlideDistance.roundToPx(),
@@ -2586,10 +2615,9 @@ class MainActivity : ComponentActivity() {
                                                             val hideOffset =
                                                                 navSlideDistance *
                                                                     (
-                                                                        1 -
-                                                                            bottomNavigationBarHeight.coerceAtMost(navVisibleHeight) /
-                                                                            navVisibleHeight
-                                                                    )
+                                                                        1f -
+                                                                            (clampedNavHeight / navVisibleHeight).coerceIn(0f, 1f)
+                                                                        )
                                                             IntOffset(
                                                                 x = 0,
                                                                 y = (slideOffset + hideOffset).roundToPx(),
@@ -2662,11 +2690,11 @@ class MainActivity : ComponentActivity() {
                                         if (
                                             shouldShowNavigationBar ||
                                             !playerBottomSheetState.isDismissed ||
-                                            bottomUiCompactFractionState.value > 0.01f
+                                            bottomUiCompactFractionState.value.coerceIn(0f, 1f) > 0.01f
                                         ) {
                                             val compactRowVisible by remember(playerBottomSheetState, bottomUiCompactFractionState) {
                                                 derivedStateOf {
-                                                    bottomUiCompactFractionState.value *
+                                                    bottomUiCompactFractionState.value.coerceIn(0f, 1f) *
                                                         (1f - playerBottomSheetState.progress.coerceIn(0f, 1f)) > 0.01f
                                                 }
                                             }
@@ -2678,17 +2706,21 @@ class MainActivity : ComponentActivity() {
                                                             .fillMaxWidth()
                                                             .padding(horizontal = NavigationBarHorizontalPadding)
                                                             .padding(
-                                                                bottom = bottomInset +
-                                                                    floatingBarsBottomPadding +
-                                                                    (navVisibleHeight - CompactControlSize) / 2,
+                                                                bottom = (
+                                                                    bottomInset +
+                                                                        floatingBarsBottomPadding +
+                                                                        (navVisibleHeight - CompactControlSize) / 2
+                                                                    ).coerceAtLeast(0.dp),
                                                             )
                                                             .height(CompactControlSize)
                                                             .graphicsLayer {
                                                                 val slideDistancePx =
                                                                     (bottomInset + floatingBarsBottomPadding + navVisibleHeight + 8.dp).toPx()
                                                                 val compactRowAlpha =
-                                                                    bottomUiCompactFractionState.value *
-                                                                        (1f - playerBottomSheetState.progress.coerceIn(0f, 1f))
+                                                                    (
+                                                                        bottomUiCompactFractionState.value.coerceIn(0f, 1f) *
+                                                                            (1f - playerBottomSheetState.progress.coerceIn(0f, 1f))
+                                                                        ).coerceIn(0f, 1f)
                                                                 translationY =
                                                                     (1f - compactRowAlpha) * slideDistancePx
                                                             },
@@ -3665,6 +3697,10 @@ private fun HomeOverflowFab(
     onMusicRecognitionClick: () -> Unit,
     onMusicTogetherClick: () -> Unit,
 ) {
+    val menuToggle = moe.rukamori.archivetune.ui.component.rememberDropdownMenuToggle(initialExpanded = expanded)
+    BackHandler(enabled = expanded) {
+        menuToggle.onExternalItemSelection(onExpandedChange)
+    }
     val menuItemColors =
         MenuDefaults.itemColors(
             textColor = if (pureBlack) Color.White else MaterialTheme.colorScheme.onSurface,
@@ -3678,7 +3714,7 @@ private fun HomeOverflowFab(
 
     Box {
         FloatingActionButton(
-            onClick = { onExpandedChange(!expanded) },
+            onClick = { menuToggle.onExternalTriggerClick(expanded, onExpandedChange) },
             modifier = Modifier.size(HomeOverflowFabSize),
             containerColor = MaterialTheme.colorScheme.primary,
             contentColor = MaterialTheme.colorScheme.onPrimary,
@@ -3691,7 +3727,7 @@ private fun HomeOverflowFab(
 
         DropdownMenu(
             expanded = expanded,
-            onDismissRequest = { onExpandedChange(false) },
+            onDismissRequest = { menuToggle.onExternalDismissRequest(onExpandedChange) },
             shape = RoundedCornerShape(24.dp),
             containerColor = if (pureBlack) Color.Black else MaterialTheme.colorScheme.surfaceContainerHigh,
             tonalElevation = 6.dp,
@@ -3699,7 +3735,7 @@ private fun HomeOverflowFab(
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.music_recognition)) },
                 onClick = {
-                    onExpandedChange(false)
+                    menuToggle.onExternalItemSelection(onExpandedChange)
                     onMusicRecognitionClick()
                 },
                 leadingIcon = {
@@ -3714,7 +3750,7 @@ private fun HomeOverflowFab(
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.music_together)) },
                 onClick = {
-                    onExpandedChange(false)
+                    menuToggle.onExternalItemSelection(onExpandedChange)
                     onMusicTogetherClick()
                 },
                 leadingIcon = {
@@ -3729,7 +3765,7 @@ private fun HomeOverflowFab(
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.shuffle)) },
                 onClick = {
-                    onExpandedChange(false)
+                    menuToggle.onExternalItemSelection(onExpandedChange)
                     onShuffleClick()
                 },
                 leadingIcon = {
@@ -3797,7 +3833,7 @@ private fun OnlineSearchSortMenu(
     selectedSort: OnlineSearchSort,
     onSortSelected: (OnlineSearchSort) -> Unit,
 ) {
-    var expanded by remember { mutableStateOf(false) }
+    val menuToggle = moe.rukamori.archivetune.ui.component.rememberDropdownMenuToggle()
     val options =
         remember {
             listOf(
@@ -3807,7 +3843,7 @@ private fun OnlineSearchSortMenu(
         }
 
     Box {
-        IconButton(onClick = { expanded = true }) {
+        IconButton(onClick = menuToggle::toggle) {
             Icon(
                 painter = painterResource(R.drawable.filter_alt),
                 contentDescription = null,
@@ -3815,8 +3851,8 @@ private fun OnlineSearchSortMenu(
         }
 
         DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false },
+            expanded = menuToggle.expanded,
+            onDismissRequest = menuToggle::onDismissRequest,
         ) {
             options.forEach { sort ->
                 DropdownMenuItem(
@@ -3832,7 +3868,7 @@ private fun OnlineSearchSortMenu(
                         )
                     },
                     onClick = {
-                        expanded = false
+                        menuToggle.closeFromItemSelection()
                         onSortSelected(sort)
                     },
                     leadingIcon = {

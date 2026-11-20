@@ -119,9 +119,9 @@ fun <Int> ChoiceChipsRow(
     modifier: Modifier = Modifier,
     containerColor: Color = MaterialTheme.colorScheme.surfaceContainer,
 ) {
-    var expandIconDegree by remember { mutableFloatStateOf(0f) }
+    val menuToggle = rememberDropdownMenuToggle()
     val rotationAnimation by animateFloatAsState(
-        targetValue = expandIconDegree,
+        targetValue = if (menuToggle.expanded) -180f else 0f,
         animationSpec = tween(durationMillis = 400),
         label = "",
     )
@@ -132,14 +132,9 @@ fun <Int> ChoiceChipsRow(
                 .fillMaxWidth()
                 .padding(start = 12.dp),
     ) {
-        var expanded by remember { mutableStateOf(false) }
-
         Column {
             AssistChip(
-                onClick = {
-                    expanded = !expanded
-                    expandIconDegree -= 180
-                },
+                onClick = menuToggle::toggle,
                 label = {
                     Text(
                         text =
@@ -168,25 +163,21 @@ fun <Int> ChoiceChipsRow(
             )
 
             AnimatedVisibility(
-                visible = expanded,
+                visible = menuToggle.expanded,
                 enter = expandIn() + fadeIn(),
                 exit = shrinkOut() + fadeOut(),
             ) {
                 DropdownMenu(
                     modifier = Modifier.padding(start = 12.dp),
-                    expanded = expanded,
-                    onDismissRequest = {
-                        expanded = false
-                        expandIconDegree -= 180
-                    },
+                    expanded = menuToggle.expanded,
+                    onDismissRequest = menuToggle::onDismissRequest,
                 ) {
                     options.forEach { option ->
                         DropdownMenuItem(
                             text = { Text(text = option.second) },
                             onClick = {
                                 onSelectionChange(option.first)
-                                expandIconDegree -= 180
-                                expanded = false
+                                menuToggle.closeFromItemSelection()
                             },
                         )
                     }

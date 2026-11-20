@@ -314,11 +314,18 @@ fun SpatialFlowPlayerContent(
             }
         }
 
-    BackHandler(enabled = lyricsModeEnabled || queueExpanded) {
-        if (lyricsModeEnabled) {
-            lyricsModeEnabled = false
-        } else if (queueExpanded) {
+    val rootOverlayActive = moe.rukamori.archivetune.ui.player.LocalRootOverlayActive.current
+    BackHandler(
+        enabled =
+            state.isExpandedOrExpanding &&
+                (lyricsModeEnabled || queueExpanded) &&
+                !rootOverlayActive &&
+                !showSleepTimerDialog,
+    ) {
+        if (queueExpanded) {
             queueExpanded = false
+        } else if (lyricsModeEnabled) {
+            lyricsModeEnabled = false
         }
     }
 
@@ -743,7 +750,11 @@ fun SpatialFlowPlayerContent(
                         icon = painterResource(id = R.drawable.spatialflow_ic_lyrics),
                         label = "Lyrics",
                         isSelected = lyricsModeEnabled,
-                        onClick = { lyricsModeEnabled = true },
+                        onClick = {
+                            val next = !lyricsModeEnabled
+                            lyricsModeEnabled = next
+                            if (next) queueExpanded = false
+                        },
                         contentColor = contentColor,
                         accentColor = dynamicAccentColor,
                         isDark = surfaceIsDark,
@@ -905,7 +916,7 @@ fun SpatialFlowPlayerContent(
                                             .height(76.dp)
                                     },
                                 interactionSource = interactionSource,
-                                shape = RoundedCornerShape(cornerRadius),
+                                shape = RoundedCornerShape(cornerRadius.coerceAtLeast(0.dp)),
                                 colors =
                                     ButtonDefaults.buttonColors(
                                         containerColor = contentColor.copy(alpha = if (surfaceIsDark) 0.08f else 0.06f),
@@ -957,7 +968,7 @@ fun SpatialFlowPlayerContent(
                                             .height(76.dp)
                                     },
                                 interactionSource = interactionSource,
-                                shape = RoundedCornerShape(cornerRadius),
+                                shape = RoundedCornerShape(cornerRadius.coerceAtLeast(0.dp)),
                                 colors =
                                     ButtonDefaults.buttonColors(
                                         containerColor = dynamicAccentColor,
@@ -1009,7 +1020,7 @@ fun SpatialFlowPlayerContent(
                                             .height(76.dp)
                                     },
                                 interactionSource = interactionSource,
-                                shape = RoundedCornerShape(cornerRadius),
+                                shape = RoundedCornerShape(cornerRadius.coerceAtLeast(0.dp)),
                                 colors =
                                     ButtonDefaults.buttonColors(
                                         containerColor = contentColor.copy(alpha = if (surfaceIsDark) 0.08f else 0.06f),
@@ -1053,7 +1064,9 @@ fun SpatialFlowPlayerContent(
                                 indication = null,
                             ) {
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                queueExpanded = true
+                                val next = !queueExpanded
+                                queueExpanded = next
+                                if (next) lyricsModeEnabled = false
                             },
                     contentAlignment = Alignment.Center,
                 ) {

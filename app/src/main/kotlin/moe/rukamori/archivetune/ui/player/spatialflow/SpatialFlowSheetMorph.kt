@@ -77,11 +77,11 @@ fun BoxScope.SpatialFlowFloatingArtwork(
         derivedStateOf {
             val rawP = state.progress.coerceIn(0f, 1f)
             val p = if (miniRectMissing) 1f else rawP
-            val lyricsSuppress = lerp(1f, lyricsFade, p)
-            val queueSuppress = lerp(1f, queueFade, p)
+            val lyricsSuppress = lerp(1f, lyricsFade.coerceIn(0f, 1f), p).coerceIn(0f, 1f)
+            val queueSuppress = lerp(1f, queueFade.coerceIn(0f, 1f), p).coerceIn(0f, 1f)
             val fallbackFade = if (miniRectMissing) (2f * rawP).coerceIn(0f, 1f) else 1f
             val layerAlpha =
-                (if (artworkActive) 1f else 0f) * lyricsSuppress * queueSuppress * fallbackFade
+                ((if (artworkActive) 1f else 0f) * lyricsSuppress * queueSuppress * fallbackFade).coerceIn(0f, 1f)
             layerAlpha > 0.01f
         }
     }
@@ -92,19 +92,19 @@ fun BoxScope.SpatialFlowFloatingArtwork(
                 .align(Alignment.TopStart)
 
                 .offset { IntOffset(full.left.roundToInt(), full.top.roundToInt()) }
-                .size(with(androidx.compose.ui.platform.LocalDensity.current) { full.width.toDp() })
+                .size(with(androidx.compose.ui.platform.LocalDensity.current) { full.width.toDp().coerceAtLeast(0.dp) })
                 .graphicsLayer {
                     val rawP = state.progress.coerceIn(0f, 1f)
 
                     val p = if (miniRectMissing) 1f else rawP
 
-                    val lyricsSuppress = lerp(1f, lyricsFade, p)
-                    val queueSuppress = lerp(1f, queueFade, p)
+                    val lyricsSuppress = lerp(1f, lyricsFade.coerceIn(0f, 1f), p).coerceIn(0f, 1f)
+                    val queueSuppress = lerp(1f, queueFade.coerceIn(0f, 1f), p).coerceIn(0f, 1f)
                     val fallbackFade = if (miniRectMissing) (2f * rawP).coerceIn(0f, 1f) else 1f
-                    alpha = (if (artworkActive) 1f else 0f) * lyricsSuppress * queueSuppress * fallbackFade
+                    alpha = ((if (artworkActive) 1f else 0f) * lyricsSuppress * queueSuppress * fallbackFade).coerceIn(0f, 1f)
                     if (alpha <= 0.01f) return@graphicsLayer
 
-                    val scale = lerp(mini.width / full.width, 1f, p)
+                    val scale = lerp(mini.width / full.width, 1f, p).coerceAtLeast(0.01f)
                     scaleX = scale
                     scaleY = scale
 
@@ -113,11 +113,11 @@ fun BoxScope.SpatialFlowFloatingArtwork(
                     translationX = targetCentreX - full.center.x
                     translationY = targetCentreY - full.center.y
 
-                    val cornerPx = lerp(mini.width / 2f, 16.dp.toPx(), p)
+                    val cornerPx = lerp(mini.width / 2f, 16.dp.toPx(), p).coerceAtLeast(0f)
                     shape = RoundedCornerShape(cornerPx)
                     clip = true
 
-                    shadowElevation = lerp(0f, 16.dp.toPx(), p)
+                    shadowElevation = lerp(0f, 16.dp.toPx(), p).coerceAtLeast(0f)
                 },
     ) {
         if (pagerVisible) {

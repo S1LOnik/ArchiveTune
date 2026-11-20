@@ -452,7 +452,7 @@ fun SlidingQueueDrawer(
                                                 .height(56.dp)
                                         },
                                     interactionSource = interactionSource,
-                                    shape = RoundedCornerShape(cornerRadius),
+                                    shape = RoundedCornerShape(cornerRadius.coerceAtLeast(0.dp)),
                                     colors =
                                         ButtonDefaults.buttonColors(
                                             containerColor = if (isShuffleEnabled) queueTrayActiveButtonColor else queueTrayInactiveButtonColor,
@@ -503,7 +503,7 @@ fun SlidingQueueDrawer(
                                                 .height(56.dp)
                                         },
                                     interactionSource = interactionSource,
-                                    shape = RoundedCornerShape(cornerRadius),
+                                    shape = RoundedCornerShape(cornerRadius.coerceAtLeast(0.dp)),
                                     colors =
                                         ButtonDefaults.buttonColors(
                                             containerColor = if (loopActive) queueTrayActiveButtonColor else queueTrayInactiveButtonColor,
@@ -548,7 +548,7 @@ fun SlidingQueueDrawer(
                                                 .height(56.dp)
                                         },
                                     interactionSource = interactionSource,
-                                    shape = RoundedCornerShape(cornerRadius),
+                                    shape = RoundedCornerShape(cornerRadius.coerceAtLeast(0.dp)),
                                     colors =
                                         ButtonDefaults.buttonColors(
                                             containerColor = if (timerActive) queueTrayActiveButtonColor else queueTrayInactiveButtonColor,
@@ -585,7 +585,7 @@ fun SpatialFlowQueueListItem(
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
-    var showMenu by remember { mutableStateOf(false) }
+    val menuToggle = moe.rukamori.archivetune.ui.component.rememberDropdownMenuToggle(anchorVisible = showReorderControls)
 
     ListItem(
         onClick = onClick,
@@ -646,7 +646,7 @@ fun SpatialFlowQueueListItem(
         trailingContent = {
             if (showReorderControls) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = { showMenu = true }) {
+                    IconButton(onClick = menuToggle::toggle) {
                         Icon(
                             painter = painterResource(R.drawable.more_vert),
                             contentDescription = "Options",
@@ -655,20 +655,20 @@ fun SpatialFlowQueueListItem(
                     }
 
                     DropdownMenu(
-                        expanded = showMenu,
-                        onDismissRequest = { showMenu = false },
+                        expanded = menuToggle.expanded,
+                        onDismissRequest = menuToggle::onDismissRequest,
                     ) {
                         DropdownMenuItem(
                             text = { Text("Move Up") },
                             onClick = {
-                                showMenu = false
+                                menuToggle.closeFromItemSelection()
                                 onMoveUp()
                             },
                         )
                         DropdownMenuItem(
                             text = { Text("Move Down") },
                             onClick = {
-                                showMenu = false
+                                menuToggle.closeFromItemSelection()
                                 onMoveDown()
                             },
                         )

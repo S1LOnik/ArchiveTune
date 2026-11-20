@@ -267,10 +267,27 @@ fun TikTokPlayerContent(
         videoState != null && !videoState.hasPlaybackFailed && !lyricsOpen
     var immersive by rememberSaveable { mutableStateOf(false) }
 
-    BackHandler(enabled = lyricsOpen) { lyricsOpen = false }
-    BackHandler(enabled = immersive) { immersive = false }
+    val rootOverlayActive = moe.rukamori.archivetune.ui.player.LocalRootOverlayActive.current
+    BackHandler(
+        enabled =
+            state.isExpandedOrExpanding &&
+                lyricsOpen &&
+                !showLyricsMenu &&
+                !rootOverlayActive,
+    ) { lyricsOpen = false }
+    BackHandler(
+        enabled =
+            state.isExpandedOrExpanding &&
+                immersive &&
+                !rootOverlayActive,
+    ) { immersive = false }
 
-    BackHandler(enabled = queueOpen) { queueOpen = false }
+    BackHandler(
+        enabled =
+            state.isExpandedOrExpanding &&
+                queueOpen &&
+                !rootOverlayActive,
+    ) { queueOpen = false }
 
     LaunchedEffect(state.isExpandedOrExpanding) {
         if (!state.isExpandedOrExpanding) {
@@ -415,10 +432,11 @@ fun TikTokPlayerContent(
                 onTogglePlayPause = { player.togglePlayPause() },
 
                 onQueueClick = {
-                    if (lyricsOpen) lyricsOpen = false
-                    queueOpen = true
+                    val next = !queueOpen
+                    if (next && lyricsOpen) lyricsOpen = false
+                    queueOpen = next
                 },
-                onOpenLyricsMenu = { showLyricsMenu = true },
+                onOpenLyricsMenu = { showLyricsMenu = !showLyricsMenu },
                 onLyricsOverflowAnchorChange = { lyricsOverflowAnchor = it },
                 navController = navController,
                 menuState = menuState,

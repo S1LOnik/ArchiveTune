@@ -61,10 +61,10 @@ fun SearchSourcePicker(
     onSelection: (SearchSource, SearchProvider) -> Unit,
     includeLocal: Boolean = true,
 ) {
-    var expanded by rememberSaveable { mutableStateOf(false) }
+    val menuToggle = rememberDropdownMenuToggle()
 
     Box {
-        IconButton(onClick = { expanded = true }) {
+        IconButton(onClick = menuToggle::toggle) {
             Icon(
                 painter = painterResource(searchProviderIconRes(currentScope, currentProvider)),
                 contentDescription = stringResource(R.string.search_source_picker),
@@ -73,8 +73,8 @@ fun SearchSourcePicker(
             )
         }
         DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false },
+            expanded = menuToggle.expanded,
+            onDismissRequest = menuToggle::onDismissRequest,
             shape = RoundedCornerShape(20.dp),
             containerColor =
                 LocalUnglassColorScheme.current?.surfaceContainerHigh
@@ -86,7 +86,7 @@ fun SearchSourcePicker(
                     iconRes = R.drawable.library_music,
                     selected = currentScope == SearchSource.LOCAL,
                 ) {
-                    expanded = false
+                    menuToggle.closeFromItemSelection()
                     onSelection(SearchSource.LOCAL, currentProvider)
                 }
             }
@@ -95,7 +95,7 @@ fun SearchSourcePicker(
                 iconRes = R.drawable.youtube_icon,
                 selected = currentScope == SearchSource.ONLINE && currentProvider == SearchProvider.YOUTUBE,
             ) {
-                expanded = false
+                menuToggle.closeFromItemSelection()
                 onSelection(SearchSource.ONLINE, SearchProvider.YOUTUBE)
             }
             SearchSourceMenuItem(
@@ -103,7 +103,7 @@ fun SearchSourcePicker(
                 iconRes = R.drawable.spotify_icon,
                 selected = currentScope == SearchSource.ONLINE && currentProvider == SearchProvider.SPOTIFY,
             ) {
-                expanded = false
+                menuToggle.closeFromItemSelection()
                 onSelection(SearchSource.ONLINE, SearchProvider.SPOTIFY)
             }
             SearchSourceMenuItem(
@@ -111,7 +111,7 @@ fun SearchSourcePicker(
                 iconRes = R.drawable.apple_music_icon,
                 selected = currentScope == SearchSource.ONLINE && currentProvider == SearchProvider.APPLE_MUSIC,
             ) {
-                expanded = false
+                menuToggle.closeFromItemSelection()
                 onSelection(SearchSource.ONLINE, SearchProvider.APPLE_MUSIC)
             }
             SearchSourceMenuItem(
@@ -119,7 +119,7 @@ fun SearchSourcePicker(
                 iconRes = R.drawable.solar_music_note_2_linear,
                 selected = currentScope == SearchSource.ONLINE && currentProvider == SearchProvider.SOUNDCLOUD,
             ) {
-                expanded = false
+                menuToggle.closeFromItemSelection()
                 onSelection(SearchSource.ONLINE, SearchProvider.SOUNDCLOUD)
             }
             SearchSourceMenuItem(
@@ -127,7 +127,7 @@ fun SearchSourcePicker(
                 iconRes = R.drawable.provider_tidal,
                 selected = currentScope == SearchSource.ONLINE && currentProvider == SearchProvider.TIDAL,
             ) {
-                expanded = false
+                menuToggle.closeFromItemSelection()
                 onSelection(SearchSource.ONLINE, SearchProvider.TIDAL)
             }
         }

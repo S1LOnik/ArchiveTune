@@ -117,6 +117,8 @@ class MenuState(
         private set
     internal var dialogContent by mutableStateOf<(@Composable () -> Unit)?>(null)
         private set
+    private var lastDismissUptimeMs: Long = Long.MIN_VALUE
+    private var lastShowUptimeMs: Long = Long.MIN_VALUE
 
     fun show(content: @Composable ColumnScope.() -> Unit) {
         show(content, MenuPresentation.FLOATING)
@@ -131,6 +133,15 @@ class MenuState(
         content: @Composable ColumnScope.() -> Unit,
         presentation: MenuPresentation,
     ) {
+        val now = android.os.SystemClock.uptimeMillis()
+        if (isVisible && this.presentation == presentation && (now - lastShowUptimeMs) in 0..260L) {
+            dismiss()
+            return
+        }
+        if (!isVisible && lastDismissUptimeMs != Long.MIN_VALUE && (now - lastDismissUptimeMs) in 0..220L) {
+            return
+        }
+        lastShowUptimeMs = now
         dialogContent = null
         isVisible = true
         this.presentation = presentation
@@ -138,11 +149,15 @@ class MenuState(
     }
 
     fun dismiss() {
+        if (isVisible) {
+            lastDismissUptimeMs = android.os.SystemClock.uptimeMillis()
+        }
         isVisible = false
     }
 
     fun showDialog(content: @Composable () -> Unit) {
         isVisible = false
+        lastDismissUptimeMs = Long.MIN_VALUE
         dialogContent = content
     }
 
@@ -183,20 +198,30 @@ fun BottomSheetMenu(
                 )
             }
         } else if (renderState) {
-            if (animationsEnabled) {
-                enterProgress.animateTo(
-                    targetValue = 0f,
-                    animationSpec = motionConfig.microTween(200),
-                )
-            } else {
-                enterProgress.snapTo(0f)
+            try {
+                if (animationsEnabled) {
+                    enterProgress.animateTo(
+                        targetValue = 0f,
+                        animationSpec = motionConfig.microTween(200),
+                    )
+                } else {
+                    enterProgress.snapTo(0f)
+                }
+            } finally {
+                if (!state.isVisible) {
+                    focusManager.clearFocus()
+                    renderState = false
+                }
             }
-            focusManager.clearFocus()
-            renderState = false
         }
     }
 
     val menuPredictiveBack = rememberPredictiveSheetBackState()
+    PredictiveStyleBackHandler(
+        backState = menuPredictiveBack,
+        enabled = renderState && state.isVisible && state.dialogContent == null,
+        onBack = state::dismiss,
+    )
     PredictiveStyleBackHandler(
         backState = menuPredictiveBack,
         enabled = state.dialogContent != null,
@@ -205,13 +230,7 @@ fun BottomSheetMenu(
 
     if (!renderState) return
 
-    PredictiveStyleBackHandler(
-        backState = menuPredictiveBack,
-        enabled = renderState,
-        onBack = { state.isVisible = false },
-    )
-
-    val alpha = enterProgress.value
+    val alpha = enterProgress.value.coerceIn(0f, 1f)
 
     val immersive = state.presentation == MenuPresentation.IMMERSIVE
     val menuShape = if (immersive) ImmersiveMenuShape else FloatingMenuShape
@@ -369,15 +388,16 @@ fun BottomSheetMenu(
         }
     }
     val maxPopupHeight by animateDpAsState(
-        targetValue = configuration.screenHeightDp.dp * when {
+        targetValue = (configuration.screenHeightDp.dp * when {
             immersive && expanded -> 1f
             immersive -> 0.72f
             else -> 0.44f
-        },
+        }).coerceAtLeast(0.dp),
         animationSpec = if (!animationsEnabled) snap() else motionConfig.microTween(200),
         label = "menuHeight",
     )
-    val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val safeMaxPopupHeight = maxPopupHeight.coerceAtLeast(0.dp)
+    val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding().coerceAtLeast(0.dp)
     val predictiveBackStyle = LocalBackAnimationStyle.current == BackAnimationStyle.PREDICTIVE
 
     Box(modifier = modifier.fillMaxSize()) {
@@ -386,16 +406,23 @@ fun BottomSheetMenu(
                 Modifier
                     .fillMaxSize()
                     .graphicsLayer {
-                        val backFade = if (predictiveBackStyle) 1f - 0.35f * menuPredictiveBack.progress.value else 1f
-                        this.alpha = alpha * backFade
+                        val p = if (predictiveBackStyle) menuPredictiveBack.progress.value.coerceIn(0f, 1f) else 0f
+                        val backFade = (1f - 0.35f * p).coerceIn(0f, 1f)
+                        this.alpha = (alpha * backFade).coerceIn(0f, 1f)
                     }
                     .background(Color.Black.copy(alpha = 0.50f))
-                    .clickable(
-                        interactionSource = scrimInteractionSource,
-                        indication = null,
-                    ) {
-                        state.isVisible = false
-                    },
+                    .then(
+                        if (state.isVisible) {
+                            Modifier.clickable(
+                                interactionSource = scrimInteractionSource,
+                                indication = null,
+                            ) {
+                                state.dismiss()
+                            }
+                        } else {
+                            Modifier
+                        },
+                    ),
         )
 
         Box(
@@ -410,14 +437,14 @@ fun BottomSheetMenu(
                         },
                     )
                     .widthIn(max = 640.dp)
-                    .heightIn(max = maxPopupHeight)
+                    .heightIn(max = safeMaxPopupHeight)
                     .fillMaxWidth()
                     .graphicsLayer {
-                        val p = if (predictiveBackStyle) menuPredictiveBack.progress.value else 0f
+                        val p = if (predictiveBackStyle) menuPredictiveBack.progress.value.coerceIn(0f, 1f) else 0f
                         val scale = 1f - 0.06f * p
                         scaleX = scale
                         scaleY = scale
-                        this.alpha = alpha * (1f - 0.22f * p)
+                        this.alpha = (alpha * (1f - 0.22f * p)).coerceIn(0f, 1f)
 
                         translationY =
                             with(density) {
@@ -425,7 +452,7 @@ fun BottomSheetMenu(
                             }
                     }
                     .shadow(
-                        elevation = (24f * glassTuning.shadowFactor).dp,
+                        elevation = (24f * glassTuning.shadowFactor).coerceAtLeast(0f).dp,
                         shape = menuShape,
                         clip = false,
                     )
@@ -441,11 +468,17 @@ fun BottomSheetMenu(
                     )
                     .clip(menuShape)
                     .nestedScroll(gestureConnection)
-                    .clickable(
-                        interactionSource = popupInteractionSource,
-                        indication = null,
-                    ) {
-                    },
+                    .then(
+                        if (state.isVisible) {
+                            Modifier.clickable(
+                                interactionSource = popupInteractionSource,
+                                indication = null,
+                            ) {
+                            }
+                        } else {
+                            Modifier
+                        },
+                    ),
         ) {
             val unglassedColorScheme = MaterialTheme.colorScheme
 

@@ -89,7 +89,7 @@ fun ParameterDropdown(
     onValueChanged: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var expanded by remember { mutableStateOf(false) }
+    val menuToggle = moe.rukamori.archivetune.ui.component.rememberDropdownMenuToggle()
 
     Column(modifier = modifier) {
         Text(
@@ -106,7 +106,7 @@ fun ParameterDropdown(
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(8.dp))
                     .liquidGlass(shape = RoundedCornerShape(8.dp))
-                    .clickable { expanded = true }
+                    .clickable(onClick = menuToggle::toggle)
                     .padding(horizontal = 12.dp, vertical = 12.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
@@ -126,15 +126,15 @@ fun ParameterDropdown(
 
             UnglassedDialogTheme {
                 DropdownMenu(
-                    expanded = expanded,
-                    onDismissRequest = { expanded = false }
+                    expanded = menuToggle.expanded,
+                    onDismissRequest = menuToggle::onDismissRequest
                 ) {
                     options.forEach { option ->
                         DropdownMenuItem(
                             text = { Text(option) },
                             onClick = {
                                 onValueChanged(option)
-                                expanded = false
+                                menuToggle.closeFromItemSelection()
                             }
                         )
                     }

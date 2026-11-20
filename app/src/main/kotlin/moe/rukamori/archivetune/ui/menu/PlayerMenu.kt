@@ -142,6 +142,7 @@ fun PlayerMenu(
     onSleepTimerClick: (() -> Unit)? = null,
     onPlayNextFromQueue: (() -> Unit)? = null,
     onRemoveFromQueue: (() -> Unit)? = null,
+    onQueueClick: (() -> Unit)? = null,
     onShowDetailsDialog: () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -523,6 +524,7 @@ fun PlayerMenu(
                     },
                     text = context.getString(R.string.queue),
                     onClick = {
+                        onQueueClick?.invoke()
                         onDismiss()
                     },
                 )

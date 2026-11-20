@@ -48,7 +48,7 @@ inline fun <reified T : Enum<T>> SortHeader(
     modifier: Modifier = Modifier,
     showDescending: Boolean? = true,
 ) {
-    var menuExpanded by remember { mutableStateOf(false) }
+    val menuToggle = rememberDropdownMenuToggle()
     val allowDescending =
         when (sortType) {
             is PlaylistSongSortType -> sortType != PlaylistSongSortType.CUSTOM
@@ -66,7 +66,7 @@ inline fun <reified T : Enum<T>> SortHeader(
             SplitButtonLayout(
                 leadingButton = {
                     SplitButtonDefaults.TonalLeadingButton(
-                        onClick = { menuExpanded = true },
+                        onClick = menuToggle::toggle,
                         modifier = Modifier.heightIn(min = SplitButtonDefaults.MediumContainerHeight),
                     ) {
                         Text(
@@ -105,7 +105,7 @@ inline fun <reified T : Enum<T>> SortHeader(
             )
         } else {
             FilledTonalButton(
-                onClick = { menuExpanded = true },
+                onClick = menuToggle::toggle,
                 modifier = Modifier.heightIn(min = SplitButtonDefaults.MediumContainerHeight),
             ) {
                 Text(
@@ -117,8 +117,8 @@ inline fun <reified T : Enum<T>> SortHeader(
         }
 
         DropdownMenu(
-            expanded = menuExpanded,
-            onDismissRequest = { menuExpanded = false },
+            expanded = menuToggle.expanded,
+            onDismissRequest = menuToggle::onDismissRequest,
             modifier = Modifier.widthIn(min = 172.dp),
         ) {
             enumValues<T>().forEach { type ->
@@ -144,7 +144,7 @@ inline fun <reified T : Enum<T>> SortHeader(
                     },
                     onClick = {
                         onSortTypeChange(type)
-                        menuExpanded = false
+                        menuToggle.closeFromItemSelection()
                     },
                 )
             }

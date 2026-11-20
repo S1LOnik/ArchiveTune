@@ -1150,11 +1150,15 @@ fun BottomSheetPlayer(
     val openQueue =
         remember(state, queueSheetState) {
             {
-                isInlineLyricsOpen = false
-                if (!state.isExpandedOrExpanding) {
-                    state.expandSoft()
+                if (queueSheetState.isExpandedOrExpanding) {
+                    queueSheetState.collapseSoft()
+                } else {
+                    isInlineLyricsOpen = false
+                    if (!state.isExpandedOrExpanding) {
+                        state.expandSoft()
+                    }
+                    queueSheetState.expandSoft()
                 }
-                queueSheetState.expandSoft()
             }
         }
 
@@ -2141,6 +2145,7 @@ fun BottomSheetPlayer(
                                                     mediaMetadata = metadata,
                                                     navController = navController,
                                                     playerBottomSheetState = state,
+                                                    onQueueClick = openQueue,
                                                     onShowDetailsDialog = {
                                                         bottomSheetPageState.show {
                                                             ShowMediaInfo(metadata.id)
@@ -2221,7 +2226,7 @@ fun BottomSheetPlayer(
                             modifier =
                                 Modifier
                                     .align(Alignment.BottomCenter)
-                                    .padding(bottom = queueSheetState.collapsedBound)
+                                    .padding(bottom = queueSheetState.collapsedBound.coerceAtLeast(0.dp))
                                     .windowInsetsPadding(WindowInsets.systemBars.only(WindowInsetsSides.Horizontal))
                                     .nestedScroll(state.preUpPostDownNestedScrollConnection),
                         ) {
@@ -2276,6 +2281,7 @@ fun BottomSheetPlayer(
                                                 mediaMetadata = metadata,
                                                 navController = navController,
                                                 playerBottomSheetState = state,
+                                                onQueueClick = openQueue,
                                                 onShowDetailsDialog = {
                                                     bottomSheetPageState.show {
                                                         ShowMediaInfo(metadata.id)
@@ -2301,7 +2307,7 @@ fun BottomSheetPlayer(
                             backdropBlurAmount = backdropBlurAmount,
                             showVolumeBar = showPlayerVolumeBar,
                             showCodecOnPlayer = showCodecOnPlayer,
-                            contentBottomPadding = queueSheetState.collapsedBound,
+                            contentBottomPadding = queueSheetState.collapsedBound.coerceAtLeast(0.dp),
                             // [FIX-ZCODE] T7: nav header actions handled here so the
                             // collapse/lyrics/queue buttons work like V9's header
                             onAction = { action ->
@@ -2350,7 +2356,7 @@ fun BottomSheetPlayer(
                             modifier =
                                 Modifier
                                     .fillMaxSize()
-                                    .padding(bottom = queueSheetState.collapsedBound)
+                                    .padding(bottom = queueSheetState.collapsedBound.coerceAtLeast(0.dp))
                                     .windowInsetsPadding(
                                         WindowInsets(top = LocalStableSystemBarsTopPadding.current)
                                             .union(WindowInsets.systemBars.only(WindowInsetsSides.Horizontal)),
@@ -2395,6 +2401,7 @@ fun BottomSheetPlayer(
                                         mediaMetadata = metadata,
                                         navController = navController,
                                         playerBottomSheetState = state,
+                                        onQueueClick = openQueue,
                                         onShowDetailsDialog = {
                                             bottomSheetPageState.show {
                                                 ShowMediaInfo(metadata.id)
@@ -2407,7 +2414,7 @@ fun BottomSheetPlayer(
                             modifier =
                                 Modifier
                                     .fillMaxSize()
-                                    .padding(bottom = queueSheetState.collapsedBound)
+                                    .padding(bottom = queueSheetState.collapsedBound.coerceAtLeast(0.dp))
                                     .windowInsetsPadding(
                                         WindowInsets(top = LocalStableSystemBarsTopPadding.current)
                                             .union(WindowInsets.systemBars.only(WindowInsetsSides.Horizontal)),
@@ -2541,7 +2548,7 @@ fun BottomSheetPlayer(
                             canvasPrimaryUrl = artworkCanvas?.animated,
                             canvasFallbackUrl = artworkCanvas?.videoUrl,
                             currentFormat = currentFormat,
-                            contentBottomPadding = queueSheetState.collapsedBound + 20.dp,
+                            contentBottomPadding = queueSheetState.collapsedBound.coerceAtLeast(0.dp) + 20.dp,
                             onSliderValueChange = onSliderValueChange,
                             onSliderValueChangeFinished = onSliderValueChangeFinished,
                             lyricsSyncOffset = lyricsSyncOffset,
@@ -2569,7 +2576,7 @@ fun BottomSheetPlayer(
                                     WindowInsets.systemBars.only(
                                         WindowInsetsSides.Horizontal,
                                     ),
-                                ).padding(bottom = queueSheetState.collapsedBound),
+                                ).padding(bottom = queueSheetState.collapsedBound.coerceAtLeast(0.dp)),
                     ) {
                         Box(
                             contentAlignment = Alignment.Center,
@@ -2591,6 +2598,7 @@ fun BottomSheetPlayer(
                                                     mediaMetadata = metadata,
                                                     navController = navController,
                                                     playerBottomSheetState = state,
+                                                    onQueueClick = openQueue,
                                                     onShowDetailsDialog = {
                                                         bottomSheetPageState.show {
                                                             ShowMediaInfo(metadata.id)

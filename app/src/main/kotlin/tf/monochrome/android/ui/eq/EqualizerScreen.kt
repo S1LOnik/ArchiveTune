@@ -121,7 +121,7 @@ fun EqualizerScreen(
     val showTutorial by viewModel.showTutorial.collectAsStateWithLifecycle()
 
     var showSaveDialog by rememberSaveable { mutableStateOf(false) }
-    var showTargetMenu by remember { mutableStateOf(false) }
+    val targetMenuToggle = moe.rukamori.archivetune.ui.component.rememberDropdownMenuToggle()
     var showHeadphoneSelect by remember { mutableStateOf(false) }
     var showPresetMenu by remember { mutableStateOf(false) }
     var showBandsExpanded by rememberSaveable { mutableStateOf(true) }
@@ -632,7 +632,7 @@ fun EqualizerScreen(
                     Box {
                         SelectorRow(
                             value = selectedTarget.label,
-                            onClick = { showTargetMenu = true },
+                            onClick = targetMenuToggle::toggle,
                             trailingIcon = {
                                 IconButton(
                                     onClick = { targetFilePicker.launch("text/*") },
@@ -653,8 +653,8 @@ fun EqualizerScreen(
 
                         UnglassedDialogTheme {
                         DropdownMenu(
-                            expanded = showTargetMenu,
-                            onDismissRequest = { showTargetMenu = false }
+                            expanded = targetMenuToggle.expanded,
+                            onDismissRequest = targetMenuToggle::onDismissRequest
                         ) {
                             availableTargets.forEach { target ->
                                 val isCustom = target.id.startsWith("custom_")
@@ -670,7 +670,7 @@ fun EqualizerScreen(
                                                 IconButton(
                                                     onClick = {
                                                         viewModel.deleteCustomTarget(target.id)
-                                                        showTargetMenu = false
+                                                        targetMenuToggle.closeFromItemSelection()
                                                     },
                                                     modifier = Modifier.size(24.dp)
                                                 ) {
@@ -686,7 +686,7 @@ fun EqualizerScreen(
                                     },
                                     onClick = {
                                         viewModel.selectTarget(target.id)
-                                        showTargetMenu = false
+                                        targetMenuToggle.closeFromItemSelection()
                                     }
                                 )
                             }

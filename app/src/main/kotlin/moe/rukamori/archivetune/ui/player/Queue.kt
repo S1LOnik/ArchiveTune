@@ -183,8 +183,9 @@ fun Queue(
         selectedItems.clear()
     }
 
+    val rootOverlayActive = LocalRootOverlayActive.current
     if (selection) {
-        BackHandler {
+        BackHandler(enabled = state.isExpandedOrExpanding && !rootOverlayActive) {
             clearSelection()
         }
     }
@@ -412,11 +413,15 @@ fun Queue(
     val openQueue =
         remember(playerBottomSheetState, state) {
             {
-                scrollToCurrentRequested = true
-                if (!playerBottomSheetState.isExpandedOrExpanding) {
-                    playerBottomSheetState.expandSoft()
+                if (state.isExpandedOrExpanding) {
+                    state.collapseSoft()
+                } else {
+                    scrollToCurrentRequested = true
+                    if (!playerBottomSheetState.isExpandedOrExpanding) {
+                        playerBottomSheetState.expandSoft()
+                    }
+                    state.expandSoft()
                 }
-                state.expandSoft()
             }
         }
 
@@ -424,6 +429,7 @@ fun Queue(
         state = state,
         backgroundColor = { Color.Unspecified },
         modifier = modifier,
+        backHandlerEnabled = !selection,
 
         onCollapsedContentClick = {},
         collapsedContent = {
@@ -454,6 +460,7 @@ fun Queue(
                                     mediaMetadata = mediaMetadata,
                                     navController = navController,
                                     playerBottomSheetState = playerBottomSheetState,
+                                    onQueueClick = openQueue,
                                     onShowDetailsDialog = {
                                         mediaMetadata?.id?.let {
                                             bottomSheetPageState.show {
@@ -510,6 +517,7 @@ fun Queue(
                                     mediaMetadata = mediaMetadata,
                                     navController = navController,
                                     playerBottomSheetState = playerBottomSheetState,
+                                    onQueueClick = openQueue,
                                     onShowDetailsDialog = {
                                         mediaMetadata?.id?.let {
                                             bottomSheetPageState.show {
@@ -809,6 +817,7 @@ fun Queue(
                                 navController = navController,
                                 playerBottomSheetState = playerBottomSheetState,
                                 isQueueTrigger = true,
+                                onQueueClick = openQueue,
                                 onRemoveFromQueue = {
                                     currentWindow?.let { onRemoveWithUndo(it) }
                                 },

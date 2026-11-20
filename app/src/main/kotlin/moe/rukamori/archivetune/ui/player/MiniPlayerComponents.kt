@@ -200,8 +200,11 @@ fun SwipeableMiniPlayerBox(
                         } else if (miniPlayerStyle == MiniPlayerStyle.BAR) {
                             baseModifier
                         } else {
+                            val safeCompactFraction = compactFraction.coerceIn(0f, 1f)
                             baseModifier.padding(
-                                horizontal = lerp(NavigationBarHorizontalPadding, 0.dp, compactFraction),
+                                horizontal =
+                                    lerp(NavigationBarHorizontalPadding, 0.dp, safeCompactFraction)
+                                        .coerceAtLeast(0.dp),
                             )
                         }
                     }.let { baseModifier ->
@@ -671,13 +674,14 @@ fun NewMiniPlayerContent(
     compactShowTransportControls: Boolean = false,
     onArtworkSlotPositioned: ((androidx.compose.ui.geometry.Rect) -> Unit)? = null,
 ) {
+    val safeCompactFraction = compactFraction.coerceIn(0f, 1f)
     if (miniPlayerStyle == MiniPlayerStyle.BAR) {
         MiniPlayerBarContent(
             positionProvider = positionProvider,
             durationProvider = durationProvider,
             playerConnection = playerConnection,
             colors = colors,
-            compactFraction = compactFraction,
+            compactFraction = safeCompactFraction,
             compactShowTransportControls = compactShowTransportControls,
             onArtworkSlotPositioned = onArtworkSlotPositioned,
         )
@@ -690,7 +694,7 @@ fun NewMiniPlayerContent(
     val canSkipNext by playerConnection.canSkipNext.collectAsStateWithLifecycle()
 
     Box(modifier = Modifier.fillMaxSize()) {
-        if (compactFraction < 0.95f) {
+        if (safeCompactFraction < 0.95f) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier =
@@ -698,8 +702,8 @@ fun NewMiniPlayerContent(
                         .fillMaxSize()
                         .padding(start = 12.dp, end = 6.dp, top = 8.dp, bottom = 8.dp)
                         .graphicsLayer {
-                            alpha = 1f - compactFraction
-                            val scale = 1f - 0.10f * compactFraction
+                            alpha = (1f - safeCompactFraction).coerceIn(0f, 1f)
+                            val scale = 1f - 0.10f * safeCompactFraction
                             scaleX = scale
                             scaleY = scale
                         },
@@ -729,7 +733,7 @@ fun NewMiniPlayerContent(
             }
         }
 
-        if (compactFraction > 0.05f) {
+        if (safeCompactFraction > 0.05f) {
             CompactMiniPlayerContent(
                 positionProvider = positionProvider,
                 durationProvider = durationProvider,
@@ -740,8 +744,8 @@ fun NewMiniPlayerContent(
                     Modifier
                         .fillMaxSize()
                         .graphicsLayer {
-                            alpha = compactFraction
-                            val scale = 0.92f + 0.08f * compactFraction
+                            alpha = safeCompactFraction.coerceIn(0f, 1f)
+                            val scale = 0.92f + 0.08f * safeCompactFraction
                             scaleX = scale
                             scaleY = scale
                         },

@@ -1439,7 +1439,7 @@ private fun SelectableMiniPalette(
     )
 
     Surface(
-        modifier = modifier.scale(scale),
+        modifier = modifier.scale(scale.coerceAtLeast(0.01f)),
         shape = RoundedCornerShape(16.dp),
         color =
             if (isSelected) {
@@ -1530,7 +1530,7 @@ private fun CarouselDotsIndicator(
                 Box(
                     modifier =
                         Modifier
-                            .size(dotSize)
+                            .size(dotSize.coerceAtLeast(0.dp))
                             .clip(CircleShape)
                             .background(
                                 if (isSelected) {

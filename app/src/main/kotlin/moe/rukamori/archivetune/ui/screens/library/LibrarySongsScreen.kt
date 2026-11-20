@@ -196,7 +196,7 @@ fun LibrarySongsScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 // Dropdown sort trigger
-                var showSortMenu by remember { mutableStateOf(false) }
+                val sortMenuToggle = moe.rukamori.archivetune.ui.component.rememberDropdownMenuToggle()
                 // Issue 4 fix: A-Z label shows ascending direction arrow
                 val currentSortLabel =
                     when (sortType) {
@@ -229,7 +229,7 @@ fun LibrarySongsScreen(
                             Modifier
                                 .clip(CircleShape)
                                 .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                                .clickable { showSortMenu = true }
+                                .clickable(onClick = sortMenuToggle::toggle)
                                 .padding(horizontal = 14.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
@@ -248,8 +248,8 @@ fun LibrarySongsScreen(
                     }
 
                     DropdownMenu(
-                        expanded = showSortMenu,
-                        onDismissRequest = { showSortMenu = false },
+                        expanded = sortMenuToggle.expanded,
+                        onDismissRequest = sortMenuToggle::onDismissRequest,
                     ) {
                         // [FIX-ZCODE] Wave 8 (owner request): sub-filters live inside the
                         // sort dropdown; menu stays open so filter and sort combine in one tap-flow.
@@ -299,7 +299,7 @@ fun LibrarySongsScreen(
                                     onSortTypeChange(type)
                                     // A-Z sort should default to ascending
                                     if (type == SongSortType.NAME) onSortDescendingChange(false)
-                                    showSortMenu = false
+                                    sortMenuToggle.closeFromItemSelection()
                                 },
                             )
                         }

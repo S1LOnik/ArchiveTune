@@ -113,12 +113,12 @@ fun BottomSheet(
                     translationY = y + takeOver * (1f - state.progress.coerceIn(0f, 1f))
 
                     if (predictiveBackStyle) {
-                        val p = predictiveBack.progress.value
+                        val p = predictiveBack.progress.value.coerceIn(0f, 1f)
                         if (p > 0f) {
                             val scale = 1f - 0.08f * p
                             scaleX = scale
                             scaleY = scale
-                            alpha = 1f - 0.25f * p
+                            alpha = (1f - 0.25f * p).coerceIn(0f, 1f)
                         }
                     }
                 }.bottomSheetDraggable(state, onDismiss)
@@ -230,7 +230,7 @@ fun BottomSheet(
                                 Modifier
                             },
                         ).fillMaxWidth()
-                        .height(state.collapsedBound),
+                        .height(state.collapsedBound.coerceAtLeast(0.dp)),
                 content = collapsedContent,
             )
         }
@@ -246,8 +246,11 @@ private class PlayerSheetDynamicShape(
         layoutDirection: androidx.compose.ui.unit.LayoutDirection,
         density: Density,
     ): Outline {
-        val progress = progressProvider()
-        val cornerPx = with(density) { androidx.compose.ui.unit.lerp(baseCornerDp, 0.dp, progress).toPx() }
+        val progress = progressProvider().coerceIn(0f, 1f)
+        val cornerPx =
+            with(density) {
+                androidx.compose.ui.unit.lerp(baseCornerDp, 0.dp, progress).coerceAtLeast(0.dp).toPx().coerceAtLeast(0f)
+            }
         return Outline.Rounded(
             androidx.compose.ui.geometry.RoundRect(
                 left = 0f,

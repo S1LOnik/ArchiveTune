@@ -851,7 +851,7 @@ fun PlayerPlaybackControls(
                                 playerConnection.player.togglePlayPause()
                             }
                         },
-                        shape = RoundedCornerShape(cinematicPlayPauseCorner),
+                        shape = RoundedCornerShape(cinematicPlayPauseCorner.coerceAtLeast(0.dp)),
                         color = textButtonColor,
                         modifier =
                             Modifier
@@ -1017,7 +1017,7 @@ fun PlayerPlaybackControls(
                     modifier =
                         Modifier
                             .size(72.dp)
-                            .clip(RoundedCornerShape(playPauseRoundness))
+                            .clip(RoundedCornerShape(playPauseRoundness.coerceAtLeast(0.dp)))
                             .background(textButtonColor)
                             .clickable {
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)

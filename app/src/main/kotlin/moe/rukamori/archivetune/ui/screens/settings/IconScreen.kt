@@ -436,8 +436,16 @@ private fun AppIconSearchBar(
                                 )
                             }
                         }
+                        val sortMenuToggle =
+                            moe.rukamori.archivetune.ui.component.rememberDropdownMenuToggle()
                         Box {
-                            MaterialIconButton(onClick = onShowSortMenu) {
+                            MaterialIconButton(
+                                onClick = {
+                                    sortMenuToggle.onExternalTriggerClick(isSortMenuExpanded) { nextExpanded ->
+                                        if (nextExpanded) onShowSortMenu() else onDismissSortMenu()
+                                    }
+                                },
+                            ) {
                                 Icon(
                                     painter = painterResource(R.drawable.filter_alt),
                                     contentDescription = null,
@@ -445,13 +453,18 @@ private fun AppIconSearchBar(
                             }
                             DropdownMenu(
                                 expanded = isSortMenuExpanded,
-                                onDismissRequest = onDismissSortMenu,
+                                onDismissRequest = {
+                                    sortMenuToggle.onExternalDismissRequest { onDismissSortMenu() }
+                                },
                                 modifier = Modifier.widthIn(min = 184.dp),
                             ) {
                                 AppIconSortOrder.entries.forEach { order ->
                                     val selectOrder =
-                                        remember(order, onSortOrderChange) {
-                                            { onSortOrderChange(order) }
+                                        remember(order, onSortOrderChange, onDismissSortMenu, sortMenuToggle) {
+                                            {
+                                                sortMenuToggle.onExternalItemSelection { onDismissSortMenu() }
+                                                onSortOrderChange(order)
+                                            }
                                         }
                                     DropdownMenuItem(
                                         text = {

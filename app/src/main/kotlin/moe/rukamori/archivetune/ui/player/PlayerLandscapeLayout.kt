@@ -137,6 +137,22 @@ fun PlayerLandscapeLayout(
     val coroutineScope = rememberCoroutineScope()
 
     var rightPane by rememberSaveable { mutableStateOf(LandscapeRightPane.QUEUE) }
+    val rootOverlayActive = LocalRootOverlayActive.current
+
+    androidx.activity.compose.BackHandler(
+        enabled =
+            state.isExpandedOrExpanding &&
+                rightPane == LandscapeRightPane.LYRICS &&
+                !rootOverlayActive,
+    ) {
+        rightPane = LandscapeRightPane.QUEUE
+    }
+
+    LaunchedEffect(state.isExpandedOrExpanding) {
+        if (!state.isExpandedOrExpanding && rightPane != LandscapeRightPane.QUEUE) {
+            rightPane = LandscapeRightPane.QUEUE
+        }
+    }
 
     val useDarkBackdrop =
         useBlackBackground ||

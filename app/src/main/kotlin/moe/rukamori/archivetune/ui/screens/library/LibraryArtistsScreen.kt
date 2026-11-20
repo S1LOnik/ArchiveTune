@@ -349,7 +349,7 @@ fun LibraryArtistsScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    var showSortMenu by remember { mutableStateOf(false) }
+                    val sortMenuToggle = moe.rukamori.archivetune.ui.component.rememberDropdownMenuToggle()
                     val currentSortLabel =
                         when (sortType) {
                             ArtistSortType.CREATE_DATE -> {
@@ -397,7 +397,7 @@ fun LibraryArtistsScreen(
                                     Modifier
                                         .clip(CircleShape)
                                         .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                                        .clickable { showSortMenu = true }
+                                        .clickable(onClick = sortMenuToggle::toggle)
                                         .padding(horizontal = 14.dp, vertical = 8.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
@@ -416,8 +416,8 @@ fun LibraryArtistsScreen(
                             }
 
                             DropdownMenu(
-                                expanded = showSortMenu,
-                                onDismissRequest = { showSortMenu = false },
+                                expanded = sortMenuToggle.expanded,
+                                onDismissRequest = sortMenuToggle::onDismissRequest,
                             ) {
                                 ArtistSortType.entries.forEach { type ->
                                     val label =
@@ -432,7 +432,7 @@ fun LibraryArtistsScreen(
                                         onClick = {
                                             onSortTypeChange(type)
                                             if (type == ArtistSortType.NAME) onSortDescendingChange(false)
-                                            showSortMenu = false
+                                            sortMenuToggle.closeFromItemSelection()
                                         },
                                     )
                                 }

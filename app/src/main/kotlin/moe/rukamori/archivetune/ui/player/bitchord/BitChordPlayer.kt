@@ -465,7 +465,13 @@ fun BitChordPlayerContent(
         mutableIntStateOf(0)
     }
 
-    BackHandler(enabled = lyricsOpen || queueOpen) {
+    val rootOverlayActive = moe.rukamori.archivetune.ui.player.LocalRootOverlayActive.current
+    BackHandler(
+        enabled =
+            state.isExpandedOrExpanding &&
+                (lyricsOpen || queueOpen) &&
+                !rootOverlayActive,
+    ) {
         if (queueOpen) {
             queueOpen = false
         } else {
@@ -489,9 +495,11 @@ fun BitChordPlayerContent(
     }
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
         val view = LocalView.current
-        DisposableEffect(view, lyricsOpen, queueOpen) {
+        val shouldInterceptOverlayBack =
+            state.isExpandedOrExpanding && (lyricsOpen || queueOpen) && !rootOverlayActive
+        DisposableEffect(view, shouldInterceptOverlayBack) {
             val callback =
-                if (lyricsOpen || queueOpen) {
+                if (shouldInterceptOverlayBack) {
                     OverlayBack.register(view) {
                         if (queueOpen) {
                             queueOpen = false

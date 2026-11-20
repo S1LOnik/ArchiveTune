@@ -396,9 +396,9 @@ fun DiscordSettings(navController: NavController) {
                     }
                 },
                 actions = {
-                    var threeDotMenuExpanded by remember { mutableStateOf(false) }
+                    val threeDotMenuToggle = moe.rukamori.archivetune.ui.component.rememberDropdownMenuToggle()
 
-                    IconButton(onClick = { threeDotMenuExpanded = true }) {
+                    IconButton(onClick = threeDotMenuToggle::toggle) {
                         Icon(
                             painter = painterResource(R.drawable.more_vert),
                             contentDescription = null,
@@ -406,13 +406,13 @@ fun DiscordSettings(navController: NavController) {
                     }
 
                     DropdownMenu(
-                        expanded = threeDotMenuExpanded,
-                        onDismissRequest = { threeDotMenuExpanded = false },
+                        expanded = threeDotMenuToggle.expanded,
+                        onDismissRequest = threeDotMenuToggle::onDismissRequest,
                     ) {
                         DropdownMenuItem(
                             text = { Text(stringResource(R.string.experiment_settings)) },
                             onClick = {
-                                threeDotMenuExpanded = false
+                                threeDotMenuToggle.closeFromItemSelection()
                                 navController.navigate("settings/discord/experimental")
                             },
                             leadingIcon = {

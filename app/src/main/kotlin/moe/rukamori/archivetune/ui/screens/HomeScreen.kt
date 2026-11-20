@@ -455,7 +455,7 @@ private fun HomeContent(
                         ) {
                             FilterChip(
                                 selected = showHomeCustomizer,
-                                onClick = { showHomeCustomizer = true },
+                                onClick = { showHomeCustomizer = !showHomeCustomizer },
                                 leadingIcon = {
                                     Icon(
                                         painter = painterResource(R.drawable.tune),

@@ -913,7 +913,7 @@ private fun CompactBehaviorPreview(
             NavigationBarCompactBehavior.ADAPTIVE -> Unit
         }
     }
-    val compactFraction by animateFloatAsState(
+    val animatedCompactFraction by animateFloatAsState(
         targetValue = when (behavior) {
             NavigationBarCompactBehavior.ALWAYS_EXPANDED -> 0f
             NavigationBarCompactBehavior.ALWAYS_COMPACT -> 1f
@@ -922,6 +922,7 @@ private fun CompactBehaviorPreview(
         animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = 350f),
         label = "compactBehaviorPreviewFraction",
     )
+    val compactFraction = animatedCompactFraction.coerceIn(0f, 1f)
 
     val primary = MaterialTheme.colorScheme.primary
     val surfaceContainer = MaterialTheme.colorScheme.surfaceContainer
@@ -970,8 +971,8 @@ private fun CompactBehaviorPreview(
                 }
             }
 
-            val miniPlayerHeight = lerp(30.dp, 26.dp, compactFraction)
-            val navSlide = lerp(0.dp, 62.dp, compactFraction)
+            val miniPlayerHeight = lerp(30.dp, 26.dp, compactFraction).coerceAtLeast(0.dp)
+            val navSlide = lerp(0.dp, 62.dp, compactFraction).coerceAtLeast(0.dp)
             Box(
                 modifier =
                     Modifier
@@ -1020,7 +1021,7 @@ private fun CompactBehaviorPreview(
                             modifier =
                                 Modifier
                                     .size(16.dp)
-                                    .alpha(1f - compactFraction * 0.6f),
+                                    .alpha((1f - compactFraction * 0.6f).coerceIn(0f, 1f)),
                         )
                     }
                 }
@@ -1029,7 +1030,7 @@ private fun CompactBehaviorPreview(
                         Modifier
                             .align(Alignment.CenterStart)
                             .offset { IntOffset(x = (-46.dp.toPx() * compactFraction).roundToInt(), y = 0) }
-                            .alpha(compactFraction),
+                            .alpha(compactFraction.coerceIn(0f, 1f)),
                     tint = surfaceContainer,
                     iconTint = onSurfaceVariant,
                 )
@@ -1038,7 +1039,7 @@ private fun CompactBehaviorPreview(
                         Modifier
                             .align(Alignment.CenterEnd)
                             .offset { IntOffset(x = (46.dp.toPx() * compactFraction).roundToInt(), y = 0) }
-                            .alpha(compactFraction),
+                            .alpha(compactFraction.coerceIn(0f, 1f)),
                     tint = surfaceContainer,
                     iconTint = onSurfaceVariant,
                 )
@@ -1052,7 +1053,7 @@ private fun CompactBehaviorPreview(
                         .fillMaxWidth(0.8f)
                         .height(44.dp)
                         .offset { IntOffset(x = 0, y = (navSlide.toPx()).roundToInt()) }
-                        .graphicsLayer { alpha = 1f - compactFraction * 0.95f },
+                        .graphicsLayer { alpha = (1f - compactFraction * 0.95f).coerceIn(0f, 1f) },
                 shape = RoundedCornerShape(24.dp),
                 color = surfaceContainer.copy(alpha = 0.96f),
                 shadowElevation = 6.dp,

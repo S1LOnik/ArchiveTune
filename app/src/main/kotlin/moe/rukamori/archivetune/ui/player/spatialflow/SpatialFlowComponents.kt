@@ -350,9 +350,10 @@ internal fun PillChip(
                 .background(backgroundColor)
                 .drawBehind {
                     if (progress != null && progress > 0f) {
+                        val safeFill = animatedFill.coerceIn(0f, 1f)
                         drawRect(
                             color = progressColor,
-                            size = size.copy(width = size.width * animatedFill),
+                            size = size.copy(width = (size.width * safeFill).coerceAtLeast(0f)),
                         )
                     }
                 }.clickable(onClick = onClick),

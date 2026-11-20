@@ -443,7 +443,7 @@ fun LibraryPlaylistsScreen(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                 // Left: Sort dropdown
-                var showSortMenu by remember { mutableStateOf(false) }
+                val sortMenuToggle = moe.rukamori.archivetune.ui.component.rememberDropdownMenuToggle()
                 val currentSortLabel =
                     when (sortType) {
                         PlaylistSortType.CREATE_DATE -> {
@@ -484,7 +484,7 @@ fun LibraryPlaylistsScreen(
                                 Modifier
                                     .clip(CircleShape)
                                     .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                                    .clickable { showSortMenu = true }
+                                    .clickable(onClick = sortMenuToggle::toggle)
                                     .padding(horizontal = 14.dp, vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
@@ -506,8 +506,8 @@ fun LibraryPlaylistsScreen(
                         }
 
                         DropdownMenu(
-                            expanded = showSortMenu,
-                            onDismissRequest = { showSortMenu = false },
+                            expanded = sortMenuToggle.expanded,
+                            onDismissRequest = sortMenuToggle::onDismissRequest,
                         ) {
                             PlaylistSortType.entries.forEach { type ->
                                 val label =
@@ -525,14 +525,14 @@ fun LibraryPlaylistsScreen(
                                         if (type == PlaylistSortType.NAME) {
                                             onSortDescendingChange(false)
                                         }
-                                        showSortMenu = false
+                                        sortMenuToggle.closeFromItemSelection()
                                     },
                                 )
                             }
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.manage_playlist_visibility)) },
                                 onClick = {
-                                    showSortMenu = false
+                                    sortMenuToggle.closeFromItemSelection()
                                     showVisibilityManager = true
                                 },
                             )
@@ -548,7 +548,7 @@ fun LibraryPlaylistsScreen(
                                 },
                                 onClick = {
                                     showHidden = !showHidden
-                                    showSortMenu = false
+                                    sortMenuToggle.closeFromItemSelection()
                                 },
                                 leadingIcon = {
                                     Icon(
