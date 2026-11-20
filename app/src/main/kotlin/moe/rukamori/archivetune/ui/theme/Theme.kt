@@ -74,6 +74,44 @@ data class ThemeSeedPalette(
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
+fun rememberArchiveTuneColorScheme(
+    darkTheme: Boolean = isSystemInDarkTheme(),
+    pureBlack: Boolean = false,
+    themeColor: Color = DefaultThemeColor,
+    seedPalette: ThemeSeedPalette? = null,
+    contrastLevel: Double = 0.0,
+): ColorScheme {
+    val context = LocalContext.current
+    val useSystemDynamicColor =
+        (seedPalette == null && themeColor == DefaultThemeColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
+    val paletteStyle =
+        remember(themeColor, seedPalette) {
+            paletteStyleFor(seedPalette?.primary ?: themeColor)
+        }
+    val appColorScheme =
+        remember(seedPalette, themeColor, darkTheme, contrastLevel, paletteStyle) {
+            archiveTuneColorScheme(
+                darkTheme = darkTheme,
+                pureBlack = false,
+                themeColor = themeColor,
+                seedPalette = seedPalette,
+                contrastLevel = contrastLevel,
+                paletteStyle = paletteStyle,
+            )
+        }
+    val baseColorScheme =
+        if (useSystemDynamicColor) {
+            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+        } else {
+            appColorScheme
+        }
+    return remember(baseColorScheme, pureBlack, darkTheme) {
+        if (darkTheme && pureBlack) baseColorScheme.pureBlack(true) else baseColorScheme
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
 fun ArchiveTuneTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     pureBlack: Boolean = false,
@@ -85,8 +123,6 @@ fun ArchiveTuneTheme(
     content: @Composable () -> Unit,
 ) {
     val context = LocalContext.current
-    val useSystemDynamicColor =
-        (seedPalette == null && themeColor == DefaultThemeColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
 
     val customFontFamily =
         produceState<FontFamily?>(
@@ -122,33 +158,13 @@ fun ArchiveTuneTheme(
         remember(disableAnimations) {
             if (disableAnimations) DisabledMotionScheme else MotionScheme.expressive()
         }
-    val paletteStyle =
-        remember(themeColor, seedPalette) {
-            paletteStyleFor(seedPalette?.primary ?: themeColor)
-        }
-
-    val appColorScheme =
-        remember(seedPalette, themeColor, darkTheme, paletteStyle) {
-            archiveTuneColorScheme(
-                darkTheme = darkTheme,
-                pureBlack = false,
-                themeColor = themeColor,
-                seedPalette = seedPalette,
-                paletteStyle = paletteStyle,
-            )
-        }
-
-    val baseColorScheme =
-        if (useSystemDynamicColor) {
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        } else {
-            appColorScheme
-        }
-
     val colorScheme =
-        remember(baseColorScheme, pureBlack, darkTheme) {
-            if (darkTheme && pureBlack) baseColorScheme.pureBlack(true) else baseColorScheme
-        }
+        rememberArchiveTuneColorScheme(
+            darkTheme = darkTheme,
+            pureBlack = pureBlack,
+            themeColor = themeColor,
+            seedPalette = seedPalette,
+        )
 
     val animatedColorScheme =
         if (disableAnimations) {

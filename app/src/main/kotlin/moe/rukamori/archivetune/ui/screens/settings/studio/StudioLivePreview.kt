@@ -26,6 +26,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -109,7 +110,7 @@ import moe.rukamori.archivetune.ui.player.StyledPlaybackSlider
 import moe.rukamori.archivetune.ui.screens.Screens
 import moe.rukamori.archivetune.ui.screens.settings.DarkMode
 import moe.rukamori.archivetune.ui.theme.LocalArchiveTuneThemeColor
-import moe.rukamori.archivetune.ui.theme.archiveTuneColorScheme
+import moe.rukamori.archivetune.ui.theme.rememberArchiveTuneColorScheme
 import moe.rukamori.archivetune.ui.theme.resolveCustomThemeSelection
 import kotlin.math.roundToInt
 
@@ -154,11 +155,12 @@ fun StudioInteractivePreview(
     }
 
     val stageIndex = stage.ordinal
+    val systemIsDark = isSystemInDarkTheme()
     val bgIsDark =
         when (snapshot.color.darkMode) {
             DarkMode.ON -> true
             DarkMode.OFF -> false
-            DarkMode.AUTO -> MaterialTheme.colorScheme.surface.luminanceCompat() < 0.45f
+            DarkMode.AUTO -> systemIsDark
         }
     val currentAppThemeColor = LocalArchiveTuneThemeColor.current
     val (customColor, customSeedPalette) =
@@ -168,14 +170,12 @@ fun StudioInteractivePreview(
     val effectiveThemeColor = if (snapshot.color.dynamicTheme) currentAppThemeColor else customColor
     val effectiveSeedPalette = if (snapshot.color.dynamicTheme) null else customSeedPalette
     val previewColorScheme =
-        remember(bgIsDark, snapshot.color.pureBlack, effectiveThemeColor, effectiveSeedPalette) {
-            archiveTuneColorScheme(
-                darkTheme = bgIsDark,
-                pureBlack = snapshot.color.pureBlack,
-                themeColor = effectiveThemeColor,
-                seedPalette = effectiveSeedPalette,
-            )
-        }
+        rememberArchiveTuneColorScheme(
+            darkTheme = bgIsDark,
+            pureBlack = snapshot.color.pureBlack,
+            themeColor = effectiveThemeColor,
+            seedPalette = effectiveSeedPalette,
+        )
 
     Surface(
         modifier = modifier.fillMaxWidth(),

@@ -185,11 +185,10 @@ fun AppearanceStudioScreen(
             )
         }
     var draft by rememberSaveable(stateSaver = snapshotSaver) { mutableStateOf(savedSnapshot) }
-    var draftInitialized by rememberSaveable { mutableStateOf(false) }
-    LaunchedEffect(savedSnapshot) {
-        if (!draftInitialized) {
+    var hasUserEditedDraft by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(savedSnapshot, hasUserEditedDraft) {
+        if (!hasUserEditedDraft) {
             draft = savedSnapshot
-            draftInitialized = true
         }
     }
     var draftProfileId by rememberSaveable { mutableStateOf<String?>(activeProfileId.ifBlank { null }) }
@@ -198,6 +197,14 @@ fun AppearanceStudioScreen(
     val updateDraft: (AppearanceProfileSnapshot) -> Unit = { next ->
         draft = next
         draftProfileId = null
+        hasUserEditedDraft = true
+        savedToLibraryNotice = false
+    }
+
+    val discardDraft: () -> Unit = {
+        draft = savedSnapshot
+        draftProfileId = activeProfileId.ifBlank { null }
+        hasUserEditedDraft = false
         savedToLibraryNotice = false
     }
 
@@ -235,6 +242,7 @@ fun AppearanceStudioScreen(
                 mutable[ActiveAppearanceProfileIdKey] = targetProfileId
             }
             draft = target
+            hasUserEditedDraft = false
             savedToLibraryNotice = false
             snackbarHostState.showSnackbar(context.getString(R.string.studio_applied))
         }
@@ -315,6 +323,7 @@ fun AppearanceStudioScreen(
                                 target.writeToPreferences(mutable)
                                 mutable[ActiveAppearanceProfileIdKey] = targetProfileId
                             }
+                            hasUserEditedDraft = false
                             navController.navigateUp()
                         }
                     },
@@ -326,9 +335,7 @@ fun AppearanceStudioScreen(
                 TextButton(
                     onClick = {
                         showUnsavedDialog = false
-                        draft = savedSnapshot
-                        draftProfileId = activeProfileId.ifBlank { null }
-                        savedToLibraryNotice = false
+                        discardDraft()
                         navController.navigateUp()
                     },
                 ) {
@@ -617,9 +624,7 @@ fun AppearanceStudioScreen(
                     TextButton(
                         onClick = {
                             haptic(ArchiveTuneHapticKind.SELECTION)
-                            draft = savedSnapshot
-                            draftProfileId = activeProfileId.ifBlank { null }
-                            savedToLibraryNotice = false
+                            discardDraft()
                         },
                     ) {
                         Text(stringResource(R.string.studio_discard))
@@ -837,6 +842,7 @@ fun AppearanceStudioScreen(
                                             haptic(ArchiveTuneHapticKind.SELECTION)
                                             draft = profile.snapshot.normalized()
                                             draftProfileId = profile.id
+                                            hasUserEditedDraft = true
                                             savedToLibraryNotice = false
                                         },
                                     ) {
@@ -1697,9 +1703,7 @@ fun AppearanceStudioScreen(
                         OutlinedButton(
                             onClick = {
                                 haptic(ArchiveTuneHapticKind.SELECTION)
-                                draft = savedSnapshot
-                                draftProfileId = activeProfileId.ifBlank { null }
-                                savedToLibraryNotice = false
+                                discardDraft()
                             },
                             shapes = ButtonDefaults.shapes(),
                             modifier = Modifier.weight(1f),
