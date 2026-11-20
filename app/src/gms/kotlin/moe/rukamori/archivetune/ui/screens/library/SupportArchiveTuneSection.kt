@@ -156,7 +156,7 @@ private fun SupportArchiveTuneCard(
                 Text(
                     text = description,
                     style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 3,
+                    maxLines = 4,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
@@ -165,19 +165,41 @@ private fun SupportArchiveTuneCard(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier.size(64.dp),
             ) {
-                if (state is SupportArchiveTuneScreenState.Loading) {
-                    CircularProgressIndicator(
-                        color = contentColor,
-                        strokeWidth = 3.dp,
-                        modifier = Modifier.size(28.dp),
-                    )
-                } else {
-                    Icon(
-                        painter = painterResource(R.drawable.play),
-                        contentDescription = null,
-                        tint = contentColor,
-                        modifier = Modifier.size(32.dp),
-                    )
+                when (state) {
+                    is SupportArchiveTuneScreenState.Loading -> {
+                        CircularProgressIndicator(
+                            color = contentColor,
+                            strokeWidth = 3.dp,
+                            modifier = Modifier.size(28.dp),
+                        )
+                    }
+
+                    is SupportArchiveTuneScreenState.Empty -> {
+                        Icon(
+                            painter = painterResource(R.drawable.info),
+                            contentDescription = null,
+                            tint = contentColor.copy(alpha = 0.7f),
+                            modifier = Modifier.size(28.dp),
+                        )
+                    }
+
+                    is SupportArchiveTuneScreenState.Error -> {
+                        Icon(
+                            painter = painterResource(R.drawable.replay),
+                            contentDescription = null,
+                            tint = contentColor,
+                            modifier = Modifier.size(28.dp),
+                        )
+                    }
+
+                    is SupportArchiveTuneScreenState.Success -> {
+                        Icon(
+                            painter = painterResource(R.drawable.play),
+                            contentDescription = null,
+                            tint = contentColor,
+                            modifier = Modifier.size(32.dp),
+                        )
+                    }
                 }
             }
         }

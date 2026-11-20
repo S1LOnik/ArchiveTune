@@ -935,4 +935,14 @@
     <string name="lyrics_character_focus_desc">Сбалансированный акцент на текущей строке</string>
     <string name="lyrics_character_stage_desc">Крупный сценический масштаб, глубокое затухание и размытие</string>
     <string name="lyrics_jump_to_current_line">К текущей строке</string>
+
+    <string name="playlists_selected_count">Выбрано: %1$d</string>
+    <string name="playlists_hidden_count">Скрыто плейлистов: %1$d</string>
+    <string name="playlists_shown_count">Показано плейлистов: %1$d</string>
+    <string name="playlist_search_placeholder">Поиск плейлистов</string>
+    <string name="add_to_ai_filter">Добавить в ИИ-фильтр</string>
+    <string name="remove_from_ai_filter">Убрать из ИИ-фильтра</string>
+    <string name="manage_ai_filter_list">Открыть список ИИ-фильтра</string>
+    <string name="ai_filter_artist_added">Добавлен в ИИ-фильтр</string>
+    <string name="ai_filter_artist_removed">Убран из ИИ-фильтра</string>
 </resources>

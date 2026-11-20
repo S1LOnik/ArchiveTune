@@ -10,8 +10,10 @@ package moe.rukamori.archivetune.ui.screens.library
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -27,6 +29,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
@@ -49,6 +52,7 @@ import androidx.compose.ui.unit.dp
 import moe.rukamori.archivetune.R
 import moe.rukamori.archivetune.ui.component.ItemThumbnail
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun LibraryMediaListCard(
     title: String,
@@ -60,6 +64,9 @@ fun LibraryMediaListCard(
     onPlay: (() -> Unit)?,
     onMenuClick: (() -> Unit)?,
     modifier: Modifier = Modifier,
+    onLongClick: (() -> Unit)? = null,
+    isSelected: Boolean = false,
+    selectionMode: Boolean = false,
     contentAlpha: Float = 1f,
     metadataTrailingContent: (@Composable RowScope.() -> Unit)? = null,
     additionalAction: (@Composable RowScope.() -> Unit)? = null,
@@ -67,10 +74,14 @@ fun LibraryMediaListCard(
     trailingContent: (@Composable () -> Unit)? = null,
 ) {
     val cardBackgroundColor =
-        rememberArtworkCardColor(
-            thumbnailUrl = thumbnailUrl,
-            fallbackColor = MaterialTheme.colorScheme.surfaceContainerLow,
-        )
+        if (isSelected) {
+            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)
+        } else {
+            rememberArtworkCardColor(
+                thumbnailUrl = thumbnailUrl,
+                fallbackColor = MaterialTheme.colorScheme.surfaceContainerLow,
+            )
+        }
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val scale by
@@ -79,6 +90,7 @@ fun LibraryMediaListCard(
             animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
             label = "LibraryMediaListCardScale",
         )
+    val cardShape = RoundedCornerShape(32.dp)
 
     Row(
         modifier =
@@ -88,12 +100,19 @@ fun LibraryMediaListCard(
                     scaleX = scale
                     scaleY = scale
                     alpha = contentAlpha
-                }.clip(RoundedCornerShape(32.dp))
-                .background(cardBackgroundColor)
-                .clickable(
+                }.clip(cardShape)
+                .then(
+                    if (isSelected) {
+                        Modifier.border(2.dp, MaterialTheme.colorScheme.primary, cardShape)
+                    } else {
+                        Modifier
+                    },
+                ).background(cardBackgroundColor)
+                .combinedClickable(
                     interactionSource = interactionSource,
                     indication = null,
                     onClick = onClick,
+                    onLongClick = onLongClick,
                 ).padding(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -161,6 +180,11 @@ fun LibraryMediaListCard(
 
         if (trailingContent != null) {
             trailingContent()
+        } else if (selectionMode) {
+            Checkbox(
+                checked = isSelected,
+                onCheckedChange = null,
+            )
         } else {
             if (onPlay != null) {
                 IconButton(

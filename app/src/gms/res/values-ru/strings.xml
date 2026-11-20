@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="support_archivetune_title">Поддержать ArchiveTune ❤️</string>
+    <string name="support_archivetune_description">Нравится приложение? Нажмите, чтобы посмотреть короткую рекламу и поддержать разработку.</string>
+    <string name="support_archivetune_preparing">Открываем страницу поддержки…</string>
+    <string name="support_archivetune_unavailable">Реклама поддержки сейчас недоступна в этом регионе или без сети.</string>
+    <string name="support_archivetune_retry">Не удалось открыть страницу поддержки. Нажмите, чтобы попробовать снова.</string>
+    <string name="support_archivetune_failed">Не удалось открыть страницу поддержки.</string>
+</resources>

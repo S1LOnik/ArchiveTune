@@ -53,8 +53,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedListItem
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -94,10 +96,16 @@ import androidx.navigation.NavController
 import coil3.compose.AsyncImage
 import com.valentinilk.shimmer.shimmer
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.launch
 import moe.rukamori.archivetune.LocalDatabase
 import moe.rukamori.archivetune.LocalPlayerAwareWindowInsets
 import moe.rukamori.archivetune.LocalPlayerConnection
 import moe.rukamori.archivetune.R
+import moe.rukamori.archivetune.aicontentfilter.DefaultAiMusicAuthors
+import moe.rukamori.archivetune.aicontentfilter.isArtistInAiFilter
+import moe.rukamori.archivetune.aicontentfilter.toggleArtistInAiFilter
+import moe.rukamori.archivetune.constants.AiContentFilterEnabledKey
+import moe.rukamori.archivetune.constants.AiMusicAuthorsKey
 import moe.rukamori.archivetune.constants.AppBarHeight
 import moe.rukamori.archivetune.constants.CONTENT_TYPE_ALBUM
 import moe.rukamori.archivetune.constants.CONTENT_TYPE_ARTIST
@@ -173,6 +181,8 @@ fun ArtistScreen(
     val loadedLibraryAlbums by viewModel.libraryAlbums.collectAsStateWithLifecycle()
     val blockState by viewModel.blockState.collectAsStateWithLifecycle()
     val hideExplicit by rememberPreference(key = HideExplicitKey, defaultValue = false)
+    val (aiAuthors, setAiAuthors) = rememberPreference(key = AiMusicAuthorsKey, defaultValue = DefaultAiMusicAuthors)
+    val (aiFilterEnabled, setAiFilterEnabled) = rememberPreference(key = AiContentFilterEnabledKey, defaultValue = false)
     val isArtistBlocked = (blockState as? ArtistBlockState.Success)?.isBlocked == true
     val artistPage =
         remember(loadedArtistPage, isArtistBlocked) {
@@ -276,6 +286,22 @@ fun ArtistScreen(
                 listOf(topSongsSection) + sections.filterNot { it === topSongsSection }
             }
         }
+    val currentArtistName = artistPage?.artist?.title ?: libraryArtist?.artist?.name
+    val currentChannelId = artistPage?.artist?.channelId ?: libraryArtist?.artist?.channelId
+    val isInAiFilter =
+        remember(aiAuthors, currentArtistName, viewModel.artistId, currentChannelId) {
+            isArtistInAiFilter(
+                authors = aiAuthors,
+                artistName = currentArtistName,
+                artistId = viewModel.artistId,
+                channelId = currentChannelId,
+            )
+        }
+    val canFilterAi =
+        !currentArtistName.isNullOrBlank() ||
+            !currentChannelId.isNullOrBlank() ||
+            viewModel.artistId.startsWith("UC") ||
+            viewModel.artistId.startsWith("MPRE")
     val showArtistOverflowMenu: () -> Unit = {
         menuState.show {
             ArtistOverflowMenu(
@@ -295,9 +321,51 @@ fun ArtistScreen(
                                     .orEmpty()
                                     .isNotBlank()
                         ),
+                canFilterAi = canFilterAi,
+                isInAiFilter = isInAiFilter,
                 onAction = { action ->
                     viewModel.onAction(action)
                     menuState.dismiss()
+                },
+                onToggleAiFilter = {
+                    menuState.dismiss()
+                    val result =
+                        toggleArtistInAiFilter(
+                            authors = aiAuthors,
+                            artistName = currentArtistName,
+                            artistId = viewModel.artistId,
+                            channelId = currentChannelId,
+                        )
+                    if (result.entry != null) {
+                        setAiAuthors(result.updatedAuthors)
+                        val autoEnabled = result.added && !aiFilterEnabled
+                        if (autoEnabled) {
+                            setAiFilterEnabled(true)
+                        }
+                        val message =
+                            context.getString(
+                                if (result.added) R.string.ai_filter_artist_added else R.string.ai_filter_artist_removed,
+                            )
+                        val undoLabel = context.getString(R.string.undo)
+                        coroutineScope.launch {
+                            val snackbarResult =
+                                snackbarHostState.showSnackbar(
+                                    message = message,
+                                    actionLabel = undoLabel,
+                                    duration = SnackbarDuration.Long,
+                                )
+                            if (snackbarResult == SnackbarResult.ActionPerformed) {
+                                setAiAuthors(result.previousAuthors)
+                                if (autoEnabled) {
+                                    setAiFilterEnabled(false)
+                                }
+                            }
+                        }
+                    }
+                },
+                onOpenAiFilterSettings = {
+                    menuState.dismiss()
+                    navController.navigate("settings/content?scrollTo=ai_music_authors")
                 },
             )
         }
@@ -1072,14 +1140,71 @@ fun ArtistScreen(
     )
 }
 
+private data class ArtistOverflowMenuAction(
+    val text: String,
+    val iconRes: Int,
+    val enabled: Boolean = true,
+    val onClick: () -> Unit,
+)
+
 @Composable
 private fun ArtistOverflowMenu(
     canShare: Boolean,
     isBlocked: Boolean,
     blockActionEnabled: Boolean,
+    canFilterAi: Boolean,
+    isInAiFilter: Boolean,
     onAction: (ArtistAction) -> Unit,
+    onToggleAiFilter: () -> Unit,
+    onOpenAiFilterSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val actions =
+        buildList {
+            if (canShare) {
+                add(
+                    ArtistOverflowMenuAction(
+                        text = stringResource(R.string.share),
+                        iconRes = R.drawable.share,
+                        onClick = { onAction(ArtistAction.Share) },
+                    ),
+                )
+                add(
+                    ArtistOverflowMenuAction(
+                        text = stringResource(R.string.copy_link),
+                        iconRes = R.drawable.copy,
+                        onClick = { onAction(ArtistAction.CopyLink) },
+                    ),
+                )
+            }
+            add(
+                ArtistOverflowMenuAction(
+                    text = stringResource(if (isBlocked) R.string.unblock_artist else R.string.block_artist),
+                    iconRes = R.drawable.block,
+                    enabled = blockActionEnabled,
+                    onClick = { onAction(ArtistAction.ToggleBlock) },
+                ),
+            )
+            if (canFilterAi) {
+                add(
+                    ArtistOverflowMenuAction(
+                        text =
+                            stringResource(
+                                if (isInAiFilter) R.string.remove_from_ai_filter else R.string.add_to_ai_filter,
+                            ),
+                        iconRes = R.drawable.auto_awesome,
+                        onClick = onToggleAiFilter,
+                    ),
+                )
+            }
+            add(
+                ArtistOverflowMenuAction(
+                    text = stringResource(R.string.manage_ai_filter_list),
+                    iconRes = R.drawable.tune,
+                    onClick = onOpenAiFilterSettings,
+                ),
+            )
+        }
     Column(
         modifier =
             modifier
@@ -1087,30 +1212,16 @@ private fun ArtistOverflowMenu(
                 .padding(bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        if (canShare) {
+        actions.forEachIndexed { index, item ->
             ArtistOverflowMenuItem(
-                text = stringResource(R.string.share),
-                iconRes = R.drawable.share,
-                index = 0,
-                count = ArtistOverflowMenuItemCount,
-                onClick = { onAction(ArtistAction.Share) },
-            )
-            ArtistOverflowMenuItem(
-                text = stringResource(R.string.copy_link),
-                iconRes = R.drawable.copy,
-                index = 1,
-                count = ArtistOverflowMenuItemCount,
-                onClick = { onAction(ArtistAction.CopyLink) },
+                text = item.text,
+                iconRes = item.iconRes,
+                index = index,
+                count = actions.size,
+                enabled = item.enabled,
+                onClick = item.onClick,
             )
         }
-        ArtistOverflowMenuItem(
-            text = stringResource(if (isBlocked) R.string.unblock_artist else R.string.block_artist),
-            iconRes = R.drawable.block,
-            index = if (canShare) 2 else 0,
-            count = if (canShare) ArtistOverflowMenuItemCount else 1,
-            enabled = blockActionEnabled,
-            onClick = { onAction(ArtistAction.ToggleBlock) },
-        )
     }
 }
 
@@ -1148,7 +1259,6 @@ private fun ArtistOverflowMenuItem(
     }
 }
 
-private const val ArtistOverflowMenuItemCount = 3
 private const val ArtistHeroArtworkSizePx = 1200
 private const val ArtistReleaseArtworkSizePx = 320
 private val ArtistHeroArtworkSizeBuckets = listOf(ArtistHeroArtworkSizePx)

@@ -9,6 +9,7 @@ package moe.rukamori.archivetune.ui.menu
 
 import android.content.Intent
 import android.content.res.Configuration
+import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -24,9 +25,11 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -44,6 +47,11 @@ import kotlinx.coroutines.withContext
 import moe.rukamori.archivetune.LocalDatabase
 import moe.rukamori.archivetune.LocalPlayerConnection
 import moe.rukamori.archivetune.R
+import moe.rukamori.archivetune.aicontentfilter.DefaultAiMusicAuthors
+import moe.rukamori.archivetune.aicontentfilter.isArtistInAiFilter
+import moe.rukamori.archivetune.aicontentfilter.toggleArtistInAiFilter
+import moe.rukamori.archivetune.constants.AiContentFilterEnabledKey
+import moe.rukamori.archivetune.constants.AiMusicAuthorsKey
 import moe.rukamori.archivetune.constants.ArtistSongSortType
 import moe.rukamori.archivetune.constants.SpeedDialSongIdsKey
 import moe.rukamori.archivetune.db.entities.Artist
@@ -77,6 +85,17 @@ fun ArtistMenu(
     val isInSpeedDial =
         remember(speedDialPins, artistPin) {
             speedDialPins.any { it.type == artistPin.type && it.id == artistPin.id }
+        }
+    val (aiAuthors, setAiAuthors) = rememberPreference(AiMusicAuthorsKey, DefaultAiMusicAuthors)
+    val (aiFilterEnabled, setAiFilterEnabled) = rememberPreference(AiContentFilterEnabledKey, false)
+    val isInAiFilter =
+        remember(aiAuthors, artist.artist.name, artist.id, artist.artist.channelId) {
+            isArtistInAiFilter(
+                authors = aiAuthors,
+                artistName = artist.artist.name,
+                artistId = artist.id,
+                channelId = artist.artist.channelId,
+            )
         }
 
     ArtistListItem(
@@ -281,6 +300,62 @@ fun ArtistMenu(
                             Modifier.clickable {
                                 val updatedPins = toggleSpeedDialPin(speedDialPins, artistPin)
                                 onSpeedDialSongIdsChange(serializeSpeedDialPins(updatedPins))
+                                onDismiss()
+                            },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                    )
+
+                    HorizontalDivider(
+                        modifier = dividerModifier,
+                        color = MaterialTheme.colorScheme.outlineVariant,
+                    )
+
+                    ListItem(
+                        headlineContent = {
+                            Text(
+                                text =
+                                    stringResource(
+                                        if (isInAiFilter) {
+                                            R.string.remove_from_ai_filter
+                                        } else {
+                                            R.string.add_to_ai_filter
+                                        },
+                                    ),
+                            )
+                        },
+                        leadingContent = {
+                            Icon(
+                                painter = painterResource(R.drawable.auto_awesome),
+                                contentDescription = null,
+                                tint =
+                                    if (isInAiFilter) {
+                                        MaterialTheme.colorScheme.primary
+                                    } else {
+                                        LocalContentColor.current
+                                    },
+                            )
+                        },
+                        modifier =
+                            Modifier.clickable {
+                                val result =
+                                    toggleArtistInAiFilter(
+                                        authors = aiAuthors,
+                                        artistName = artist.artist.name,
+                                        artistId = artist.id,
+                                        channelId = artist.artist.channelId,
+                                    )
+                                if (result.entry != null) {
+                                    setAiAuthors(result.updatedAuthors)
+                                    if (result.added && !aiFilterEnabled) {
+                                        setAiFilterEnabled(true)
+                                    }
+                                    Toast
+                                        .makeText(
+                                            context,
+                                            if (result.added) R.string.ai_filter_artist_added else R.string.ai_filter_artist_removed,
+                                            Toast.LENGTH_SHORT,
+                                        ).show()
+                                }
                                 onDismiss()
                             },
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),

@@ -2489,4 +2489,14 @@
     <string name="lyrics_character_focus_desc">Balanced emphasis on the current line</string>
     <string name="lyrics_character_stage_desc">Expressive stage scale, deeper fade &amp; stronger blur</string>
     <string name="lyrics_jump_to_current_line">Jump to current line</string>
+
+    <string name="playlists_selected_count">%1$d selected</string>
+    <string name="playlists_hidden_count">Hidden %1$d playlists</string>
+    <string name="playlists_shown_count">Shown %1$d playlists</string>
+    <string name="playlist_search_placeholder">Search playlists</string>
+    <string name="add_to_ai_filter">Add to AI filter</string>
+    <string name="remove_from_ai_filter">Remove from AI filter</string>
+    <string name="manage_ai_filter_list">Manage AI filter list</string>
+    <string name="ai_filter_artist_added">Added to AI filter</string>
+    <string name="ai_filter_artist_removed">Removed from AI filter</string>
 </resources>
