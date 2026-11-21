@@ -1,3 +1,4 @@
+import com.android.build.api.variant.HostTestBuilder
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import java.util.Properties
 
@@ -507,6 +508,8 @@ dependencies {
     implementation(libs.timber)
     testImplementation(libs.junit)
     testImplementation(libs.turbine)
+    androidTestImplementation(libs.androidx.test.junit)
+    androidTestImplementation(libs.androidx.test.runner)
     implementation(libs.translator)
     implementation("androidx.lifecycle:lifecycle-process:2.11.0")
     implementation("androidx.compose.material3.adaptive:adaptive:1.3.0-rc01")
@@ -517,23 +520,35 @@ dependencies {
     implementation("com.github.RouHim:jaudiotagger:1.4.31")
 }
 
-// Pass -PautoMixNdk=/path/to/ndk to package the Rust spectrum calculator.
-val autoMixNative = providers.gradleProperty("autoMixNdk").orNull?.let { ndkPath ->
-    val minimumApi = requireNotNull(android.defaultConfig.minSdk)
-    tasks.register<BuildAutoMixNativeTask>("buildAutoMixNative") {
-        crateDirectory.set(layout.projectDirectory.dir("native/automix"))
-        ndkDirectory.set(file(ndkPath))
-        rustVersion.set(providers.exec { commandLine("rustc", "--version", "--verbose") }.standardOutput.asText)
-        minApi.set(minimumApi)
-        cargoTargetDirectory.set(layout.buildDirectory.dir("intermediates/automixCargo"))
-        jniLibsDirectory.set(layout.buildDirectory.dir("generated/automixJniLibs"))
-    }
+val autoMixCrate = layout.projectDirectory.dir("native/automix")
+val autoMixRustVersion = providers.exec { commandLine("rustc", "--version", "--verbose") }.standardOutput.asText
+val autoMixNdk = layout.dir(providers.gradleProperty("autoMixNdk").map { file(it) })
+    .orElse(androidComponents.sdkComponents.ndkDirectory)
+val autoMixMinApi = requireNotNull(android.defaultConfig.minSdk)
+
+val autoMixNative = tasks.register<BuildAutoMixNativeTask>("buildAutoMixNative") {
+    crateDirectory.set(autoMixCrate)
+    ndkDirectory.set(autoMixNdk)
+    rustVersion.set(autoMixRustVersion)
+    minApi.set(autoMixMinApi)
+    cargoTargetDirectory.set(layout.buildDirectory.dir("intermediates/automixCargo"))
+    jniLibsDirectory.set(layout.buildDirectory.dir("generated/automixJniLibs"))
+}
+
+val autoMixHost = tasks.register<BuildAutoMixHostTask>("buildAutoMixHost") {
+    crateDirectory.set(autoMixCrate)
+    rustVersion.set(autoMixRustVersion)
+    cargoTargetDirectory.set(layout.buildDirectory.dir("intermediates/automixHostCargo"))
+    libraryFile.set(layout.buildDirectory.file("generated/automixHost/${System.mapLibraryName("archivetune_automix")}"))
 }
 
 androidComponents {
     onVariants(selector().all()) { variant ->
-        autoMixNative?.let { task ->
-            variant.sources.jniLibs?.addGeneratedSourceDirectory(task, BuildAutoMixNativeTask::jniLibsDirectory)
+        variant.sources.jniLibs?.addGeneratedSourceDirectory(autoMixNative, BuildAutoMixNativeTask::jniLibsDirectory)
+        variant.hostTests[HostTestBuilder.UNIT_TEST_TYPE]?.configureTestTask { test ->
+            val library = autoMixHost.flatMap { it.libraryFile }
+            test.inputs.file(library)
+            test.systemProperty("java.library.path", library.get().asFile.parent)
         }
         if (variant.productFlavors.any { (_, flavor) -> flavor == "automotive" }) return@onVariants
         val capitalizedVariantName =
