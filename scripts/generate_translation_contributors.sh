@@ -48,10 +48,27 @@ credits=$(
           else .
           end)
       | to_entries
-      | if length == 0 then "No translation credits found in Git history\n" | halt_error(1) else . end
       | sort_by(.key)
       | map({qualifier: .key, contributors: .value})
     ' -- "${languages[@]}"
 ) || exit 1
+if [[ $credits == '[]' ]]; then
+  if [[ ${1:-} == --allow-committed-snapshot ]] &&
+    git cat-file blob "HEAD:$output" 2>/dev/null | cmp -s - "$output" &&
+    jq -e -s '
+      def nonblank: type == "string" and test("\\S");
+      length == 1 and (.[0] | type == "array" and length > 0 and all(.[];
+        type == "object"
+        and (.qualifier | nonblank)
+        and (.contributors | type == "array" and length > 0 and all(.[]; nonblank))
+      ))
+    ' "$output" >/dev/null; then
+    echo "Using the committed translation credits snapshot"
+    exit 0
+  fi
+  echo "No translation credits found in Git history" >&2
+  exit 1
+fi
+
 printf '%s\n' "$credits" > "$output"
 printf 'Generated translation credits for %s languages\n' "$(jq 'length' <<< "$credits")"

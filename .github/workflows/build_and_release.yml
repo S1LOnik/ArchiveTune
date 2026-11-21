@@ -55,10 +55,7 @@ jobs:
         run: chmod +x gradlew
 
       - name: Generate translation contributor credits
-        run: |
-          if [ -f scripts/generate_translation_contributors.sh ]; then
-            bash scripts/generate_translation_contributors.sh || true
-          fi
+        run: bash scripts/generate_translation_contributors.sh --allow-committed-snapshot
 
       - name: Determine Version & Tag
         id: version_step
