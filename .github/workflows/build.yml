@@ -253,20 +253,6 @@ jobs:
           merge-multiple: true
           path: app/build/outputs/apk/download
 
-      - name: Set up Python 3
-        uses: actions/setup-python@v6
-        with:
-          python-version: '3.x'
-
-      - name: Install Dependencies
-        run: |
-          pip install telethon
-
-      - name: Get Git Commit Info
-        run: |
-          echo "COMMIT_AUTHOR=$(git log -1 --pretty=format:'%an')" >> $GITHUB_ENV
-          echo "COMMIT_MESSAGE=$(git log -1 --pretty=format:'%s')" >> $GITHUB_ENV
-
       - name: Restore Telegram session cache
         uses: actions/cache@v6
         id: telegram_session_cache
@@ -283,7 +269,7 @@ jobs:
           TOPIC_ID: ${{ secrets.TELEGRAM_TOPIC_ID }}
           APK_PATH: app/build/outputs/apk/download/*.apk
         run: |
-          python ./.github/workflows/deploy_artifacts.py
+          cargo run --manifest-path tools/deploy-artifacts/Cargo.toml --release
         continue-on-error: true
 
   build_debug:
