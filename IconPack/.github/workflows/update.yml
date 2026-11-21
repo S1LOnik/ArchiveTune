@@ -37,7 +37,8 @@ jobs:
 
       - name: Update all generated icons
         run: |
-          python3 .github/scripts/process_icon_submission.py \
+          cargo run --manifest-path tools/icon-pack/Cargo.toml --release -- \
+            submission \
             --mode update \
             --random-digits 6
 

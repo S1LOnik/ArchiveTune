@@ -44,7 +44,7 @@ jobs:
       - name: Remove icon pack
         env:
           ICON_NAME: ${{ inputs.name }}
-        run: python3 .github/scripts/remove_icon_pack.py --name "$ICON_NAME"
+        run: cargo run --manifest-path tools/icon-pack/Cargo.toml --release -- remove --name "$ICON_NAME"
 
       - name: Commit removed icon pack
         env:

@@ -69,7 +69,8 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
-          python3 ../trusted/.github/scripts/process_icon_submission.py \
+          cargo run --manifest-path ../trusted/tools/icon-pack/Cargo.toml --release -- \
+            submission \
             --mode pull-request \
             --event-path "$GITHUB_EVENT_PATH" \
             --base-sha "$BASE_SHA" \
@@ -85,7 +86,8 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
-          python3 ../trusted/.github/scripts/icon_preview.py generate \
+          cargo run --manifest-path ../trusted/tools/icon-pack/Cargo.toml --release -- \
+            preview generate \
             --base-sha "$BASE_SHA" \
             --metadata metadata.json \
             --svg-directory svg \
@@ -134,7 +136,8 @@ jobs:
           GENERATED_SHA: ${{ steps.commit-generated.outputs.generated_sha }}
           PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          python3 ../trusted/.github/scripts/icon_preview.py comment \
+          cargo run --manifest-path ../trusted/tools/icon-pack/Cargo.toml --release -- \
+            preview comment \
             --manifest /tmp/icon-preview-manifest.json \
             --repository "$BASE_REPOSITORY" \
             --head-repository "$HEAD_REPOSITORY" \
@@ -172,7 +175,8 @@ jobs:
 
       - name: Reconcile SVG icons
         run: |
-          python3 .github/scripts/process_icon_submission.py \
+          cargo run --manifest-path tools/icon-pack/Cargo.toml --release -- \
+            submission \
             --mode rebuild \
             --random-digits 6
 
