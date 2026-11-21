@@ -145,3 +145,17 @@ Each candidate has a standalone core suitable for delegation and a Kotlin adapte
 | Universal Release APK size | 58,681,368 B | 65,890,328 B | +7,208,960 B (+12.28%) |
 | ARM64 Release APK size | 47,874,006 B | 49,774,550 B | +1,900,544 B (+3.97%) |
 | Universal Debug APK size | 111,650,758 B | 122,102,303 B | +10,451,545 B (+9.36%) |
+
+### Verification after merging to main
+
+GitHub Linguist 9.3.0 measured **1.02394% Rust** (286,486 of 27,978,800 counted bytes) and **0 bytes of Python** at `1c98f74b1`, the commit tagged `v16.5.8`. The commit has 19 tracked `.rs` files and no tracked `.py`, `.pyw`, or `.pyi` files.
+
+At the time of verification, the [GitHub Languages API](https://api.github.com/repos/S1LOnik/ArchiveTune/languages) still returned the same byte counts as the pre-migration commit `158f1bc0c`, including 2,710 Rust bytes and 14,639 Python bytes. GitHub refreshes the displayed counts in a background job after a push to the default branch. [Linguist documentation](https://github.com/github-linguist/linguist/blob/main/docs/how-linguist-works.md#how-linguist-works-on-githubcom)
+
+To measure the checked-out repository against the current default branch, fetch it and run Linguist against that revision.
+
+```sh
+git fetch origin main
+github-linguist --rev origin/main --json
+git ls-tree -r --name-only origin/main -- '*.py' '*.pyw' '*.pyi'
+```
