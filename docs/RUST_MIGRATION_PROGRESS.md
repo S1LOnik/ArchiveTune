@@ -90,7 +90,7 @@ Each candidate has a standalone core suitable for delegation and a Kotlin adapte
 ### Overview and Success Criteria
 - Base commit `68a6519e5a04f49a77d4a19de8cdf70f14c6b6` on `migration/rust-phase-1`.
 - Working branch `migration/rust-phase-2`.
-- **Criterion 1 (Rust share ≥ 1.00%):** Reached **1.0155%** (283,809 bytes of 27,946,814 total programming language bytes) replacing real application and CI tooling logic without artificial filler or library vendoring.
+- **Criterion 1 (Rust share ≥ 1.00%):** Reached **1.0145%** (283,809 bytes of 27,974,335 total Linguist-counted programming language bytes, verified via GitHub Linguist 9.6.0) replacing real application and CI tooling logic without artificial filler or library vendoring.
   - Android application Rust: **125,677 bytes** (44.28%) in `app/native/automix/src/*.rs`.
   - CI utility Rust: **158,132 bytes** (55.72%) in `tools/**/*.rs`.
 - **Criterion 2 (100% Python elimination):** Zero `.py` files tracked in Git (`git ls-files | grep '\.py$'` returns 0). Zero active/operational invocations of `python`, `python3`, `pip`, or `actions/setup-python` in GitHub Actions workflows or scripts.
@@ -114,8 +114,17 @@ Each candidate has a standalone core suitable for delegation and a Kotlin adapte
 | Unit Tests (Cargo - `app/native/automix`) | 36 passed, 0 failed. Locked dependencies, warnings denied. |
 | Unit Tests (Cargo - `tools/*`) | 24 passed across all 5 tool crates (`deploy-artifacts`: 5, `duplicate-checker`: 6, `icon-pack`: 6, `notify-telegram`: 4, `repo-maintainer`: 3). |
 | Formatting & Clippy | `cargo fmt --check` and `cargo clippy --locked --all-targets -- -D warnings` clean across all 6 crates. |
-| JVM Unit Tests (`:app:testGmsMobileUniversalDebugUnitTest`) | 209 passed, 1 failed (`ModifiedSettingsRegistryTest` — known pre-existing baseline assertion). All JNI tests (`AutoMixSpectrumTest`, `AutoMixTempoTest`, `TrackMatchingTest`, `EmbeddedLyricsExtractorTest`, `AutoMixPlannerTest`, `LyricsUtilsTest`) passed. |
-| Packaging & Universal Debug APK | Built `app-gms-mobile-universal-debug.apk` (122,102,303 B). Packaged `libarchivetune_automix.so` for all 4 ABIs (`arm64-v8a`: 2,699,904 B, `armeabi-v7a`: 1,692,408 B, `x86`: 2,598,444 B, `x86_64`: 3,428,560 B). |
+| JVM Unit Tests (`:app:testGmsMobileUniversalDebugUnitTest`) | 209 passed, 1 failed (`ModifiedSettingsRegistryTest > removed player design styles normalize to apple music default` — identical pre-existing baseline assertion from Phase 1, zero regressions). All JNI tests (`AutoMixSpectrumTest`, `AutoMixTempoTest`, `TrackMatchingTest`, `EmbeddedLyricsExtractorTest`, `AutoMixPlannerTest`, `LyricsUtilsTest`) passed. |
+| Workflow Check & actionlint | All 13 `.github/workflows/*.yml` and 3 `IconPack/.github/workflows/*.yml` verified with `actionlint` (clean, 0 errors, 0 warnings). |
+| CI Tool Parity: `duplicate-checker` | Verified identical TF-IDF cosine similarity scores to Phase 1 `scikit-learn` baseline down to $10^{-6}$ numerical precision, score > 0.65 threshold, Unicode, ordering, tie-breaking, and empty vocabulary handling. |
+| CI Tool Parity: `icon-pack` | Verified pack addition, metadata reconciliation, pack removal, error code on non-existent icon (both exit 1), preview manifest generation, and update mode against Phase 1 Python scripts. |
+| CI Tool Parity: `notify-telegram` | Verified payload generation, MarkdownV2 character escaping, thread topic routing, and HTTP mock server responses matching Phase 1 script. |
+| CI Tool Parity: `deploy-artifacts` | Verified APK glob resolution, deduplication, semicolon patterns, ABI extraction, device extraction, caption generation contract, and error code 1 on missing APK files. |
+| Android Instrumentation on Galaxy S21 | `AutoMixSpectrumDeviceTest` passed on Samsung Galaxy S21 (SM-G991B, Android 15, `arm64-v8a`) via Gradle with `.rustphase2verify` application ID suffix protecting existing installations. |
+| On-Device Benchmark on Galaxy S21 (via `app_process` with release `libarchivetune_automix.so`) | - **AutoMixTempo:** regular pulses (120 BPM, interval 500ms, confidence 1.0, phase 0ms), phase shift (120 BPM, phase 150ms), ambiguity (150 BPM). 1000 repetitions: `p50 = 26.038 µs, p95 = 27.038 µs`.<br>- **AutoMixPlanner:** chosen transition points `style=DJ_BLEND, transitionStartMs=188000, transitionEndMs=195742, fadeMs=7742, reason='beat-matched 124.0->125.0 bpm'`. 500 repetitions: `p50 = 27.462 µs, p95 = 55.038 µs`.<br>- **EmbeddedLyricsExtractor:** MP3 (ID3v2 USLT + SYLT), FLAC (Vorbis Comment), M4A (mp4 atom) verified.<br>- **LyricsUtils:** Standard LRC, multi-timestamp LRC, QRC (`hasTrueWordSync=true`), YRC (`hasTrueWordSync=true`) verified.<br>- **TrackMatching:** catalog score (140) and title normalization verified. |
+| Universal Release APK | Built `app-gms-mobile-universal-release.apk` (65,890,328 B, SHA-256: `aff30f691c5626ee954dd1b94baef3a5a8a08ee4ed00407a2a6c80b862222cd4`). Packaged `libarchivetune_automix.so` for all 4 ABIs (`arm64-v8a`, `armeabi-v7a`, `x86`, `x86_64`). All ELF LOAD segments 16 KiB-aligned (`0x4000`), all 18 JNI exports present. |
+| ARM64 Release APK | Built `app-gms-mobile-arm64-release.apk` (49,774,550 B, SHA-256: `2260552b30f9e5ff49c8bef0693bd998c99d4b4d96b434c902cf0126c77bd65e`). Packaged `libarchivetune_automix.so` for `arm64-v8a` only. ELF LOAD segments 16 KiB-aligned (`0x4000`), all 18 JNI exports present. |
+| Universal Debug APK | Built `app-gms-mobile-universal-debug.apk` (122,102,303 B). Packaged `libarchivetune_automix.so` for all 4 ABIs. |
 | Python Elimination Check | 0 `.py` files in git. 0 operational python/pip calls across workflows and codebase. |
 
 ### Codebase Metrics
@@ -128,10 +137,12 @@ Each candidate has a standalone core suitable for delegation and a Kotlin adapte
 | Python LOC | 1,758 | 0 | −1,758 (100% eliminated) |
 | Kotlin share by source bytes | ~80.78% | 80.22% | −0.56 pp |
 | Java share by source bytes | ~18.90% | 18.75% | −0.15 pp |
-| Rust share by source bytes | ~0.0297% | **1.0155%** | **+0.9858 pp (≥ 1.00% target met)** |
+| Rust share by source bytes | ~0.0297% | **1.0145%** | **+0.9848 pp (≥ 1.00% target met)** |
 | Python share by source bytes | ~0.0445% | **0.0000%** | **−0.0445 pp** |
 | Android App Rust bytes | 8,233 B | 125,677 B | +117,444 B (44.28% of Rust) |
 | CI Tools Rust bytes | 0 B | 158,132 B | +158,132 B (55.72% of Rust) |
 | Total Rust bytes | 8,233 B | **283,809 B** | +275,576 B |
-| Universal Debug APK size | 111,650,758 B | 122,102,303 B | +10,451,545 B |
+| Universal Release APK size | 58,681,368 B | 65,890,328 B | +7,208,960 B (+12.28%) |
+| ARM64 Release APK size | 47,874,006 B | 49,774,550 B | +1,900,544 B (+3.97%) |
+| Universal Debug APK size | 111,650,758 B | 122,102,303 B | +10,451,545 B (+9.36%) |
 
