@@ -139,7 +139,7 @@ Always download verified APKs directly from GitHub Releases:
 
 ## 🛠️ Building from Source
 
-To build ArchiveTune Extended locally:
+Install JDK 21, Android SDK 37.2, NDK r30 (`30.0.16248370`) and Rust with the Android targets before building. See the [Rust build instructions](docs/RUST_MIGRATION_PROGRESS.md#build-and-verification).
 
 ```bash
 # Clone the repository
@@ -153,7 +153,7 @@ cd ArchiveTune
 ./gradlew :app:assembleGmsMobileArm64Release
 ```
 
-Compiled APKs will be output to `app/build/outputs/apk/gmsMobile/release/`.
+Gradle writes each APK under `app/build/outputs/apk/<variant>/release/`.
 
 ---
 

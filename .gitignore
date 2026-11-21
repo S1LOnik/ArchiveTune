@@ -119,3 +119,6 @@ core.[0-9]*
 /android_resource_cleaner.py
 # Release signing keystore (restored from CI secrets)
 app/keystore/
+
+# Local Cargo output
+/app/native/automix/target/
