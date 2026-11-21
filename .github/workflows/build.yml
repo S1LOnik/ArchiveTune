@@ -18,22 +18,13 @@ jobs:
         with:
           submodules: true
 
-      - name: Set up Python 3
-        uses: actions/setup-python@v6
-        with:
-          python-version: '3.x'
-
-      - name: Install Dependencies
-        run: |
-          pip install requests
-
       - name: Send a message to Telegram
         env:
           BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           TOPIC_ID: ${{ secrets.TELEGRAM_TOPIC_ID }}
         run: |
-          python ./.github/workflows/notify_telegram.py
+          cargo run --manifest-path tools/notify-telegram/Cargo.toml --release
         continue-on-error: true
 
   build:
