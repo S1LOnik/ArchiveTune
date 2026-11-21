@@ -240,7 +240,7 @@ jobs:
           ABI="${{ matrix.abi }}"
 
           if [ "$ABI" = "armeabi" ] || [ "$ABI" = "x86" ]; then
-            ./gradlew "$GRADLE_TASK" 2>&1 | python3 -c "import re,sys;p=re.compile(r'^(WARNING: )?\[CXX5202\] This app only has 32-bit \[(armeabi-v7a|x86)\] native libraries\. Beginning August 1, 2025, Google Play will require 64-bit versions of apps and app updates that contain native code\.\\s*$', re.M);sys.stdout.write(p.sub('', sys.stdin.read()))"
+            ./gradlew "$GRADLE_TASK" 2>&1 | awk '!/^(WARNING: )?\[CXX5202\] This app only has 32-bit \[(armeabi-v7a|x86)\] native libraries\./'
           else
             ./gradlew "$GRADLE_TASK"
           fi

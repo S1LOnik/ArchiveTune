@@ -122,3 +122,5 @@ app/keystore/
 
 # Local Cargo output
 /app/native/automix/target/
+target/
+**/target/

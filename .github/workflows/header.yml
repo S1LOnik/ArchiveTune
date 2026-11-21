@@ -27,64 +27,10 @@ jobs:
           EOF
 
       - name: Find duplicate Kotlin headers
-        run: |
-          python3 <<'PY'
-          from pathlib import Path
-
-          marker = "GPL-3.0 License | Contributors: see git history"
-          duplicates = []
-
-          for path in Path(".").rglob("*.kt"):
-              if ".git" in path.parts or "build" in path.parts:
-                  continue
-
-              count = path.read_text(encoding="utf-8").count(marker)
-              if count > 1:
-                  duplicates.append((path, count))
-
-          if duplicates:
-              print("Duplicate Kotlin headers found:")
-              for path, count in duplicates:
-                  print(f"{path}: {count}")
-          else:
-              print("No duplicate Kotlin headers found.")
-          PY
+        run: cargo run --manifest-path tools/repo-maintainer/Cargo.toml --release -- header find-duplicates
 
       - name: Remove existing Kotlin headers
-        run: |
-          python3 <<'PY'
-          from pathlib import Path
-
-          archive_marker = "ArchiveTune ("
-          license_marker = "GPL-3.0 License | Contributors: see git history"
-          total_removed = 0
-
-          for path in Path(".").rglob("*.kt"):
-              if ".git" in path.parts or "build" in path.parts:
-                  continue
-
-              text = path.read_text(encoding="utf-8")
-              removed = 0
-
-              while text.startswith("/*"):
-                  end = text.find("*/")
-                  if end == -1:
-                      break
-
-                  header = text[:end + 2]
-                  if archive_marker not in header or license_marker not in header:
-                      break
-
-                  text = text[end + 2:].lstrip("\r\n")
-                  removed += 1
-
-              if removed:
-                  path.write_text(text, encoding="utf-8")
-                  total_removed += removed
-                  print(f"{path}: removed {removed} existing header(s)")
-
-          print(f"Removed {total_removed} existing Kotlin header(s).")
-          PY
+        run: cargo run --manifest-path tools/repo-maintainer/Cargo.toml --release -- header remove
 
       - name: Add current Kotlin header
         run: |
@@ -92,32 +38,8 @@ jobs:
           rm banner.txt
 
       - name: Verify Kotlin headers are unique
-        run: |
-          python3 <<'PY'
-          from pathlib import Path
-          import sys
-
-          marker = "GPL-3.0 License | Contributors: see git history"
-          duplicates = []
-
-          for path in Path(".").rglob("*.kt"):
-              if ".git" in path.parts or "build" in path.parts:
-                  continue
-
-              count = path.read_text(encoding="utf-8").count(marker)
-              if count > 1:
-                  duplicates.append((path, count))
-
-          if duplicates:
-              print("Duplicate Kotlin headers remain:")
-              for path, count in duplicates:
-                  print(f"{path}: {count}")
-              sys.exit(1)
-
-          print("Every Kotlin file has at most one ArchiveTune header.")
-          PY
+        run: cargo run --manifest-path tools/repo-maintainer/Cargo.toml --release -- header verify
 
       - uses: stefanzweifel/git-auto-commit-action@v7
         with:
           commit_message: Kotlin Header
-          
