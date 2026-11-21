@@ -77,10 +77,61 @@ Six active Python files remain. The Telegram notifier and deployment tool use re
 
 Each candidate has a standalone core suitable for delegation and a Kotlin adapter for Android integration.
 
-| Priority | Candidate | Expected benefit and desktop suitability | Complexity, dependencies and risk | Parity check |
-| --- | --- | --- | --- | --- |
-| 1 | `AutoMixAnalyzer.estimateTempo` | Move spectral-flux autocorrelation and beat inference closer to the Rust DSP. High desktop reuse. | Medium. Pass the full flux window once. Preserve BPM bounds, tie handling and confidence. | Synthetic click tracks, half/double-time ambiguity, silence and recorded flux fixtures. |
-| 2 | `TrackMatching.best` | Share catalog matching across streaming sources and desktop. | Medium. Batch candidate metadata. Preserve Locale.US normalization, Unicode decomposition, title qualifiers and input tie order. | Provider fixtures with duration mismatches, Cyrillic, Japanese, diacritics and ties. |
-| 3 | `EmbeddedLyricsExtractor` | Reuse tag parsing for desktop file imports. | Medium/high. Start with one ID3 or Vorbis format. Keep Android ContentResolver and stream ownership in Kotlin. Guard malformed offsets and encodings. | Byte-level fixtures, truncated files and encoding variants from local library scans. |
-| 4 | `LyricsUtils.parseLyrics` LRC/QRC/YRC branches | Reuse timed lyric parsing across Android and desktop. | High. Keep TTML and Kotlin UI models separate. Preserve word timing, translation indexing, Unicode and ordering. | Multilingual provider payloads, malformed timestamps and duplicate lines. |
-| 5 | `AutoMixPlanner.plan` | Share a deterministic transition planner with the desktop player. | Medium/high. Send feature curves and track state once per transition. Preserve gain and timing decisions. | Existing Smart DJ planner tests and golden feature curves near thresholds. |
+| Priority | Candidate | Expected benefit and desktop suitability | Complexity, dependencies and risk | Parity check | Status |
+| --- | --- | --- | --- | --- | --- |
+| 1 | `AutoMixAnalyzer.estimateTempo` | Move spectral-flux autocorrelation and beat inference closer to the Rust DSP. High desktop reuse. | Medium. Pass the full flux window once. Preserve BPM bounds, tie handling and confidence. | Synthetic click tracks, half/double-time ambiguity, silence and recorded flux fixtures. | **Completed** (`5f1af708c`) |
+| 2 | `TrackMatching.best` | Share catalog matching across streaming sources and desktop. | Medium. Batch candidate metadata. Preserve Locale.US normalization, Unicode decomposition, title qualifiers and input tie order. | Provider fixtures with duration mismatches, Cyrillic, Japanese, diacritics and ties. | **Completed** (`f6efb0bc4`) |
+| 3 | `EmbeddedLyricsExtractor` | Reuse tag parsing for desktop file imports. | Medium/high. Start with one ID3 or Vorbis format. Keep Android ContentResolver and stream ownership in Kotlin. Guard malformed offsets and encodings. | Byte-level fixtures, truncated files and encoding variants from local library scans. | **Completed** (`3a76394b3`) |
+| 4 | `LyricsUtils.parseLyrics` LRC/QRC/YRC branches | Reuse timed lyric parsing across Android and desktop. | High. Keep TTML and Kotlin UI models separate. Preserve word timing, translation indexing, Unicode and ordering. | Multilingual provider payloads, malformed timestamps and duplicate lines. | **Completed** (`5152a039f`) |
+| 5 | `AutoMixPlanner.plan` | Share a deterministic transition planner with the desktop player. | Medium/high. Send feature curves and track state once per transition. Preserve gain and timing decisions. | Existing Smart DJ planner tests and golden feature curves near thresholds. | **Completed** (`d2da256ae`) |
+
+## Phase 2 — Python elimination and Rust expansion to ≥ 1.00%
+
+### Overview and Success Criteria
+- Base commit `68a6519e5a04f49a77d4a19de8cdf70f14c6b6` on `migration/rust-phase-1`.
+- Working branch `migration/rust-phase-2`.
+- **Criterion 1 (Rust share ≥ 1.00%):** Reached **1.0155%** (283,809 bytes of 27,946,814 total programming language bytes) replacing real application and CI tooling logic without artificial filler or library vendoring.
+  - Android application Rust: **125,677 bytes** (44.28%) in `app/native/automix/src/*.rs`.
+  - CI utility Rust: **158,132 bytes** (55.72%) in `tools/**/*.rs`.
+- **Criterion 2 (100% Python elimination):** Zero `.py` files tracked in Git (`git ls-files | grep '\.py$'` returns 0). Zero active/operational invocations of `python`, `python3`, `pip`, or `actions/setup-python` in GitHub Actions workflows or scripts.
+
+### Phase 2 Commit History
+1. `5f1af708c`: `refactor(automix): migrate estimateTempo algorithm to Rust` — migrated spectral flux autocorrelation, decimation, and beat candidate inference to `app/native/automix/src/tempo.rs`.
+2. `49370cd06`: `build(ci): replace inline Python scripts with repo-maintainer CLI and jq/awk` — created `tools/repo-maintainer` and removed inline Python blocks from `cleanup.yml`, `header.yml`, `build.yml`, `build_pull_request.yml`, `release.yml`, and `IconPack`.
+3. `b994269e1`: `build(ci): migrate Telegram notification script to Rust CLI` — replaced `.github/workflows/notify_telegram.py` with `tools/notify-telegram` Rust CLI.
+4. `1421de380`: `build(icon-pack): migrate submission and preview scripts to Rust CLI` — consolidated `icon_preview.py`, `process_icon_submission.py`, and `remove_icon_pack.py` into unified `tools/icon-pack` Rust CLI (`icon-pack-tool`).
+5. `56ba2500a`: `build(ci): replace issue duplicate checker with Rust implementation` — replaced `duplicate_checker.py` with `tools/duplicate-checker` Rust CLI implementing exact scikit-learn TF-IDF cosine similarity.
+6. `2fbe4b607`: `build(ci): migrate artifact deployment to Rust MTProto CLI` — replaced `.github/workflows/deploy_artifacts.py` with `tools/deploy-artifacts` Rust CLI using `grammers-client` MTProto.
+7. `f6efb0bc4`: `feat(automix): migrate track matching algorithms to Rust` — implemented catalog matching, Unicode normalization, token overlap, and batch `best_match_index` in `app/native/automix/src/track_matching.rs`.
+8. `3a76394b3`: `feat(localmedia): migrate embedded lyrics extraction to Rust` — implemented ID3v2 USLT/SYLT, MP4 ilst `\xa9lyr`, and Vorbis comment parsing in `app/native/automix/src/embedded_lyrics.rs`.
+9. `d2da256ae`: `feat(automix): migrate transition planner to Rust` — ported transition planning, curve calculations, beat alignment, and fallback strategy to `app/native/automix/src/planner.rs`.
+10. `5152a039f`: `feat(lyrics): migrate LRC, QRC, and timing sync parser to Rust` — implemented timed lyrics parsing, word sync extraction, QRC parsing, and translation merging in `app/native/automix/src/lyrics_parser.rs`.
+
+### Verification Suite Results
+
+| Check | Result |
+| --- | --- |
+| Unit Tests (Cargo - `app/native/automix`) | 36 passed, 0 failed. Locked dependencies, warnings denied. |
+| Unit Tests (Cargo - `tools/*`) | 24 passed across all 5 tool crates (`deploy-artifacts`: 5, `duplicate-checker`: 6, `icon-pack`: 6, `notify-telegram`: 4, `repo-maintainer`: 3). |
+| Formatting & Clippy | `cargo fmt --check` and `cargo clippy --locked --all-targets -- -D warnings` clean across all 6 crates. |
+| JVM Unit Tests (`:app:testGmsMobileUniversalDebugUnitTest`) | 209 passed, 1 failed (`ModifiedSettingsRegistryTest` — known pre-existing baseline assertion). All JNI tests (`AutoMixSpectrumTest`, `AutoMixTempoTest`, `TrackMatchingTest`, `EmbeddedLyricsExtractorTest`, `AutoMixPlannerTest`, `LyricsUtilsTest`) passed. |
+| Packaging & Universal Debug APK | Built `app-gms-mobile-universal-debug.apk` (122,102,303 B). Packaged `libarchivetune_automix.so` for all 4 ABIs (`arm64-v8a`: 2,699,904 B, `armeabi-v7a`: 1,692,408 B, `x86`: 2,598,444 B, `x86_64`: 3,428,560 B). |
+| Python Elimination Check | 0 `.py` files in git. 0 operational python/pip calls across workflows and codebase. |
+
+### Codebase Metrics
+
+| Metric | Phase 1 Baseline | Phase 2 Result | Net Change |
+| --- | ---: | ---: | ---: |
+| Kotlin LOC | 613,543 | 613,165 | −378 |
+| Java LOC | 155,722 | 155,722 | 0 |
+| Rust LOC | 260 | 8,902 | +8,642 |
+| Python LOC | 1,758 | 0 | −1,758 (100% eliminated) |
+| Kotlin share by source bytes | ~80.78% | 80.22% | −0.56 pp |
+| Java share by source bytes | ~18.90% | 18.75% | −0.15 pp |
+| Rust share by source bytes | ~0.0297% | **1.0155%** | **+0.9858 pp (≥ 1.00% target met)** |
+| Python share by source bytes | ~0.0445% | **0.0000%** | **−0.0445 pp** |
+| Android App Rust bytes | 8,233 B | 125,677 B | +117,444 B (44.28% of Rust) |
+| CI Tools Rust bytes | 0 B | 158,132 B | +158,132 B (55.72% of Rust) |
+| Total Rust bytes | 8,233 B | **283,809 B** | +275,576 B |
+| Universal Debug APK size | 111,650,758 B | 122,102,303 B | +10,451,545 B |
+
