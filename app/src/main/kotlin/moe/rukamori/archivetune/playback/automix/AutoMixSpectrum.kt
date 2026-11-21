@@ -7,27 +7,28 @@
 
 package moe.rukamori.archivetune.playback.automix
 
-/** A spectrum calculator confined to one decoder invocation. */
+import androidx.annotation.Keep
+
+/** Owns one native FFT plan and its reusable scratch buffers. */
+@Keep
 internal class AutoMixSpectrum(private val size: Int) : AutoCloseable {
-    private var handle = if (nativeAvailable) {
-        try {
-            nativeCreate(size)
-        } catch (_: UnsatisfiedLinkError) {
-            0L
-        }
-    } else {
-        0L
-    }
-    private val fallback by lazy(LazyThreadSafetyMode.NONE) { Fft(size) }
-    private val imaginary by lazy(LazyThreadSafetyMode.NONE) { FloatArray(size) }
+    private var handle: Long
 
+    init {
+        require(size == 512 || size == 1024) { "Unsupported AutoMix FFT size: $size" }
+        handle = nativeCreate(size)
+        check(handle != 0L) { "Could not initialize the AutoMix spectrum calculator" }
+    }
+
+    @Synchronized
     fun magnitudeSpectrum(real: FloatArray, magnitudes: FloatArray) {
-        if (handle != 0L && nativeCalculate(handle, real, magnitudes)) return
-
-        imaginary.fill(0f)
-        fallback.magnitudeSpectrum(real, imaginary, magnitudes)
+        check(handle != 0L) { "AutoMix spectrum calculator is closed" }
+        require(real.size == size) { "Expected $size FFT samples" }
+        require(magnitudes.size == size / 2) { "Expected ${size / 2} FFT bins" }
+        check(nativeCalculate(handle, real, magnitudes)) { "AutoMix spectrum calculation failed" }
     }
 
+    @Synchronized
     override fun close() {
         val nativeHandle = handle
         handle = 0
@@ -39,11 +40,8 @@ internal class AutoMixSpectrum(private val size: Int) : AutoCloseable {
     private external fun nativeRelease(handle: Long)
 
     private companion object {
-        val nativeAvailable = try {
+        init {
             System.loadLibrary("archivetune_automix")
-            true
-        } catch (_: UnsatisfiedLinkError) {
-            false
         }
     }
 }
