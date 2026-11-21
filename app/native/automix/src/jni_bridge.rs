@@ -631,6 +631,149 @@ extern "system" fn Java_moe_rukamori_archivetune_playback_automix_AutoMixPlanner
     })
 }
 
+#[unsafe(no_mangle)]
+extern "system" fn Java_moe_rukamori_archivetune_lyrics_LyricsUtils_nativeParseLyrics(
+    mut env: JNIEnv,
+    _class: JClass,
+    lyrics: JString,
+) -> jstring {
+    contain_panic(ptr::null_mut(), || {
+        let lyrics_str: String = match env.get_string(&lyrics) {
+            Ok(s) => s.into(),
+            Err(_) => return ptr::null_mut(),
+        };
+
+        let parsed = crate::lyrics_parser::parse_lyrics(&lyrics_str);
+        let json = crate::lyrics_parser::serialize_entries_to_json(&parsed);
+        match env.new_string(json) {
+            Ok(js) => js.into_raw(),
+            Err(_) => ptr::null_mut(),
+        }
+    })
+}
+
+#[unsafe(no_mangle)]
+extern "system" fn Java_moe_rukamori_archivetune_lyrics_LyricsUtils_nativeCleanInlineWordTiming(
+    mut env: JNIEnv,
+    _class: JClass,
+    text: JString,
+) -> jstring {
+    contain_panic(ptr::null_mut(), || {
+        let text_str: String = match env.get_string(&text) {
+            Ok(s) => s.into(),
+            Err(_) => return ptr::null_mut(),
+        };
+
+        let cleaned = crate::lyrics_parser::clean_inline_word_timing_text(&text_str);
+        match env.new_string(cleaned) {
+            Ok(js) => js.into_raw(),
+            Err(_) => ptr::null_mut(),
+        }
+    })
+}
+
+#[unsafe(no_mangle)]
+extern "system" fn Java_moe_rukamori_archivetune_lyrics_LyricsUtils_nativeIsLineSyncedLrc(
+    mut env: JNIEnv,
+    _class: JClass,
+    lyrics: JString,
+) -> jboolean {
+    contain_panic(JNI_FALSE, || {
+        let lyrics_str: String = match env.get_string(&lyrics) {
+            Ok(s) => s.into(),
+            Err(_) => return JNI_FALSE,
+        };
+
+        if crate::lyrics_parser::is_line_synced_lrc(&lyrics_str) {
+            JNI_TRUE
+        } else {
+            JNI_FALSE
+        }
+    })
+}
+
+#[unsafe(no_mangle)]
+extern "system" fn Java_moe_rukamori_archivetune_lyrics_LyricsUtils_nativeFindCurrentLineIndex(
+    env: JNIEnv,
+    _class: JClass,
+    times: JLongArray,
+    durations: JLongArray,
+    position: jlong,
+    lead_ms: jlong,
+) -> jint {
+    contain_panic(-1, || {
+        let len = match env.get_array_length(&times) {
+            Ok(l) => l as usize,
+            Err(_) => return -1,
+        };
+        let mut times_buf = vec![0i64; len];
+        if env
+            .get_long_array_region(&times, 0, &mut times_buf)
+            .is_err()
+        {
+            return -1;
+        }
+
+        let dur_len = match env.get_array_length(&durations) {
+            Ok(l) => l as usize,
+            Err(_) => 0,
+        };
+        let mut dur_buf = vec![0i64; dur_len];
+        if dur_len > 0 {
+            let _ = env.get_long_array_region(&durations, 0, &mut dur_buf);
+        }
+
+        crate::lyrics_parser::find_current_line_index(&times_buf, &dur_buf, position, lead_ms)
+    })
+}
+
+#[unsafe(no_mangle)]
+extern "system" fn Java_moe_rukamori_archivetune_lyrics_LyricsUtils_nativeHasTrueWordSync(
+    env: JNIEnv,
+    _class: JClass,
+    start_times: JDoubleArray,
+    end_times: JDoubleArray,
+) -> jboolean {
+    contain_panic(JNI_FALSE, || {
+        let len = match env.get_array_length(&start_times) {
+            Ok(l) => l as usize,
+            Err(_) => return JNI_FALSE,
+        };
+        if len == 0 {
+            return JNI_FALSE;
+        }
+        let end_len = match env.get_array_length(&end_times) {
+            Ok(l) => l as usize,
+            Err(_) => return JNI_FALSE,
+        };
+        if len != end_len {
+            return JNI_FALSE;
+        }
+
+        let mut st_buf = vec![0.0f64; len];
+        if env
+            .get_double_array_region(&start_times, 0, &mut st_buf)
+            .is_err()
+        {
+            return JNI_FALSE;
+        }
+
+        let mut et_buf = vec![0.0f64; len];
+        if env
+            .get_double_array_region(&end_times, 0, &mut et_buf)
+            .is_err()
+        {
+            return JNI_FALSE;
+        }
+
+        if crate::lyrics_parser::has_true_word_sync(&st_buf, &et_buf) {
+            JNI_TRUE
+        } else {
+            JNI_FALSE
+        }
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::contain_panic;

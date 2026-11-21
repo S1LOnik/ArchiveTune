@@ -5,6 +5,7 @@
 
 pub mod embedded_lyrics;
 mod jni_bridge;
+pub mod lyrics_parser;
 pub mod planner;
 mod spectrum;
 mod tempo;
