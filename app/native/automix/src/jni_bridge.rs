@@ -7,12 +7,12 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::ptr;
 
 use jni::JNIEnv;
-use jni::objects::{JClass, JFloatArray, JLongArray, JObject, JObjectArray, JString};
+use jni::objects::{JByteArray, JClass, JFloatArray, JLongArray, JObject, JObjectArray, JString};
 use jni::sys::{JNI_FALSE, JNI_TRUE, jboolean, jdouble, jdoubleArray, jint, jlong, jstring};
 
 use crate::{
-    Spectrum, best_match_index, duration_matches, estimate_tempo, normalize, normalize_title,
-    score, search_artist, search_title,
+    Spectrum, best_match_index, duration_matches, estimate_tempo, extract_embedded_lyrics,
+    normalize, normalize_title, score, search_artist, search_title,
 };
 
 fn contain_panic<T>(failure: T, call: impl FnOnce() -> T) -> T {
@@ -387,6 +387,57 @@ extern "system" fn Java_moe_rukamori_archivetune_audiosource_TrackMatching_nativ
             &c_artists_refs,
             &c_dur_opts,
         )
+    })
+}
+
+#[unsafe(no_mangle)]
+extern "system" fn Java_moe_rukamori_archivetune_localmedia_EmbeddedLyricsExtractor_nativeExtractLyrics(
+    mut env: JNIEnv,
+    _class: JClass,
+    bytes: JByteArray,
+    extension: JString,
+    mime_type: JString,
+) -> jstring {
+    contain_panic(ptr::null_mut(), || {
+        if bytes.is_null() {
+            return ptr::null_mut();
+        }
+        let len = match env.get_array_length(&bytes) {
+            Ok(l) if l > 0 => l as usize,
+            _ => return ptr::null_mut(),
+        };
+
+        let mut signed_bytes = vec![0i8; len];
+        if env
+            .get_byte_array_region(&bytes, 0, &mut signed_bytes)
+            .is_err()
+        {
+            return ptr::null_mut();
+        }
+
+        let u8_slice: &[u8] = unsafe {
+            std::slice::from_raw_parts(signed_bytes.as_ptr() as *const u8, signed_bytes.len())
+        };
+
+        let ext_str: Option<String> = if extension.is_null() {
+            None
+        } else {
+            env.get_string(&extension).ok().map(|s| s.into())
+        };
+
+        let mime_str: Option<String> = if mime_type.is_null() {
+            None
+        } else {
+            env.get_string(&mime_type).ok().map(|s| s.into())
+        };
+
+        match extract_embedded_lyrics(u8_slice, ext_str.as_deref(), mime_str.as_deref()) {
+            Some(lyrics) => env
+                .new_string(lyrics)
+                .map(|s| s.into_raw())
+                .unwrap_or(ptr::null_mut()),
+            None => ptr::null_mut(),
+        }
     })
 }
 

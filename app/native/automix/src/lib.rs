@@ -3,11 +3,13 @@
 // GPL-3.0 License | Contributors: see git history
 // Do not remove or alter this notice. - Per GPL-3.0 Section 4 & Section 5
 
+pub mod embedded_lyrics;
 mod jni_bridge;
 mod spectrum;
 mod tempo;
 pub mod track_matching;
 
+pub use embedded_lyrics::extract_embedded_lyrics;
 pub use spectrum::{Spectrum, SpectrumError};
 pub use tempo::{TempoEstimate, estimate_tempo};
 pub use track_matching::{
