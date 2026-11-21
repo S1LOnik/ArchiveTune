@@ -14,6 +14,8 @@ import androidx.lifecycle.viewModelScope
 import com.google.common.collect.ImmutableList
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -24,6 +26,8 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import moe.rukamori.archivetune.spotify.models.SpotifyPlaylist
+import moe.rukamori.archivetune.spotify.models.SpotifyPlaylistTracksRef
+import moe.rukamori.archivetune.spotify.models.SpotifySimpleAlbum
 import moe.rukamori.archivetune.spotify.models.SpotifyTrack
 import moe.rukamori.archivetune.utils.reportException
 import javax.inject.Inject
@@ -48,10 +52,10 @@ class SpotifyPlaylistViewModel
         private var downloadResolutionJob: Job? = null
 
         init {
-            reload()
+            reload(forceRefresh = false)
         }
 
-        fun reload() {
+        fun reload(forceRefresh: Boolean = true) {
             if (playlistId.isBlank()) {
                 _uiState.value = SpotifyPlaylistUiState(errorMessage = "Missing Spotify playlist")
                 return
@@ -94,29 +98,30 @@ class SpotifyPlaylistViewModel
                                             total = album.totalTracks,
                                         ),
                                 )
-                            synthPlaylist to album.tracks?.items.orEmpty()
+                            val trackAlbum = SpotifySimpleAlbum(
+                                id = album.id,
+                                name = album.name,
+                                uri = album.uri,
+                                images = album.images,
+                            )
+                            synthPlaylist to album.tracks?.items.orEmpty().map { it.copy(album = trackAlbum) }
                         } else if (isLikedSongsPlaylistId(playlistId)) {
-                            val liked = repository.likedSongs()
-                            val synthPlaylist =
-                                SpotifyPlaylist(
-                                    id = playlistId,
-                                    name = "Liked Songs",
-                                    description = "Your Spotify Liked Songs",
-                                    images = emptyList(),
-                                    uri = "spotify:user:liked",
-                                    owner = null,
-                                    public = false,
-                                    collaborative = false,
-                                    tracks =
-                                        moe.rukamori.archivetune.spotify.models.SpotifyPlaylistTracksRef(
-                                            total = liked.size,
-                                        ),
-                                )
-                            synthPlaylist to liked
+                            val liked = repository.likedSongs(forceRefresh) { firstPage ->
+                                _uiState.update { state ->
+                                    if (state.tracks.isNotEmpty()) state
+                                    else state.copy(
+                                        playlist = likedPlaylist(firstPage.size),
+                                        tracks = firstPage,
+                                    )
+                                }
+                            }
+                            likedPlaylist(liked.size) to liked
                         } else {
-                            val p = repository.playlist(playlistId)
-                            val t = repository.playlistTracks(playlistId)
-                            p to t
+                            coroutineScope {
+                                val metadata = async { repository.playlist(playlistId) }
+                                val tracks = repository.playlistTracks(playlistId)
+                                metadata.await() to tracks
+                            }
                         }
                     _uiState.value =
                         SpotifyPlaylistUiState(
@@ -136,6 +141,19 @@ class SpotifyPlaylistViewModel
                     }
                 }
             }
+        }
+
+        private fun likedPlaylist(count: Int): SpotifyPlaylist =
+            SpotifyPlaylist(
+                id = playlistId,
+                name = "Liked Songs",
+                uri = "spotify:user:liked",
+                tracks = SpotifyPlaylistTracksRef(total = count),
+            )
+
+        suspend fun tracksForPlayback(): List<SpotifyTrack> {
+            reloadJob?.join()
+            return _uiState.value.tracks
         }
 
         fun resolveDownloads() {

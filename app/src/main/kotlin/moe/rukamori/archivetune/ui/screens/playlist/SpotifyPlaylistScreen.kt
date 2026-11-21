@@ -90,7 +90,10 @@ import moe.rukamori.archivetune.ui.component.EmptyPlaceholder
 import moe.rukamori.archivetune.ui.component.ExpressivePullToRefreshBox
 import moe.rukamori.archivetune.ui.component.IconButton
 import moe.rukamori.archivetune.ui.component.MediaDetailAction
+import moe.rukamori.archivetune.constants.LargeAlbumCoverKey
+import moe.rukamori.archivetune.ui.component.AlbumArtworkButton
 import moe.rukamori.archivetune.ui.component.MediaDetailHero
+import moe.rukamori.archivetune.utils.rememberPreference
 import moe.rukamori.archivetune.ui.component.MediaDetailIconAction
 import moe.rukamori.archivetune.ui.component.SpotifyTrackListItem
 import moe.rukamori.archivetune.ui.utils.HeaderDownloadItem
@@ -121,6 +124,8 @@ fun SpotifyPlaylistScreen(
     val mediaMetadata by playerConnection?.mediaMetadata?.collectAsStateWithLifecycle()
         ?: remember { mutableStateOf<MediaMetadata?>(null) }
     val playlist = state.playlist
+    val isAlbum = playlist?.id?.let { it.startsWith("album:") || it.startsWith("spotify:album:") } == true
+    val showFullArtwork by rememberPreference(LargeAlbumCoverKey, false)
     val tracks = state.tracks
     val lazyListState = rememberLazyListState()
     val systemBarsTopPadding = WindowInsets.systemBars.asPaddingValues().calculateTopPadding()
@@ -235,8 +240,11 @@ fun SpotifyPlaylistScreen(
     val surfaceColor = MaterialTheme.colorScheme.surface
 
     val thumbnailUrl =
-        remember(playlist) {
-            playlist?.let { SpotifyMapper.getPlaylistThumbnail(it)?.resize(544, 544) }
+        remember(playlist, isAlbum) {
+            playlist?.let {
+                if (isAlbum) SpotifyMapper.getLargestImage(it.images)
+                else SpotifyMapper.getPlaylistThumbnail(it)?.resize(544, 544)
+            }
         }
 
     val transparentAppBar by remember {
@@ -292,16 +300,18 @@ fun SpotifyPlaylistScreen(
         shuffled: Boolean = false,
     ) {
         val currentPlaylist = playlist ?: return
-        val queueTracks = if (shuffled) tracks.shuffled() else tracks
-        if (queueTracks.isEmpty()) return
-        val boundedStartIndex = startIndex.coerceIn(queueTracks.indices)
-        val preloadTrack = queueTracks[boundedStartIndex]
+        val selectedTrack = tracks.getOrNull(startIndex) ?: return
         if (resolvingTrackId != null) return
 
         coroutineScope.launch {
-            resolvingTrackId = preloadTrack.id
+            resolvingTrackId = selectedTrack.id
             try {
-                val preloadItem = SpotifyPlaybackResolver.resolveToMetadata(preloadTrack)
+                val loadedTracks = if (state.isLoading) viewModel.tracksForPlayback() else tracks
+                val queueTracks = if (shuffled) loadedTracks.shuffled() else loadedTracks
+                if (queueTracks.isEmpty()) return@launch
+                val boundedStartIndex =
+                    if (shuffled) 0 else queueTracks.indexOfFirst { it.id == selectedTrack.id }.coerceAtLeast(0)
+                val preloadItem = SpotifyPlaybackResolver.resolveToMetadata(queueTracks[boundedStartIndex])
                 playerConnection?.playQueue(
                     SpotifyPlaylistQueue(
                         playlistId = currentPlaylist.id,
@@ -319,7 +329,7 @@ fun SpotifyPlaylistScreen(
 
     ExpressivePullToRefreshBox(
         isRefreshing = state.isLoading,
-        onRefresh = viewModel::reload,
+        onRefresh = { viewModel.reload() },
         modifier =
             Modifier
                 .fillMaxSize()
@@ -357,6 +367,7 @@ fun SpotifyPlaylistScreen(
                         MediaDetailHero(
                             title = currentPlaylist.name,
                             thumbnailUrl = thumbnailUrl,
+                            showFullArtwork = isAlbum && showFullArtwork,
                             fallbackIcon = R.drawable.queue_music,
                             systemBarsTopPadding = systemBarsTopPadding,
                             subtitle =
@@ -365,7 +376,7 @@ fun SpotifyPlaylistScreen(
                                     ?.takeIf(String::isNotBlank)
                                     ?.let(::AnnotatedString),
                             metadata = metadata,
-                            description = currentPlaylist.description,
+                            description = currentPlaylist.description.takeUnless { isAlbum },
                             isAdded = false,
                             addContentDescription = R.string.add_to_library,
                             removeContentDescription = R.string.remove_from_library,
@@ -456,7 +467,7 @@ fun SpotifyPlaylistScreen(
                                     icon = R.drawable.sync,
                                     contentDescription = R.string.spotify_reload_playlist,
                                     contentColor = contentColor,
-                                    onClick = viewModel::reload,
+                                    onClick = { viewModel.reload() },
                                 )
                                 if (tracks.isNotEmpty()) {
                                     MediaDetailIconAction(
@@ -624,6 +635,9 @@ fun SpotifyPlaylistScreen(
             },
             actions = {
                 if (!isSearching) {
+                    if (isAlbum && playlist != null) {
+                        AlbumArtworkButton(SpotifyMapper.getLargestImage(playlist.images), playlist.name)
+                    }
                     IconButton(
                         onClick = { isSearching = true },
                         onLongClick = {},

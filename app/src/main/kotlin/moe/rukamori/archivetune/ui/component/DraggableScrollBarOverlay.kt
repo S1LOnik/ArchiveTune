@@ -38,6 +38,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
+import moe.rukamori.archivetune.constants.HideScrollbarKey
+import moe.rukamori.archivetune.utils.rememberPreference
 import kotlin.math.abs
 import kotlin.math.max
 
@@ -55,6 +57,9 @@ fun DraggableScrollbar(
     minScrollRangeForDrag: Int = 5,
     headerItems: Int = 0,
 ) {
+    val (hideScrollbar) = rememberPreference(HideScrollbarKey, false)
+    if (hideScrollbar) return
+
     val density = LocalDensity.current
     val coroutineScope = rememberCoroutineScope()
     var isDragging by remember { mutableStateOf(false) }

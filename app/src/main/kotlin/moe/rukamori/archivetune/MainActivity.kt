@@ -258,7 +258,8 @@ import moe.rukamori.archivetune.aod.ACTION_AOD_MODE
 import moe.rukamori.archivetune.constants.AodAutoStartScreenOffKey
 import moe.rukamori.archivetune.constants.AppBarHeight
 import moe.rukamori.archivetune.constants.AppFontPreference
-import moe.rukamori.archivetune.constants.AppLanguageKey
+import moe.rukamori.archivetune.constants.HideStatusBarKey
+import moe.rukamori.archivetune.constants.TabletModeEnabledKey
 import moe.rukamori.archivetune.constants.BackAnimationStyle
 import moe.rukamori.archivetune.constants.BackAnimationStyleKey
 import moe.rukamori.archivetune.constants.UseSystemLanguageKey
@@ -1097,8 +1098,9 @@ class MainActivity : ComponentActivity() {
                     val bottomInsetDp = WindowInsets.systemBars.asPaddingValues().calculateBottomPadding()
 
                     val isTvDevice = remember { applicationContext.isTvDevice() }
+                    val (tabletMode) = rememberPreference(TabletModeEnabledKey, false)
                     val useRail =
-                        isTvDevice ||
+                        isTvDevice || tabletMode ||
                             currentWindowAdaptiveInfo()
                                 .windowSizeClass
                                 .isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND)
@@ -1527,8 +1529,9 @@ class MainActivity : ComponentActivity() {
 
                     var yearInMusicSavedPlayerAnchor by rememberSaveable { mutableStateOf(-1) }
 
+                    val (hideStatusBar) = rememberPreference(HideStatusBarKey, false)
                     val shouldHideStatusBars =
-                        isYearInMusicScreen ||
+                        hideStatusBar || isYearInMusicScreen ||
                             (playerBottomSheetState.isExpandedOrExpanding &&
                                 playerDesignStyle == PlayerDesignStyle.V7)
 

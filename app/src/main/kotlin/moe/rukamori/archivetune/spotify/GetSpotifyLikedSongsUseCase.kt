@@ -19,9 +19,17 @@ class GetSpotifyLikedSongsUseCase
     constructor(
         private val repository: SpotifyLibraryRepository,
     ) {
-        suspend operator fun invoke(): List<SpotifyLikedSong> =
+        suspend operator fun invoke(
+            forceRefresh: Boolean = false,
+            onFirstPage: ((List<SpotifyLikedSong>) -> Unit)? = null,
+        ): List<SpotifyLikedSong> =
             repository
-                .likedSongs()
+                .likedSongs(
+                    forceRefresh = forceRefresh,
+                    onFirstPage = onFirstPage?.let { callback ->
+                        { tracks -> callback(tracks.map(SpotifyTrack::toSpotifyLikedSong)) }
+                    },
+                )
                 .map(SpotifyTrack::toSpotifyLikedSong)
     }
 
@@ -32,6 +40,7 @@ data class SpotifyLikedSong(
     val thumbnailUrl: String?,
     val durationMs: Int,
     val isExplicit: Boolean,
+    val album: SpotifySimpleAlbum? = null,
 ) {
     fun toPlaybackTrack(): SpotifyTrack =
         SpotifyTrack(
@@ -39,7 +48,7 @@ data class SpotifyLikedSong(
             name = title,
             artists = artistNames.map { artistName -> SpotifySimpleArtist(name = artistName) },
             album =
-                thumbnailUrl?.let { url ->
+                album ?: thumbnailUrl?.let { url ->
                     SpotifySimpleAlbum(images = listOf(SpotifyImage(url = url)))
                 },
             durationMs = durationMs,
@@ -55,4 +64,5 @@ private fun SpotifyTrack.toSpotifyLikedSong(): SpotifyLikedSong =
         thumbnailUrl = SpotifyMapper.getTrackThumbnail(this),
         durationMs = durationMs,
         isExplicit = explicit,
+        album = album,
     )

@@ -188,7 +188,10 @@ fun ContentSettings(
 
         AiContentFilterPreferences(preferencePositions)
 
-        PreferenceGroup(title = stringResource(R.string.app_language)) {
+        PreferenceGroup(
+            title = stringResource(R.string.app_language),
+            modifier = preferencePositions.modifierFor("app_language"),
+        ) {
             item {
                 SwitchPreference(
                     title = { Text(stringResource(R.string.use_system_language)) },

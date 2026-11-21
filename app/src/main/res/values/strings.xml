@@ -2403,7 +2403,7 @@
     <string name="studio_delete_style">Delete</string>
     <string name="studio_reset_section">Reset section</string>
     <string name="studio_fine_tuning">Fine tuning</string>
-    <string name="studio_open_full_settings">Open section settings</string>
+    <string name="studio_open_full_settings">More settings</string>
     <string name="studio_starter_presets">Starter presets</string>
     <string name="studio_export_profile">Export JSON</string>
     <string name="studio_import_profile">Import JSON</string>
@@ -2425,8 +2425,8 @@
     <string name="studio_section_navigation">Navigation &amp; mini-player</string>
     <string name="studio_section_player">Player</string>
     <string name="studio_section_lyrics">Lyrics</string>
-    <string name="studio_section_color">Color &amp; background</string>
-    <string name="studio_section_motion">Motion</string>
+    <string name="studio_section_color">Theme &amp; colors</string>
+    <string name="studio_section_motion">Animations &amp; vibration</string>
     <string name="nav_preset_floating">Floating</string>
     <string name="nav_preset_compact">Compact</string>
     <string name="nav_preset_frosted">Frosted</string>
@@ -2575,4 +2575,17 @@
     <string name="playlist_mix_albums">Albums in playlist list</string>
     <string name="playlist_mix_albums_empty">Save an album in your library to add it here.</string>
     <string name="playlist_reorder_item">Reorder item</string>
+    <string name="studio_basic_theme">Theme &amp; colors</string>
+    <string name="studio_basic_display">Text &amp; screen size</string>
+    <string name="studio_basic_motion">Animations &amp; vibration</string>
+    <string name="studio_glass_details">Liquid Glass effects</string>
+    <string name="studio_theme_creator_short">Create a color theme</string>
+    <string name="studio_card_visibility">Show or hide library cards</string>
+    <string name="studio_tiktok_lyrics">Show lyrics on the TikTok player</string>
+    <string name="studio_more_appearance">More appearance settings</string>
+    <string name="studio_library_and_albums">Library &amp; albums</string>
+    <string name="studio_preview_and_styles">Preview, presets &amp; saved styles</string>
+    <string name="album_large_cover">Show full cover on album pages</string>
+    <string name="album_view_cover">View album cover</string>
+    <string name="support_easter_egg_description">Tap to open a surprise</string>
 </resources>

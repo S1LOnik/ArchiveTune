@@ -8,6 +8,7 @@
 package moe.rukamori.archivetune.ui.screens
 
 import android.net.Uri
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.animation.AnimatedContentScope
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.EnterTransition
@@ -68,7 +69,9 @@ import moe.rukamori.archivetune.ui.screens.settings.AppearanceExtrasSettings
 import moe.rukamori.archivetune.ui.screens.settings.AodCustomizedScreen
 import moe.rukamori.archivetune.ui.screens.settings.AndroidAutoSettings
 import moe.rukamori.archivetune.ui.screens.settings.CanvasSettings
-import moe.rukamori.archivetune.ui.screens.settings.AppearanceSettings
+import moe.rukamori.archivetune.ui.screens.settings.AppearanceDetailPage
+import moe.rukamori.archivetune.ui.screens.settings.AppearanceDetailSettings
+import moe.rukamori.archivetune.ui.screens.settings.appearanceSearchRoute
 import moe.rukamori.archivetune.ui.screens.settings.BackupAndRestore
 import moe.rukamori.archivetune.ui.screens.settings.ChangelogScreen
 import moe.rukamori.archivetune.ui.screens.settings.ContentSettings
@@ -470,10 +473,27 @@ fun NavGraphBuilder.navigationBuilder(
         )
     }
     composable(
+        route = "settings/appearance_studio/{page}?scrollTo={scrollTo}",
+        arguments = listOf(
+            navArgument("page") { type = NavType.StringType },
+            navArgument("scrollTo") { type = NavType.StringType; nullable = true; defaultValue = null },
+        ),
+    ) {
+        val pageId = it.savedStateHandle.get<String>("page")
+        val page = AppearanceDetailPage.entries.firstOrNull { candidate -> candidate.id == pageId }
+        if (page != null) {
+            AppearanceDetailSettings(navController, page, scrollTo = it.savedStateHandle["scrollTo"])
+        }
+    }
+    composable(
         route = "settings/appearance?scrollTo={scrollTo}",
         arguments = listOf(navArgument("scrollTo") { type = NavType.StringType; nullable = true; defaultValue = null }),
-    ) {
-        AppearanceSettings(navController, scrollTo = it.savedStateHandle["scrollTo"])
+    ) { entry ->
+        LaunchedEffect(entry) {
+            navController.navigate(appearanceSearchRoute(entry.savedStateHandle["scrollTo"])) {
+                popUpTo(entry.destination.id) { inclusive = true }
+            }
+        }
     }
     composable("settings/mascot") {
         MascotSettings(navController)

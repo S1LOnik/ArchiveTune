@@ -372,6 +372,7 @@ fun NavigationBarSettings(navController: NavController, scrollTo: String? = null
                 }
                 item {
                     EnumListPreference(
+                        modifier = positions.modifierFor("mini_player_background_style"),
                         title = { Text(stringResource(R.string.mini_player_background_style)) },
                         icon = { Icon(painterResource(R.drawable.music_note), null) },
                         selectedValue = miniPlayerBackgroundStyle,

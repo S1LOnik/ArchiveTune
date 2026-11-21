@@ -23,7 +23,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.navigation.NavController
 import moe.rukamori.archivetune.BuildConfig
 import moe.rukamori.archivetune.R
-import moe.rukamori.archivetune.constants.AlbumCanvasEnabledKey
 import moe.rukamori.archivetune.constants.TikTokMainLyricsEnabledKey
 import moe.rukamori.archivetune.constants.ArchiveTuneCanvasKey
 import moe.rukamori.archivetune.constants.SpotifyCanvasKey
@@ -67,7 +66,6 @@ import moe.rukamori.archivetune.constants.LyricsClickKey
 import moe.rukamori.archivetune.constants.LyricsScrollKey
 import moe.rukamori.archivetune.constants.AutoHideLyricsPlayerControlsKey
 import moe.rukamori.archivetune.constants.ShowLyricsPlayerControlsKey
-import moe.rukamori.archivetune.constants.LiquidGlassEnabledKey
 import moe.rukamori.archivetune.constants.MascotEnabledKey
 import moe.rukamori.archivetune.constants.MascotSpeechEnabledKey
 import moe.rukamori.archivetune.constants.LiquidGlassChromaticAberrationKey
@@ -95,7 +93,6 @@ import moe.rukamori.archivetune.constants.SwipeToSongKey
 import moe.rukamori.archivetune.constants.TelegramLosslessOnlyKey
 import moe.rukamori.archivetune.constants.TidalArtworkFallbackEnabledKey
 import moe.rukamori.archivetune.constants.TidalEnabledKey
-import moe.rukamori.archivetune.constants.UseSystemFontKey
 import moe.rukamori.archivetune.constants.WakelockKey
 import moe.rukamori.archivetune.constants.AllowAgeRestrictedKey
 import moe.rukamori.archivetune.constants.AodArtworkGlowKey
@@ -338,22 +335,30 @@ fun buildSettingsGroups(
             subtitle = stringResource(R.string.settings_appearance_subtitle),
             accentColor = SettingsIconPalette.Appearance,
             keywords = listOf("appearance", "theme", "dark", "light", "color", "palette", "style", "design", "оформление", "внешний вид", "тема"),
-            onClick = { navController.navigate("settings/appearance") },
+            onClick = { navController.navigate("settings/appearance_studio") },
             hidden = true,
             children = listOf(
                 SettingsChild("Random theme on startup", "random_theme_on_startup", listOf("random theme", "random color", "shuffle theme")) { SearchResultSwitch(RandomThemeOnStartupKey, false) },
                 SettingsChild("Dark theme", "dark_theme", listOf("dark", "dark theme", "night", "amoled", "темная", "тема")),
                 SettingsChild("Color palette", "color_palette", listOf("color palette", "accent color", "theme color", "color", "палитра", "цвет")),
+                SettingsChild(context.getString(R.string.liquid_glass_effects), "liquid_glass_effects", listOf("liquid glass", "glass effects", "ликвид", "стекло")),
+                SettingsChild(context.getString(R.string.album_large_cover), "album_large_cover", listOf("album cover", "album art", "обложка альбома")),
+                SettingsChild(context.getString(R.string.default_lib_chips), "default_lib_chips", listOf("library tabs", "library filters")),
+                SettingsChild(context.getString(R.string.arrange_library_chips), "arrange_library_chips", listOf("arrange library tabs")),
+                SettingsChild(context.getString(R.string.arrange_playlist_tags), "arrange_playlist_tags", listOf("sort playlist tags")),
+                SettingsChild(context.getString(R.string.manage_playlist_tags), "manage_playlist_tags", listOf("playlist tags")),
+                SettingsChild(context.getString(R.string.quick_picks_display_mode), "quick_picks_display_mode", listOf("quick picks layout")),
+                SettingsChild(context.getString(R.string.show_mix_song_titles), "show_mix_song_titles", listOf("mix titles")),
                 SettingsChild("Color source", "color_source", listOf("color source", "color", "dynamic color", "material you")),
                 SettingsChild("App icon", "app_icon", listOf("icon", "app icon", "icon pack", "launcher icon", "иконка")),
                 SettingsChild("Disable blur", "disable_blur", listOf("blur", "disable blur", "no blur", "performance", "размытие", "отключить размытие", "убрать размытие")) { SearchResultSwitch(DisableBlurKey, false) },
                 SettingsChild("Blur intensity", "blur_intensity", listOf("blur intensity", "blur amount", "blur level", "blur radius")),
                 SettingsChild("Backdrop blur", "backdrop_blur", listOf("backdrop", "backdrop blur", "background blur", "frosted", "фон", "размытие")) { SearchResultSwitch(BackdropEnabledKey, true) },
                 SettingsChild("Font preference", "font_preference", listOf("font", "font style", "typography", "шрифт")),
-                SettingsChild("Use system font", "use_system_font", listOf("system font", "default font", "roboto")) { SearchResultSwitch(UseSystemFontKey, false) },
+                SettingsChild("Use system font", "use_system_font", listOf("system font", "default font", "roboto")),
                 SettingsChild("Thumbnail corner radius", "thumbnail_corner_radius", listOf("thumbnail corner", "corner radius", "rounded thumbnail", "thumbnail shape", "обложка", "скругление")),
                 SettingsChild("Crop thumbnail to square", "crop_thumbnail_to_square", listOf("crop thumbnail", "square thumbnail", "thumbnail crop", "обложка", "квадратная", "квадратная обложка")) { SearchResultSwitch(CropThumbnailToSquareKey, false) },
-                SettingsChild("Enable canvas in album, playlist and artist page", "album_canvas_enabled", listOf("album canvas", "playlist canvas", "artist canvas", "canvas in album", "canvas in playlist", "canvas in artist", "canvas page", "motion artwork", "animated cover", "album header video", "playlist header video", "artist header video")) { SearchResultSwitch(AlbumCanvasEnabledKey, true) },
+                SettingsChild("Enable canvas in album, playlist and artist page", "album_canvas_enabled", listOf("album canvas", "playlist canvas", "artist canvas", "canvas in album", "canvas in playlist", "canvas in artist", "canvas page", "motion artwork", "animated cover", "album header video", "playlist header video", "artist header video")),
                 SettingsChild("Player design style", "player_design_style", listOf("player design", "player layout", "player style", "стиль плеера", "дизайн плеера")),
                 SettingsChild("Show lyrics on main player (TikTok)", "tiktok_main_lyrics", listOf("tiktok lyrics", "main player lyrics", "current line lyrics", "karaoke line", "tiktok player")) { SearchResultSwitch(TikTokMainLyricsEnabledKey, false) },
                 SettingsChild("Player background style", "player_background_style", listOf("player background", "player bg", "background style", "фон плеера")),
@@ -369,8 +374,6 @@ fun buildSettingsGroups(
                 SettingsChild("Hide status bar", "hide_status_bar", listOf("status bar", "hide status", "immersive", "fullscreen", "hide bar")) { SearchResultSwitch(HideStatusBarKey, false) },
                 SettingsChild("Force high refresh rate", "force_high_refresh_rate", listOf("refresh rate", "high refresh", "120hz", "90hz", "smooth")) { SearchResultSwitch(ForceHighRefreshRateKey, false) },
                 SettingsChild("Frosted navigation bar", "frosted_nav_bar", listOf("frosted nav", "frosted navigation", "frosted blur")) { SearchResultSwitch(NavigationBarFrostedBlurKey, false) },
-                SettingsChild("Liquid Glass navigation bar", "liquid_glass_nav_bar", listOf("liquid glass", "glass nav", "glass navigation", "liquid nav")) { SearchResultSwitch(LiquidGlassNavBarEnabledKey, false) },
-                SettingsChild("Liquid Glass effects", "liquid_glass_effects", listOf("liquid glass", "glass effects", "liquid glass effects", "header glass", "mini player glass")) { SearchResultSwitch(LiquidGlassEnabledKey, true) },
                 SettingsChild("Liquid Glass customisation", "liquid_glass_customisation", listOf("liquid glass tuning", "refraction", "chromatic aberration", "glass intensity", "blur radius", "vibrancy")),
                 SettingsChild("Chromatic aberration", "glass_chromatic_aberration", listOf("chromatic aberration", "prismatic", "color fringing", "lens")) { SearchResultSwitch(LiquidGlassChromaticAberrationKey, true) },
                 SettingsChild("3D depth effect", "glass_depth_3d", listOf("3d depth", "depth effect", "spatial refraction", "thick glass")) { SearchResultSwitch(LiquidGlassDepth3DKey, true) },
@@ -381,14 +384,13 @@ fun buildSettingsGroups(
                 SettingsChild("Default open tab", "default_open_tab", listOf("default tab", "home tab", "start page", "open tab")),
                 SettingsChild("Show home category chips", "show_home_category_chips", listOf("home chips", "category chips", "home category", "chips")) { SearchResultSwitch(ShowHomeCategoryChipsKey, true) },
                 SettingsChild("Language", "app_language", listOf("language", "app language", "locale", "язык")),
-                SettingsChild("UI scale", "ui_scale", listOf("ui scale", "scale", "zoom", "interface size", "display size", "bigger", "smaller", "масштаб", "масштаб интерфейса", "размер интерфейса", "крупнее", "мельче")),
+                SettingsChild(context.getString(R.string.ui_scale), "ui_scale", listOf("ui scale", "scale", "zoom", "interface size", "display size", "bigger", "smaller", "масштаб", "масштаб интерфейса", "размер интерфейса", "крупнее", "мельче")),
                 SettingsChild("Custom font", "custom_font", listOf("custom font", "font file", "typeface", "own font")),
                 SettingsChild("Backdrop blur amount", "backdrop_blur_amount", listOf("backdrop blur amount", "backdrop intensity", "background blur amount")),
                 SettingsChild("Customized background", "customized_background", listOf("customized background", "custom background", "background image", "wallpaper")),
                 SettingsChild("Tablet mode", "tablet_mode", listOf("tablet mode", "tablet", "large screen", "landscape layout")) { SearchResultSwitch(TabletModeEnabledKey, false) },
                 SettingsChild("Minimal mode", "minimal_home_mode", listOf("minimal mode", "minimal home", "simple home", "clean home")) { SearchResultSwitch(MinimalHomeModeKey, false) },
                 SettingsChild("Home layout", "home_feed_style", listOf("home layout", "home feed", "now", "covers", "главная", "оформление главной")),
-                SettingsChild("Liquid Glass effects", "liquid_glass_effects", listOf("liquid glass", "glass effects", "header glass", "mini player glass")),
                 SettingsChild("Theme creator", "theme_creator", listOf("theme creator", "create theme", "custom theme", "make theme")),
                 SettingsChild("Palette picker", "palette_picker", listOf("palette picker", "pick palette", "choose palette", "custom palette")),
                 SettingsChild("Extras", "extras", listOf("extras", "appearance extras", "home cards", "hide cards", "more appearance")),

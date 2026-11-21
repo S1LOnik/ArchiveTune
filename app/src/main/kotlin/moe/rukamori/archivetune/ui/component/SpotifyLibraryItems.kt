@@ -155,7 +155,7 @@ fun SpotifyLibraryAlbumListItem(
         badges = {},
         thumbnailContent = {
             ItemThumbnail(
-                thumbnailUrl = album.images.firstOrNull()?.url?.resize(400, 400),
+                thumbnailUrl = SpotifyMapper.getLargestImage(album.images)?.resize(400, 400),
                 isActive = false,
                 isPlaying = false,
                 shape = RoundedCornerShape(ThumbnailCornerRadius),

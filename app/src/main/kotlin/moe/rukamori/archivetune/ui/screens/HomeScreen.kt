@@ -46,6 +46,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import moe.rukamori.archivetune.constants.HomeFeedStyle
 import moe.rukamori.archivetune.constants.HomeFeedStyleKey
 import moe.rukamori.archivetune.constants.HomeSectionOrderKey
+import moe.rukamori.archivetune.constants.MinimalHomeModeKey
 import moe.rukamori.archivetune.utils.rememberEnumPreference
 import moe.rukamori.archivetune.utils.rememberPreference
 import androidx.compose.runtime.LaunchedEffect
@@ -421,10 +422,12 @@ private fun HomeContent(
 
                 var showHomeCustomizer by rememberSaveable { mutableStateOf(false) }
                 val (homeSectionOrderRaw) = rememberPreference(HomeSectionOrderKey, "")
+                val (minimalMode) = rememberPreference(MinimalHomeModeKey, false)
                 val homeFeedStyle = LocalHomeFeedStyle.current
                 val orderedVisibleSections =
-                    remember(homeSectionOrderRaw, uiState.homeHiddenSections) {
+                    remember(homeSectionOrderRaw, uiState.homeHiddenSections, minimalMode) {
                         HomeLayoutPolicy.visibleSections(homeSectionOrderRaw, uiState.homeHiddenSections)
+                            .filter { !minimalMode || it == HomeSectionId.CONTINUE_LISTEN }
                     }
 
                 if (showHomeCustomizer) {

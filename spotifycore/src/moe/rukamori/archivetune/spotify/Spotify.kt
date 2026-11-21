@@ -22,6 +22,7 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.content.TextContent
 import io.ktor.serialization.kotlinx.json.json
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -1185,6 +1186,7 @@ object Spotify {
                     offset = offset,
                 )
             } catch (gqlError: Throwable) {
+                if (gqlError is CancellationException) throw gqlError
                 log("W", "fetchLibraryTracks GQL failed: ${gqlError.message}. Falling back to REST me/tracks")
                 authenticatedGet<SpotifyPaging<SpotifySavedTrack>>("me/tracks", failFastOn429 = true) {
                     parameter("limit", limit)

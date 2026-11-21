@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -22,12 +21,10 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
@@ -41,33 +38,14 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import moe.rukamori.archivetune.R
-import moe.rukamori.archivetune.ads.presentation.SupportArchiveTuneScreenState
-import moe.rukamori.archivetune.ads.presentation.SupportArchiveTuneUiEvent
-import moe.rukamori.archivetune.ads.presentation.SupportArchiveTuneViewModel
 
 internal const val supportArchiveTuneAvailable = true
 
 @Composable
 internal fun SupportArchiveTuneSection(
     modifier: Modifier = Modifier,
-    onMessage: (String) -> Unit,
-    viewModel: SupportArchiveTuneViewModel = hiltViewModel(),
 ) {
-    val state by viewModel.screenState.collectAsStateWithLifecycle()
-    val failureMessage = stringResource(R.string.support_archivetune_failed)
-    val openSupportPage = remember(viewModel) { viewModel::onSupportArchiveTuneClick }
-
-    LaunchedEffect(viewModel, onMessage, failureMessage) {
-        viewModel.events.collect { event ->
-            when (event) {
-                SupportArchiveTuneUiEvent.OpenFailed -> onMessage(failureMessage)
-            }
-        }
-    }
-
     var showMeme by rememberSaveable { mutableStateOf(false) }
     if (showMeme) {
         AlertDialog(
@@ -83,21 +61,14 @@ internal fun SupportArchiveTuneSection(
                 }
             },
             confirmButton = {
-                TextButton(onClick = {
-                    showMeme = false
-                    openSupportPage()
-                }) {
-                    Text(stringResource(R.string.support_archivetune_title))
+                TextButton(onClick = { showMeme = false }) {
+                    Text(stringResource(R.string.close_dialog))
                 }
-            },
-            dismissButton = {
-                TextButton(onClick = { showMeme = false }) { Text(stringResource(R.string.close_dialog)) }
             },
         )
     }
 
     SupportArchiveTuneCard(
-        state = state,
         onClick = { showMeme = true },
         modifier = modifier,
     )
@@ -105,7 +76,6 @@ internal fun SupportArchiveTuneSection(
 
 @Composable
 private fun SupportArchiveTuneCard(
-    state: SupportArchiveTuneScreenState,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -119,30 +89,8 @@ private fun SupportArchiveTuneCard(
                 .clip(CircleShape)
                 .background(iconContainerColor)
         }
-    val description =
-        when (state) {
-            is SupportArchiveTuneScreenState.Loading -> {
-                stringResource(R.string.support_archivetune_preparing)
-            }
-
-            is SupportArchiveTuneScreenState.Success -> {
-                stringResource(R.string.support_archivetune_description)
-            }
-
-            is SupportArchiveTuneScreenState.Empty -> {
-                stringResource(R.string.support_archivetune_unavailable)
-            }
-
-            is SupportArchiveTuneScreenState.Error -> {
-                stringResource(R.string.support_archivetune_retry)
-            }
-        }
-
     Card(
         onClick = onClick,
-        enabled =
-            state !is SupportArchiveTuneScreenState.Loading &&
-                state !is SupportArchiveTuneScreenState.Empty,
         shape = MaterialTheme.shapes.extraLarge,
         colors =
             CardDefaults.cardColors(
@@ -153,8 +101,7 @@ private fun SupportArchiveTuneCard(
             ),
         modifier =
             modifier
-                .fillMaxWidth()
-                .heightIn(min = 128.dp),
+                .fillMaxWidth(),
     ) {
         Row(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -184,58 +131,21 @@ private fun SupportArchiveTuneCard(
                     text = stringResource(R.string.support_archivetune_title),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = description,
+                    stringResource(R.string.support_easter_egg_description),
                     style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 4,
-                    overflow = TextOverflow.Ellipsis,
                 )
             }
 
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier.size(64.dp),
-            ) {
-                when (state) {
-                    is SupportArchiveTuneScreenState.Loading -> {
-                        CircularProgressIndicator(
-                            color = contentColor,
-                            strokeWidth = 3.dp,
-                            modifier = Modifier.size(28.dp),
-                        )
-                    }
-
-                    is SupportArchiveTuneScreenState.Empty -> {
-                        Icon(
-                            painter = painterResource(R.drawable.info),
-                            contentDescription = null,
-                            tint = contentColor.copy(alpha = 0.7f),
-                            modifier = Modifier.size(28.dp),
-                        )
-                    }
-
-                    is SupportArchiveTuneScreenState.Error -> {
-                        Icon(
-                            painter = painterResource(R.drawable.replay),
-                            contentDescription = null,
-                            tint = contentColor,
-                            modifier = Modifier.size(28.dp),
-                        )
-                    }
-
-                    is SupportArchiveTuneScreenState.Success -> {
-                        Icon(
-                            painter = painterResource(R.drawable.play),
-                            contentDescription = null,
-                            tint = contentColor,
-                            modifier = Modifier.size(32.dp),
-                        )
-                    }
-                }
-            }
+            Icon(
+                painter = painterResource(R.drawable.play),
+                contentDescription = null,
+                tint = contentColor,
+                modifier = Modifier.size(28.dp),
+            )
         }
     }
 }

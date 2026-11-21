@@ -625,7 +625,7 @@ fun OnlineSearchResult(
                                         (album.releaseDate?.take(4)?.let { " • $it" } ?: ""),
                                     thumbnailContent = {
                                         AsyncImage(
-                                            model = album.images.firstOrNull()?.url,
+                                            model = SpotifyMapper.getLargestImage(album.images),
                                             contentDescription = null,
                                             modifier =
                                                 Modifier
@@ -1199,7 +1199,7 @@ fun OnlineSearchResult(
                                         (album.releaseDate?.take(4)?.let { " • $it" } ?: ""),
                                     thumbnailContent = {
                                         AsyncImage(
-                                            model = album.images.firstOrNull()?.url,
+                                            model = SpotifyMapper.getLargestImage(album.images),
                                             contentDescription = null,
                                             modifier =
                                                 Modifier

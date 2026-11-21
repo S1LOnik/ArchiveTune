@@ -98,7 +98,7 @@ fun SpotifyLikedSongsScreen(
         scrollBehavior = scrollBehavior,
         onNavigateUp = { navController.navigateUp() },
         onNavigateHome = { navController.backToMain() },
-        onRefresh = viewModel::reload,
+        onRefresh = { viewModel.reload() },
         onPlayAll = viewModel::playAll,
         onPlaySong = viewModel::playSong,
     )

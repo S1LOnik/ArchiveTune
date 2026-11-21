@@ -90,6 +90,7 @@ import moe.rukamori.archivetune.ui.menu.YouTubeArtistMenu
 import moe.rukamori.archivetune.ui.menu.YouTubeSongMenu
 import moe.rukamori.archivetune.ui.screens.MoodAndGenresButton
 import moe.rukamori.archivetune.ui.screens.MoodAndGenresButtonHeight
+import moe.rukamori.archivetune.constants.MinimalHomeModeKey
 import moe.rukamori.archivetune.utils.rememberPreference
 import moe.rukamori.archivetune.viewmodels.SearchDiscoveryScreenState
 import moe.rukamori.archivetune.viewmodels.SearchDiscoveryTab
@@ -106,6 +107,7 @@ fun SearchScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val selectedTab by viewModel.selectedTab.collectAsStateWithLifecycle()
     val (disableBlur) = rememberPreference(DisableBlurKey, false)
+    val (minimalMode) = rememberPreference(MinimalHomeModeKey, false)
     val tonalStart = MaterialTheme.colorScheme.primaryContainer
     val tonalMiddle = MaterialTheme.colorScheme.secondaryContainer
     val lazyListState = rememberLazyListState()
@@ -188,6 +190,8 @@ fun SearchScreen(
                             .animateItem(),
                 )
             }
+
+            if (minimalMode) return@LazyColumn
 
             when (val currentState = state) {
                 SearchDiscoveryScreenState.Loading -> {
@@ -550,7 +554,6 @@ private fun SuggestedSongsSection(
                 ) {
                     YouTubeListItem(
                         item = song,
-                        albumIndex = index + 1,
                         viewCountText = song.viewCountText,
                         isActive = isActive,
                         isPlaying = isPlaying,

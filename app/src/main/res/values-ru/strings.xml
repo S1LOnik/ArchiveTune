@@ -849,7 +849,7 @@
     <string name="studio_delete_style">Удалить</string>
     <string name="studio_reset_section">Сбросить раздел</string>
     <string name="studio_fine_tuning">Тонкая настройка</string>
-    <string name="studio_open_full_settings">Все параметры раздела</string>
+    <string name="studio_open_full_settings">Дополнительные настройки</string>
     <string name="studio_starter_presets">Готовые сочетания</string>
     <string name="studio_export_profile">Экспорт JSON</string>
     <string name="studio_import_profile">Импорт JSON</string>
@@ -871,8 +871,8 @@
     <string name="studio_section_navigation">Навигация и мини-плеер</string>
     <string name="studio_section_player">Плеер</string>
     <string name="studio_section_lyrics">Тексты</string>
-    <string name="studio_section_color">Цвет и фон</string>
-    <string name="studio_section_motion">Движение</string>
+    <string name="studio_section_color">Тема и цвета</string>
+    <string name="studio_section_motion">Анимации и вибрация</string>
     <string name="nav_preset_floating">Плавающий</string>
     <string name="nav_preset_compact">Компактный</string>
     <string name="nav_preset_frosted">Матовый</string>
@@ -1101,4 +1101,17 @@
     <string name="playlist_mix_albums">Альбомы в списке плейлистов</string>
     <string name="playlist_mix_albums_empty">Сохраните альбом в медиатеке, чтобы добавить его сюда.</string>
     <string name="playlist_reorder_item">Изменить порядок</string>
+    <string name="studio_basic_theme">Тема и цвета</string>
+    <string name="studio_basic_display">Текст и размер интерфейса</string>
+    <string name="studio_basic_motion">Анимации и вибрация</string>
+    <string name="studio_glass_details">Эффекты Liquid Glass</string>
+    <string name="studio_theme_creator_short">Создать цветовую тему</string>
+    <string name="studio_card_visibility">Видимость карточек медиатеки</string>
+    <string name="studio_tiktok_lyrics">Показывать текст в плеере TikTok</string>
+    <string name="studio_more_appearance">Другие настройки оформления</string>
+    <string name="studio_library_and_albums">Медиатека и альбомы</string>
+    <string name="studio_preview_and_styles">Предпросмотр, пресеты и сохранённые стили</string>
+    <string name="album_large_cover">Показывать обложку альбома целиком</string>
+    <string name="album_view_cover">Посмотреть обложку альбома</string>
+    <string name="support_easter_egg_description">Нажмите, чтобы открыть сюрприз</string>
 </resources>

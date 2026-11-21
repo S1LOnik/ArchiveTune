@@ -40,8 +40,18 @@ object SpotifyPlaybackResolver {
                 .removePrefix("spotify://")
                 .substringBefore("?")
 
+            val artwork = SpotifyMapper.getTrackThumbnail(track)
             mutex.withLock {
-                cache[cleanTrackId]?.let { return@withContext it }
+                cache[cleanTrackId]?.let { cached ->
+                    val hasLargeArtwork =
+                        track.album?.images.orEmpty().any { image ->
+                            image.url == artwork && maxOf(image.width ?: 0, image.height ?: 0) >= 600
+                        }
+                    if (artwork != null && (cached.thumbnailUrl == null || hasLargeArtwork)) {
+                        return@withContext cached.copy(thumbnailUrl = artwork).also { cache[cleanTrackId] = it }
+                    }
+                    return@withContext cached
+                }
             }
 
             val sessionManager = SpotifySessionManager.get()
@@ -58,7 +68,7 @@ object SpotifyPlaybackResolver {
                         title = track.name,
                         artists = track.artists.map { MediaMetadata.Artist(id = it.id, name = it.name) },
                         duration = if (track.durationMs > 0) track.durationMs / 1000 else -1,
-                        thumbnailUrl = SpotifyMapper.getTrackThumbnail(track),
+                        thumbnailUrl = artwork,
                         album = track.album?.let { MediaMetadata.Album(id = it.id, title = it.name) },
                         spotifyTrackId = cleanTrackId,
                         explicit = track.explicit,
@@ -110,7 +120,7 @@ object SpotifyPlaybackResolver {
             val bestMetadata = best.toMediaMetadata()
             val metadata =
                 bestMetadata.copy(
-                    thumbnailUrl = SpotifyMapper.getTrackThumbnail(track) ?: best.thumbnail,
+                    thumbnailUrl = artwork ?: best.thumbnail,
                     duration = if (track.durationMs > 0) track.durationMs / 1000 else best.duration ?: -1,
                     explicit = track.explicit || best.explicit,
                     album =

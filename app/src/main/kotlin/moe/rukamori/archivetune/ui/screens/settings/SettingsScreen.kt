@@ -345,11 +345,12 @@ private fun searchableSettingsRoute(
     parentKey: String,
     scrollKey: String?,
 ): String? {
+    if (parentKey == "appearance") return appearanceSearchRoute(scrollKey)
+
     val route =
         when (parentKey) {
             "account" -> "settings/account"
             "stats" -> "settings/account"
-            "appearance" -> "settings/appearance"
             "appearance_studio" -> "settings/appearance_studio"
             "modified", "modified_settings" -> "settings/modified"
             "mascot" -> "settings/mascot"
@@ -393,7 +394,6 @@ private fun searchableSettingsRoute(
             setOf(
                 "account",
                 "stats",
-                "appearance",
                 "appearance_studio",
                 "appearance_extras",
                 "navigation_bar",

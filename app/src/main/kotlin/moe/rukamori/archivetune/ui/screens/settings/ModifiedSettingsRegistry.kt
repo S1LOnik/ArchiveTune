@@ -296,19 +296,19 @@ object ModifiedSettingsRegistry {
                 key = DynamicThemeKey,
                 titleRes = R.string.enable_dynamic_theme,
                 categoryRes = R.string.theme,
-                route = "settings/appearance",
+                route = "settings/appearance_studio/theme?scrollTo=color_source",
             ) { true },
             booleanSpec(
                 key = RandomThemeOnStartupKey,
                 titleRes = R.string.random_theme_on_startup,
                 categoryRes = R.string.theme,
-                route = "settings/appearance",
+                route = "settings/appearance_studio/theme?scrollTo=random_theme_on_startup",
             ) { false },
             enumSpec(
                 key = DarkModeKey,
                 titleRes = R.string.dark_theme,
                 categoryRes = R.string.theme,
-                route = "settings/appearance?scrollTo=dark_theme",
+                route = "settings/appearance_studio/theme?scrollTo=dark_theme",
                 defaultValue = DarkMode.AUTO,
             ) { mode ->
                 SettingValueText.Resource(
@@ -323,19 +323,19 @@ object ModifiedSettingsRegistry {
                 key = PureBlackKey,
                 titleRes = R.string.pure_black,
                 categoryRes = R.string.theme,
-                route = "settings/appearance",
+                route = "settings/appearance_studio/theme?scrollTo=pure_black",
             ) { false },
             booleanSpec(
                 key = DisableBlurKey,
                 titleRes = R.string.disable_blur,
                 categoryRes = R.string.theme,
-                route = "settings/appearance",
+                route = "settings/appearance_studio/theme?scrollTo=disable_blur",
             ) { false },
             booleanSpec(
                 key = DisableAnimationsKey,
                 titleRes = R.string.disable_animations,
                 categoryRes = R.string.motion_profile_title,
-                route = "settings/appearance?scrollTo=disable_animations",
+                route = "settings/appearance_studio/motion?scrollTo=disable_animations",
             ) { isLowRam -> isLowRam },
             enumSpec(
                 key = MotionProfileKey,
@@ -399,25 +399,25 @@ object ModifiedSettingsRegistry {
                 key = EnableHapticFeedbackKey,
                 titleRes = R.string.haptics,
                 categoryRes = R.string.motion_profile_title,
-                route = "settings/appearance",
+                route = "settings/appearance_studio/motion?scrollTo=haptics",
             ) { true },
             booleanSpec(
                 key = ForceHighRefreshRateKey,
                 titleRes = R.string.force_high_refresh_rate,
                 categoryRes = R.string.theme,
-                route = "settings/appearance",
+                route = "settings/appearance_studio/motion?scrollTo=force_high_refresh_rate",
             ) { false },
             booleanSpec(
                 key = BackdropEnabledKey,
                 titleRes = R.string.album_backdrop,
                 categoryRes = R.string.theme,
-                route = "settings/appearance",
+                route = "settings/appearance_studio/library?scrollTo=backdrop_blur",
             ) { true },
             intSpec(
                 key = BackdropBlurAmountKey,
                 titleRes = R.string.backdrop_blur_amount,
                 categoryRes = R.string.theme,
-                route = "settings/appearance",
+                route = "settings/appearance_studio/library?scrollTo=backdrop_blur_amount",
                 defaultValue = 60,
             ) { SettingValueText.Plain("$it%") },
 
@@ -426,7 +426,7 @@ object ModifiedSettingsRegistry {
                 key = HomeFeedStyleKey,
                 titleRes = R.string.home_feed_style,
                 categoryRes = R.string.home,
-                route = "settings/appearance?scrollTo=home_feed_style",
+                route = "settings/appearance_studio/home?scrollTo=home_feed_style",
                 defaultValue = HomeFeedStyle.STANDARD,
             ) { style ->
                 SettingValueText.Resource(
@@ -512,9 +512,9 @@ object ModifiedSettingsRegistry {
             ) { false },
             booleanSpec(
                 key = LiquidGlassEnabledKey,
-                titleRes = R.string.liquid_glass_nav_bar,
-                categoryRes = R.string.navigation_bar_settings_title,
-                route = "settings/appearance/navigation_bar?scrollTo=liquid_glass_nav_bar",
+                titleRes = R.string.liquid_glass_effects,
+                categoryRes = R.string.theme,
+                route = "settings/appearance_studio/glass?scrollTo=liquid_glass_effects",
             ) { true },
             booleanSpec(
                 key = LiquidGlassNavBarEnabledKey,
@@ -608,7 +608,7 @@ object ModifiedSettingsRegistry {
                 key = PlayerDesignStyleKey,
                 titleRes = R.string.player_design_style,
                 categoryRes = R.string.player,
-                route = "settings/appearance?scrollTo=player_design_style",
+                route = "settings/appearance_studio/player?scrollTo=player_design_style",
                 defaultValue = PlayerDesignStyle.APPLE_MUSIC,
                 normalize = { if (it in RemovedPlayerDesignStyles) PlayerDesignStyle.APPLE_MUSIC else it },
             ) { style ->
@@ -637,7 +637,7 @@ object ModifiedSettingsRegistry {
                 key = PlayerBackgroundStyleKey,
                 titleRes = R.string.player_background_style,
                 categoryRes = R.string.player,
-                route = "settings/appearance?scrollTo=player_background_style",
+                route = "settings/appearance_studio/player?scrollTo=player_background_style",
                 defaultValue = PlayerBackgroundStyle.DEFAULT,
             ) { bg ->
                 SettingValueText.Plain(bg.name.replace('_', ' ').lowercase().replaceFirstChar(Char::titlecase))
@@ -661,7 +661,7 @@ object ModifiedSettingsRegistry {
                 key = SliderStyleKey,
                 titleRes = R.string.player_slider_style,
                 categoryRes = R.string.player,
-                route = "settings/appearance",
+                route = "settings/appearance_studio/player?scrollTo=player_slider_style",
                 defaultValue = SliderStyle.Standard,
             ) { slider ->
                 SettingValueText.Resource(
@@ -678,25 +678,25 @@ object ModifiedSettingsRegistry {
                 key = ShowPlayerVolumeBarKey,
                 titleRes = R.string.show_player_volume_bar,
                 categoryRes = R.string.player,
-                route = "settings/appearance",
+                route = "settings/appearance_studio/player?scrollTo=show_player_volume_bar",
             ) { true },
             booleanSpec(
                 key = HidePlayerThumbnailKey,
                 titleRes = R.string.hide_player_thumbnail,
                 categoryRes = R.string.player,
-                route = "settings/appearance",
+                route = "settings/appearance_studio/player?scrollTo=hide_player_thumbnail",
             ) { false },
             booleanSpec(
                 key = CropThumbnailToSquareKey,
                 titleRes = R.string.crop_thumbnail_to_square,
                 categoryRes = R.string.player,
-                route = "settings/appearance?scrollTo=crop_thumbnail_to_square",
+                route = "settings/appearance_studio/player?scrollTo=crop_thumbnail_to_square",
             ) { false },
             floatSpec(
                 key = ThumbnailCornerRadiusKey,
                 titleRes = R.string.custom_radius,
                 categoryRes = R.string.player,
-                route = "settings/appearance",
+                route = "settings/appearance_studio/player?scrollTo=thumbnail_corner_radius",
                 defaultValue = 16f,
                 formatter = { SettingValueText.Plain("${it.roundToInt()} dp") },
             ),
@@ -704,7 +704,7 @@ object ModifiedSettingsRegistry {
                 key = MiniPlayerBackgroundStyleKey,
                 titleRes = R.string.mini_player_style_title,
                 categoryRes = R.string.player,
-                route = "settings/appearance",
+                route = "settings/appearance/navigation_bar?scrollTo=mini_player_background_style",
                 defaultValue = MiniPlayerBackgroundStyle.THEME,
             ) { style ->
                 SettingValueText.Plain(style.name.replace('_', ' ').lowercase().replaceFirstChar(Char::titlecase))
@@ -751,7 +751,7 @@ object ModifiedSettingsRegistry {
                 key = LyricsBackgroundStyleKey,
                 titleRes = R.string.lyrics_background_style,
                 categoryRes = R.string.lyrics,
-                route = "settings/appearance",
+                route = "settings/appearance_studio/player?scrollTo=lyrics_background_style",
                 defaultValue = LyricsBackgroundStyle.DEFAULT,
             ) { style ->
                 SettingValueText.Plain(style.name.replace('_', ' ').lowercase().replaceFirstChar(Char::titlecase))

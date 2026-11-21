@@ -86,6 +86,8 @@ import moe.rukamori.archivetune.playback.queues.LocalAlbumRadio
 import moe.rukamori.archivetune.ui.component.IconButton
 import moe.rukamori.archivetune.ui.component.LocalMenuState
 import moe.rukamori.archivetune.ui.component.MediaDetailAction
+import moe.rukamori.archivetune.constants.LargeAlbumCoverKey
+import moe.rukamori.archivetune.ui.component.AlbumArtworkButton
 import moe.rukamori.archivetune.ui.component.MediaDetailHero
 import moe.rukamori.archivetune.ui.component.MediaDetailStatePanel
 import moe.rukamori.archivetune.ui.component.NavigationTitle
@@ -134,6 +136,7 @@ fun AlbumScreen(
     val albumWithSongs by viewModel.albumWithSongs.collectAsStateWithLifecycle()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val otherVersions by viewModel.otherVersions.collectAsStateWithLifecycle()
+    val showFullArtwork by rememberPreference(LargeAlbumCoverKey, false)
     val hideExplicit by rememberPreference(key = HideExplicitKey, defaultValue = false)
 
     // System bars padding
@@ -272,6 +275,7 @@ fun AlbumScreen(
                     MediaDetailHero(
                         title = albumWithSongs.album.title,
                         thumbnailUrl = albumWithSongs.album.thumbnailUrl,
+                        showFullArtwork = showFullArtwork,
                         fallbackIcon = R.drawable.album,
                         systemBarsTopPadding = systemBarsTopPadding,
                         subtitle = artistNames,
@@ -679,6 +683,11 @@ fun AlbumScreen(
                 }
             },
             actions = {
+                if (!selection) {
+                    albumWithSongs?.album?.let { album ->
+                        AlbumArtworkButton(album.thumbnailUrl, album.title)
+                    }
+                }
                 if (selection) {
                     val count = wrappedSongs.count { it.isSelected }
                     IconButton(

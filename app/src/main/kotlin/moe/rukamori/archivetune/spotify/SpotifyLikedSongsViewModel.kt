@@ -63,11 +63,11 @@ class SpotifyLikedSongsViewModel
                         )
                     }
                 }
-                reload()
+                reload(forceRefresh = false)
             }
         }
 
-        fun reload() {
+        fun reload(forceRefresh: Boolean = true) {
             reloadJob?.cancel()
             if (loadedSongs.isEmpty()) {
                 _uiState.value = SpotifyLikedSongsScreenState.Loading
@@ -75,16 +75,10 @@ class SpotifyLikedSongsViewModel
             reloadJob =
                 viewModelScope.launch(Dispatchers.IO) {
                     try {
-                        val songs = ImmutableList.copyOf(getSpotifyLikedSongs())
-                        loadedSongs = songs
-                        _uiState.value =
-                            if (songs.isEmpty()) {
-                                SpotifyLikedSongsScreenState.Empty
-                            } else {
-                                SpotifyLikedSongsScreenState.Success(
-                                    songs = ImmutableList.copyOf(songs.map(SpotifyLikedSong::toUiModel)),
-                                )
-                            }
+                        val songs = getSpotifyLikedSongs(forceRefresh) { firstPage ->
+                            if (loadedSongs.isEmpty()) showSongs(firstPage)
+                        }
+                        showSongs(songs)
                         repository.syncLikedSongsToDatabase(database)
                     } catch (error: CancellationException) {
                         throw error
@@ -94,6 +88,18 @@ class SpotifyLikedSongsViewModel
                             _uiState.value = SpotifyLikedSongsScreenState.Error
                         }
                     }
+                }
+        }
+
+        private fun showSongs(songs: List<SpotifyLikedSong>) {
+            loadedSongs = ImmutableList.copyOf(songs)
+            _uiState.value =
+                if (songs.isEmpty()) {
+                    SpotifyLikedSongsScreenState.Empty
+                } else {
+                    SpotifyLikedSongsScreenState.Success(
+                        songs = ImmutableList.copyOf(songs.map(SpotifyLikedSong::toUiModel)),
+                    )
                 }
         }
 
@@ -165,7 +171,7 @@ private fun SpotifyLikedSong.toUiModel(): SpotifyLikedSongUiModel =
     SpotifyLikedSongUiModel(
         id = id,
         title = title,
-        artistNames = ImmutableList.copyOf(artistNames),
+        artistNames = artistNames,
         thumbnailUrl = thumbnailUrl,
         durationMs = durationMs,
         isExplicit = isExplicit,

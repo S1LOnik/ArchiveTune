@@ -122,6 +122,9 @@ import moe.rukamori.archivetune.ui.utils.backToMain
 import moe.rukamori.archivetune.utils.PreferenceStore
 import moe.rukamori.archivetune.utils.dataStore
 import moe.rukamori.archivetune.utils.isLowRamDevice
+import moe.rukamori.archivetune.ui.screens.settings.AppearanceDetailPage
+import moe.rukamori.archivetune.ui.component.PreferenceEntry
+import moe.rukamori.archivetune.ui.component.PreferenceGroup
 import moe.rukamori.archivetune.utils.rememberPreference
 import java.util.UUID
 import java.io.IOException
@@ -133,7 +136,7 @@ private fun sectionForScrollTo(scrollTo: String?): AppearanceSection? =
         "navigation_mini_player" -> AppearanceSection.NAVIGATION
         "player" -> AppearanceSection.PLAYER
         "lyrics" -> AppearanceSection.LYRICS
-        "color_background", "disable_blur" -> AppearanceSection.COLOR
+        "color_background", "disable_blur", "liquid_glass_effects" -> AppearanceSection.COLOR
         "motion_profile" -> AppearanceSection.MOTION
         else -> null
     }
@@ -218,6 +221,7 @@ fun AppearanceStudioScreen(
     var coverMode by rememberSaveable { mutableStateOf(StudioCoverPreviewMode.CURRENT) }
     var showUnsavedDialog by rememberSaveable { mutableStateOf(false) }
     var returnToMainAfterDraft by rememberSaveable { mutableStateOf(false) }
+    var detailsAfterDraft by rememberSaveable { mutableStateOf<String?>(null) }
     val skipAppearanceConfirmation by rememberPreference(SkipAppearanceConfirmationKey, false)
     var isSavingDraft by remember { mutableStateOf(false) }
 
@@ -328,13 +332,17 @@ fun AppearanceStudioScreen(
         if (returnToMain) navController.backToMain() else navController.navigateUp()
     }
 
-    fun attemptExit(returnToMain: Boolean = false) {
+    fun attemptExit(returnToMain: Boolean = false, detailsRoute: String? = null) {
         if (isSavingDraft) return
+        val finish = {
+            if (detailsRoute != null) navController.navigate(detailsRoute) else exitStudio(returnToMain)
+        }
         when {
-            !hasUnsavedChanges -> exitStudio(returnToMain)
-            skipAppearanceConfirmation -> saveDraft { exitStudio(returnToMain) }
+            !hasUnsavedChanges -> finish()
+            skipAppearanceConfirmation -> saveDraft { finish() }
             else -> {
                 returnToMainAfterDraft = returnToMain
+                detailsAfterDraft = detailsRoute
                 showUnsavedDialog = true
             }
         }
@@ -342,6 +350,12 @@ fun AppearanceStudioScreen(
 
     BackHandler(enabled = hasUnsavedChanges && !showUnsavedDialog) {
         attemptExit()
+    }
+
+    fun finishPendingNavigation() {
+        val route = detailsAfterDraft
+        detailsAfterDraft = null
+        if (route != null) navController.navigate(route) else exitStudio(returnToMainAfterDraft)
     }
 
     if (showUnsavedDialog) {
@@ -353,7 +367,7 @@ fun AppearanceStudioScreen(
                 TextButton(
                     onClick = {
                         showUnsavedDialog = false
-                        saveDraft { exitStudio(returnToMainAfterDraft) }
+                        saveDraft { finishPendingNavigation() }
                     },
                 ) {
                     Text(stringResource(R.string.studio_apply))
@@ -364,7 +378,7 @@ fun AppearanceStudioScreen(
                     onClick = {
                         showUnsavedDialog = false
                         discardDraft()
-                        exitStudio(returnToMainAfterDraft)
+                        finishPendingNavigation()
                     },
                 ) {
                     Text(stringResource(R.string.studio_discard))
@@ -539,6 +553,13 @@ fun AppearanceStudioScreen(
                         )
                     }
                 },
+                actions = {
+                    if (hasUnsavedChanges) {
+                        TextButton(onClick = applyDraft, enabled = !isSavingDraft) {
+                            Text(stringResource(R.string.studio_apply))
+                        }
+                    }
+                },
                 navigationIcon = {
                     IconButton(
                         onClick = { attemptExit() },
@@ -571,399 +592,200 @@ fun AppearanceStudioScreen(
                     .padding(bottom = SettingsDimensions.ScreenBottomPadding),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            // Interactive preview
-            StudioInteractivePreview(
-                snapshot = previewSnapshot,
-                isComparingSaved = isComparingSaved,
-                coverMode = coverMode,
-                onCoverModeChange = { coverMode = it },
-            )
+            // Section 5: Color & Background
+            val (resolvedCustomColor, _) =
+                remember(draft.color.customThemeColor) {
+                    resolveCustomThemeSelection(draft.color.customThemeColor)
+                }
+            val isCuratedAccent =
+                CuratedStudioAccentPalettes.any { it.id == draft.color.customThemeColor }
 
-            // Compare + Apply action bar
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
+            StudioSectionCard(
+                section = AppearanceSection.COLOR,
+                iconRes = R.drawable.palette,
+                summary = darkModeLabel(draft.color.darkMode) +
+                    if (draft.color.pureBlack) " · AMOLED" else "",
+                expanded = expandedSection == AppearanceSection.COLOR,
+                onToggleExpand = {
+                    expandedSection =
+                        if (expandedSection == AppearanceSection.COLOR) null else AppearanceSection.COLOR
+                },
+                onResetSection = { updateDraft(draft.resetSection(AppearanceSection.COLOR, isLowRam)) },
+                onOpenFullSettings = { attemptExit(detailsRoute = "settings/appearance_studio/theme") },
+                modifier = positions.modifierFor("color_background"),
             ) {
-                Surface(
-                    shape = RoundedCornerShape(999.dp),
-                    color =
-                        if (isComparingSaved) {
-                            MaterialTheme.colorScheme.tertiaryContainer
-                        } else {
-                            MaterialTheme.colorScheme.surfaceContainerHigh
-                        },
-                    modifier =
-                        Modifier
-                            .weight(1f)
-                            .pointerInput(Unit) {
-                                detectTapGestures(
-                                    onPress = {
-                                        isComparingSaved = true
-                                        try {
-                                            tryAwaitRelease()
-                                        } finally {
-                                            isComparingSaved = false
-                                        }
-                                    },
-                                )
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    DarkMode.entries.forEach { mode ->
+                        FilterChip(
+                            selected = draft.color.darkMode == mode,
+                            onClick = {
+                                haptic(ArchiveTuneHapticKind.SELECTION)
+                                updateDraft(draft.copy(color = draft.color.copy(darkMode = mode)))
                             },
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 11.dp),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(
-                            painter = painterResource(R.drawable.restore),
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = stringResource(R.string.studio_hold_to_compare),
-                            style = MaterialTheme.typography.labelLarge,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
+                            label = { Text(darkModeLabel(mode)) },
                         )
                     }
                 }
-
-                Button(
-                    onClick = applyDraft,
-                    enabled = hasUnsavedChanges,
-                    shapes = ButtonDefaults.shapes(),
-                ) {
-                    Icon(
-                        painter = painterResource(R.drawable.check),
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(stringResource(R.string.studio_apply))
-                }
-            }
-
-            if (hasUnsavedChanges) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
-                ) {
-                    TextButton(
-                        onClick = {
-                            haptic(ArchiveTuneHapticKind.SELECTION)
-                            discardDraft()
-                        },
-                    ) {
-                        Text(stringResource(R.string.studio_discard))
-                    }
-                }
-            }
-
-            if (savedToLibraryNotice && hasUnsavedChanges) {
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(
-                        text = stringResource(R.string.studio_saved_to_library_hint),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                    )
-                }
-            }
-
-            // Immediately accessible global Animations toggle
-            val animationsEnabled =
-                !draft.motion.disableAnimations && draft.motion.profile != MotionProfile.REDUCED
-            Surface(
-                shape = RoundedCornerShape(18.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerLow,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
-                        Text(
-                            text = stringResource(R.string.studio_global_animations),
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                        Text(
-                            text = stringResource(R.string.studio_global_animations_desc),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    Switch(
-                        checked = animationsEnabled,
-                        onCheckedChange = { checked ->
-                            haptic(ArchiveTuneHapticKind.PLAY_PAUSE)
-                            updateDraft(
-                                draft.copy(
-                                    motion =
-                                        if (checked) {
-                                            draft.motion.copy(
-                                                disableAnimations = false,
-                                                profile =
-                                                    if (draft.motion.profile == MotionProfile.REDUCED) {
-                                                        MotionProfile.SYSTEM
-                                                    } else {
-                                                        draft.motion.profile
-                                                    },
-                                            )
-                                        } else {
-                                            draft.motion.copy(
-                                                disableAnimations = true,
-                                                profile = MotionProfile.REDUCED,
-                                            )
-                                        },
-                                ),
-                            )
-                        },
-                    )
-                }
-            }
-
-            // Starter presets
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    text = stringResource(R.string.studio_starter_presets),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary,
+                StudioToggleRow(
+                    title = stringResource(R.string.pure_black),
+                    checked = draft.color.pureBlack,
+                    onCheckedChange = {
+                        updateDraft(draft.copy(color = draft.color.copy(pureBlack = it)))
+                    },
                 )
-                LazyRow(
+                StudioToggleRow(
+                    title = stringResource(R.string.enable_dynamic_theme),
+                    checked = draft.color.dynamicTheme,
+                    onCheckedChange = {
+                        updateDraft(draft.copy(color = draft.color.copy(dynamicTheme = it)))
+                    },
+                )
+                Text(
+                    text = stringResource(R.string.studio_accent_swatches_title),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (draft.color.dynamicTheme) {
+                    Text(
+                        text = stringResource(R.string.studio_dynamic_overrides_accent_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    items(StudioStarterPresets, key = { it.id }) { preset ->
-                        val selected = draft.normalized() == preset.snapshot.normalized()
+                    CuratedStudioAccentPalettes.forEach { palette ->
+                        val selected = !draft.color.dynamicTheme && draft.color.customThemeColor == palette.id
                         FilterChip(
                             selected = selected,
                             onClick = {
                                 haptic(ArchiveTuneHapticKind.SELECTION)
-                                updateDraft(preset.snapshot.normalized())
+                                updateDraft(
+                                    draft.copy(
+                                        color =
+                                            draft.color.copy(
+                                                customThemeColor = palette.id,
+                                                dynamicTheme = false,
+                                            ),
+                                    ),
+                                )
                             },
-                            label = { Text(preset.localizedTitle(isRussian)) },
+                            leadingIcon = {
+                                Box(
+                                    modifier =
+                                        Modifier
+                                            .size(16.dp)
+                                            .clip(CircleShape)
+                                            .background(palette.primary)
+                                            .border(
+                                                width = if (selected) 1.5.dp else 1.dp,
+                                                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.45f),
+                                                shape = CircleShape,
+                                            ),
+                                )
+                            },
+                            label = { Text(stringResource(palette.nameResId)) },
+                        )
+                    }
+                    if (!isCuratedAccent) {
+                        FilterChip(
+                            selected = !draft.color.dynamicTheme,
+                            onClick = {
+                                haptic(ArchiveTuneHapticKind.SELECTION)
+                                updateDraft(
+                                    draft.copy(color = draft.color.copy(dynamicTheme = false)),
+                                )
+                            },
+                            leadingIcon = {
+                                Box(
+                                    modifier =
+                                        Modifier
+                                            .size(16.dp)
+                                            .clip(CircleShape)
+                                            .background(resolvedCustomColor)
+                                            .border(
+                                                1.dp,
+                                                MaterialTheme.colorScheme.outline.copy(alpha = 0.45f),
+                                                CircleShape,
+                                            ),
+                                )
+                            },
+                            label = { Text(stringResource(R.string.studio_accent_custom_badge)) },
                         )
                     }
                 }
+                StudioFineTuningBlock {
+                    Text(
+                        text = stringResource(R.string.player_background_motion_policy_title),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        BackgroundMotionPolicy.entries.forEach { policy ->
+                            FilterChip(
+                                selected = draft.color.backgroundMotionPolicy == policy,
+                                onClick = {
+                                    updateDraft(
+                                        draft.copy(
+                                            color = draft.color.copy(backgroundMotionPolicy = policy),
+                                        ),
+                                    )
+                                },
+                                label = {
+                                    Text(
+                                        stringResource(
+                                            when (policy) {
+                                                BackgroundMotionPolicy.WHILE_PLAYING_OPEN ->
+                                                    R.string.player_background_motion_while_open
+                                                BackgroundMotionPolicy.RESPECT_POWER_SAVER ->
+                                                    R.string.player_background_motion_power_saver
+                                                BackgroundMotionPolicy.NEVER ->
+                                                    R.string.player_background_motion_never
+                                            },
+                                        ),
+                                    )
+                                },
+                            )
+                        }
+                    }
+                    StudioToggleRow(
+                        title = stringResource(R.string.album_backdrop),
+                        checked = draft.color.backdropEnabled,
+                        onCheckedChange = {
+                            updateDraft(draft.copy(color = draft.color.copy(backdropEnabled = it)))
+                        },
+                    )
+                    StudioToggleRow(
+                        title = stringResource(R.string.disable_blur),
+                        subtitle = stringResource(R.string.disable_blur_desc),
+                        checked = draft.color.disableBlur,
+                        onCheckedChange = {
+                            updateDraft(draft.copy(color = draft.color.copy(disableBlur = it)))
+                        },
+                        modifier = positions.modifierFor("disable_blur"),
+                    )
+                }
             }
 
-            // My Styles & Export / Import
-            Surface(
-                shape = RoundedCornerShape(18.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerLow,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Column(
-                    modifier = Modifier.padding(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            text = stringResource(R.string.studio_my_styles),
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                        FilledTonalButton(
-                            onClick = {
-                                saveStyleNameDraft = ""
-                                showSaveStyleDialog = true
-                            },
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                            shapes = ButtonDefaults.shapes(),
-                        ) {
-                            Icon(painterResource(R.drawable.add), null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(stringResource(R.string.studio_save_as_my_style))
-                        }
-                    }
-
-                    if (savedProfiles.isEmpty()) {
-                        Text(
-                            text = stringResource(R.string.studio_my_styles_empty),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    } else {
-                        savedProfiles.forEach { profile ->
-                            val isActive = profile.id == activeProfileId && activeProfileId.isNotBlank()
-                            val isDraftSelected = profile.id == draftProfileId && !isActive
-                            Surface(
-                                shape = RoundedCornerShape(12.dp),
-                                color =
-                                    when {
-                                        isActive -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)
-                                        isDraftSelected -> MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.50f)
-                                        else -> MaterialTheme.colorScheme.surfaceContainer
-                                    },
-                                modifier = Modifier.fillMaxWidth(),
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                        ) {
-                                            Text(
-                                                text = profile.name,
-                                                style = MaterialTheme.typography.labelLarge,
-                                                fontWeight = FontWeight.SemiBold,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis,
-                                                modifier = Modifier.weight(1f, fill = false),
-                                            )
-                                            if (isActive || isDraftSelected) {
-                                                Surface(
-                                                    shape = RoundedCornerShape(999.dp),
-                                                    color =
-                                                        if (isActive) {
-                                                            MaterialTheme.colorScheme.primary
-                                                        } else {
-                                                            MaterialTheme.colorScheme.secondary
-                                                        },
-                                                ) {
-                                                    Text(
-                                                        text =
-                                                            stringResource(
-                                                                if (isActive) {
-                                                                    R.string.studio_active_badge
-                                                                } else {
-                                                                    R.string.studio_draft_badge
-                                                                },
-                                                            ),
-                                                        style = MaterialTheme.typography.labelSmall,
-                                                        color =
-                                                            if (isActive) {
-                                                                MaterialTheme.colorScheme.onPrimary
-                                                            } else {
-                                                                MaterialTheme.colorScheme.onSecondary
-                                                            },
-                                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp),
-                                                    )
-                                                }
-                                            }
-                                        }
-                                        Text(
-                                            text = sectionSummaryNavigation(profile.snapshot.navigation),
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                        )
-                                    }
-                                    TextButton(
-                                        onClick = {
-                                            haptic(ArchiveTuneHapticKind.SELECTION)
-                                            draft = profile.snapshot.normalized()
-                                            draftProfileId = profile.id
-                                            hasUserEditedDraft = true
-                                            savedToLibraryNotice = false
-                                        },
-                                    ) {
-                                        Text(stringResource(R.string.studio_load_to_draft))
-                                    }
-                                    MaterialIconButton(
-                                        onClick = {
-                                            renameTargetId = profile.id
-                                            renameDraft = profile.name
-                                        },
-                                        modifier = Modifier.size(34.dp),
-                                    ) {
-                                        Icon(
-                                            painter = painterResource(R.drawable.edit),
-                                            contentDescription = stringResource(R.string.studio_rename_style),
-                                            modifier = Modifier.size(18.dp),
-                                        )
-                                    }
-                                    MaterialIconButton(
-                                        onClick = {
-                                            val updated =
-                                                SavedProfilesStore.duplicate(
-                                                    existing = savedProfiles,
-                                                    sourceId = profile.id,
-                                                    newId = UUID.randomUUID().toString(),
-                                                    copySuffix = if (isRussian) "(копия)" else "(Copy)",
-                                                    nowMs = System.currentTimeMillis(),
-                                                )
-                                            savedProfilesJson = SavedProfilesStore.encode(updated)
-                                        },
-                                        modifier = Modifier.size(34.dp),
-                                    ) {
-                                        Icon(
-                                            painter = painterResource(R.drawable.content_copy),
-                                            contentDescription = stringResource(R.string.studio_duplicate_style),
-                                            modifier = Modifier.size(18.dp),
-                                        )
-                                    }
-                                    MaterialIconButton(
-                                        onClick = {
-                                            savedProfilesJson =
-                                                SavedProfilesStore.encode(
-                                                    SavedProfilesStore.delete(savedProfiles, profile.id),
-                                                )
-                                            if (draftProfileId == profile.id) {
-                                                draftProfileId = null
-                                            }
-                                            if (activeProfileId == profile.id) {
-                                                activeProfileId = ""
-                                            }
-                                        },
-                                        modifier = Modifier.size(34.dp),
-                                    ) {
-                                        Icon(
-                                            painter = painterResource(R.drawable.delete),
-                                            contentDescription = stringResource(R.string.studio_delete_style),
-                                            modifier = Modifier.size(18.dp),
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        OutlinedButton(
-                            onClick = { exportLauncher.launch("archivetune-style.json") },
-                            contentPadding = PaddingValues(horizontal = 10.dp),
-                            shapes = ButtonDefaults.shapes(),
-                            modifier = Modifier.weight(1f),
-                        ) {
-                            Text(
-                                text = stringResource(R.string.studio_export_profile),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                        OutlinedButton(
-                            onClick = { importLauncher.launch(arrayOf("application/json", "text/plain", "*/*")) },
-                            contentPadding = PaddingValues(horizontal = 10.dp),
-                            shapes = ButtonDefaults.shapes(),
-                            modifier = Modifier.weight(1f),
-                        ) {
-                            Text(
-                                text = stringResource(R.string.studio_import_profile),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                    }
+            PreferenceGroup(title = stringResource(R.string.studio_more_appearance)) {
+                item {
+                    PreferenceEntry(
+                        title = { Text(stringResource(R.string.studio_basic_display)) },
+                        icon = { Icon(painterResource(R.drawable.text_fields), null) },
+                        onClick = { attemptExit(detailsRoute = AppearanceDetailPage.DISPLAY.route()) },
+                    )
+                }
+                item {
+                    PreferenceEntry(
+                        title = { Text(stringResource(R.string.studio_library_and_albums)) },
+                        icon = { Icon(painterResource(R.drawable.album), null) },
+                        onClick = { attemptExit(detailsRoute = AppearanceDetailPage.LIBRARY.route()) },
+                    )
                 }
             }
 
@@ -980,7 +802,7 @@ fun AppearanceStudioScreen(
                         if (expandedSection == AppearanceSection.HOME) null else AppearanceSection.HOME
                 },
                 onResetSection = { updateDraft(draft.resetSection(AppearanceSection.HOME, isLowRam)) },
-                onOpenFullSettings = { navController.navigate("settings/appearance?scrollTo=home_feed_style") },
+                onOpenFullSettings = { attemptExit(detailsRoute = "settings/appearance_studio/home") },
                 modifier = positions.modifierFor("home"),
             ) {
                 FlowRow(
@@ -1018,7 +840,7 @@ fun AppearanceStudioScreen(
                         if (expandedSection == AppearanceSection.NAVIGATION) null else AppearanceSection.NAVIGATION
                 },
                 onResetSection = { updateDraft(draft.resetSection(AppearanceSection.NAVIGATION, isLowRam)) },
-                onOpenFullSettings = { navController.navigate("settings/appearance/navigation_bar") },
+                onOpenFullSettings = { attemptExit(detailsRoute = "settings/appearance/navigation_bar") },
                 modifier = positions.modifierFor("navigation_mini_player"),
             ) {
                 Text(
@@ -1261,7 +1083,7 @@ fun AppearanceStudioScreen(
                         if (expandedSection == AppearanceSection.PLAYER) null else AppearanceSection.PLAYER
                 },
                 onResetSection = { updateDraft(draft.resetSection(AppearanceSection.PLAYER, isLowRam)) },
-                onOpenFullSettings = { navController.navigate("settings/appearance?scrollTo=player_design_style") },
+                onOpenFullSettings = { attemptExit(detailsRoute = "settings/appearance_studio/player") },
                 modifier = positions.modifierFor("player"),
             ) {
                 FlowRow(
@@ -1382,7 +1204,7 @@ fun AppearanceStudioScreen(
                         if (expandedSection == AppearanceSection.LYRICS) null else AppearanceSection.LYRICS
                 },
                 onResetSection = { updateDraft(draft.resetSection(AppearanceSection.LYRICS, isLowRam)) },
-                onOpenFullSettings = { navController.navigate("settings/lyrics?scrollTo=lyrics_mode") },
+                onOpenFullSettings = { attemptExit(detailsRoute = "settings/lyrics?scrollTo=lyrics_mode") },
                 modifier = positions.modifierFor("lyrics"),
             ) {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1469,182 +1291,57 @@ fun AppearanceStudioScreen(
                 }
             }
 
-            // Section 5: Color & Background
-            val (resolvedCustomColor, _) =
-                remember(draft.color.customThemeColor) {
-                    resolveCustomThemeSelection(draft.color.customThemeColor)
-                }
-            val isCuratedAccent =
-                CuratedStudioAccentPalettes.any { it.id == draft.color.customThemeColor }
-
-            StudioSectionCard(
-                section = AppearanceSection.COLOR,
-                iconRes = R.drawable.palette,
-                summary = darkModeLabel(draft.color.darkMode) +
-                    if (draft.color.pureBlack) " · AMOLED" else "",
-                expanded = expandedSection == AppearanceSection.COLOR,
-                onToggleExpand = {
-                    expandedSection =
-                        if (expandedSection == AppearanceSection.COLOR) null else AppearanceSection.COLOR
-                },
-                onResetSection = { updateDraft(draft.resetSection(AppearanceSection.COLOR, isLowRam)) },
-                onOpenFullSettings = { navController.navigate("settings/appearance/palette_picker") },
-                modifier = positions.modifierFor("color_background"),
+            // Immediately accessible global Animations toggle
+            val animationsEnabled =
+                !draft.motion.disableAnimations && draft.motion.profile != MotionProfile.REDUCED
+            Surface(
+                shape = RoundedCornerShape(18.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                modifier = Modifier.fillMaxWidth(),
             ) {
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    DarkMode.entries.forEach { mode ->
-                        FilterChip(
-                            selected = draft.color.darkMode == mode,
-                            onClick = {
-                                haptic(ArchiveTuneHapticKind.SELECTION)
-                                updateDraft(draft.copy(color = draft.color.copy(darkMode = mode)))
-                            },
-                            label = { Text(darkModeLabel(mode)) },
-                        )
-                    }
-                }
-                StudioToggleRow(
-                    title = stringResource(R.string.pure_black),
-                    checked = draft.color.pureBlack,
-                    onCheckedChange = {
-                        updateDraft(draft.copy(color = draft.color.copy(pureBlack = it)))
-                    },
-                )
-                StudioToggleRow(
-                    title = stringResource(R.string.enable_dynamic_theme),
-                    checked = draft.color.dynamicTheme,
-                    onCheckedChange = {
-                        updateDraft(draft.copy(color = draft.color.copy(dynamicTheme = it)))
-                    },
-                )
-                Text(
-                    text = stringResource(R.string.studio_accent_swatches_title),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                if (draft.color.dynamicTheme) {
-                    Text(
-                        text = stringResource(R.string.studio_dynamic_overrides_accent_hint),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    CuratedStudioAccentPalettes.forEach { palette ->
-                        val selected = !draft.color.dynamicTheme && draft.color.customThemeColor == palette.id
-                        FilterChip(
-                            selected = selected,
-                            onClick = {
-                                haptic(ArchiveTuneHapticKind.SELECTION)
-                                updateDraft(
-                                    draft.copy(
-                                        color =
-                                            draft.color.copy(
-                                                customThemeColor = palette.id,
-                                                dynamicTheme = false,
-                                            ),
-                                    ),
-                                )
-                            },
-                            leadingIcon = {
-                                Box(
-                                    modifier =
-                                        Modifier
-                                            .size(16.dp)
-                                            .clip(CircleShape)
-                                            .background(palette.primary)
-                                            .border(
-                                                width = if (selected) 1.5.dp else 1.dp,
-                                                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.45f),
-                                                shape = CircleShape,
-                                            ),
-                                )
-                            },
-                            label = { Text(stringResource(palette.nameResId)) },
+                    Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                        Text(
+                            text = stringResource(R.string.studio_global_animations),
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Text(
+                            text = stringResource(R.string.studio_global_animations_desc),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    if (!isCuratedAccent) {
-                        FilterChip(
-                            selected = !draft.color.dynamicTheme,
-                            onClick = {
-                                haptic(ArchiveTuneHapticKind.SELECTION)
-                                updateDraft(
-                                    draft.copy(color = draft.color.copy(dynamicTheme = false)),
-                                )
-                            },
-                            leadingIcon = {
-                                Box(
-                                    modifier =
-                                        Modifier
-                                            .size(16.dp)
-                                            .clip(CircleShape)
-                                            .background(resolvedCustomColor)
-                                            .border(
-                                                1.dp,
-                                                MaterialTheme.colorScheme.outline.copy(alpha = 0.45f),
-                                                CircleShape,
-                                            ),
-                                )
-                            },
-                            label = { Text(stringResource(R.string.studio_accent_custom_badge)) },
-                        )
-                    }
-                }
-                StudioFineTuningBlock {
-                    Text(
-                        text = stringResource(R.string.player_background_motion_policy_title),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
-                        BackgroundMotionPolicy.entries.forEach { policy ->
-                            FilterChip(
-                                selected = draft.color.backgroundMotionPolicy == policy,
-                                onClick = {
-                                    updateDraft(
-                                        draft.copy(
-                                            color = draft.color.copy(backgroundMotionPolicy = policy),
-                                        ),
-                                    )
-                                },
-                                label = {
-                                    Text(
-                                        stringResource(
-                                            when (policy) {
-                                                BackgroundMotionPolicy.WHILE_PLAYING_OPEN ->
-                                                    R.string.player_background_motion_while_open
-                                                BackgroundMotionPolicy.RESPECT_POWER_SAVER ->
-                                                    R.string.player_background_motion_power_saver
-                                                BackgroundMotionPolicy.NEVER ->
-                                                    R.string.player_background_motion_never
-                                            },
-                                        ),
-                                    )
-                                },
+                    Switch(
+                        checked = animationsEnabled,
+                        onCheckedChange = { checked ->
+                            haptic(ArchiveTuneHapticKind.PLAY_PAUSE)
+                            updateDraft(
+                                draft.copy(
+                                    motion =
+                                        if (checked) {
+                                            draft.motion.copy(
+                                                disableAnimations = false,
+                                                profile =
+                                                    if (draft.motion.profile == MotionProfile.REDUCED) {
+                                                        MotionProfile.SYSTEM
+                                                    } else {
+                                                        draft.motion.profile
+                                                    },
+                                            )
+                                        } else {
+                                            draft.motion.copy(
+                                                disableAnimations = true,
+                                                profile = MotionProfile.REDUCED,
+                                            )
+                                        },
+                                ),
                             )
-                        }
-                    }
-                    StudioToggleRow(
-                        title = stringResource(R.string.album_backdrop),
-                        checked = draft.color.backdropEnabled,
-                        onCheckedChange = {
-                            updateDraft(draft.copy(color = draft.color.copy(backdropEnabled = it)))
                         },
-                    )
-                    StudioToggleRow(
-                        title = stringResource(R.string.disable_blur),
-                        subtitle = stringResource(R.string.disable_blur_desc),
-                        checked = draft.color.disableBlur,
-                        onCheckedChange = {
-                            updateDraft(draft.copy(color = draft.color.copy(disableBlur = it)))
-                        },
-                        modifier = positions.modifierFor("disable_blur"),
                     )
                 }
             }
@@ -1660,7 +1357,7 @@ fun AppearanceStudioScreen(
                         if (expandedSection == AppearanceSection.MOTION) null else AppearanceSection.MOTION
                 },
                 onResetSection = { updateDraft(draft.resetSection(AppearanceSection.MOTION, isLowRam)) },
-                onOpenFullSettings = { navController.navigate("settings/appearance?scrollTo=disable_animations") },
+                onOpenFullSettings = { attemptExit(detailsRoute = "settings/appearance_studio/motion") },
                 modifier = positions.modifierFor("motion_profile"),
             ) {
                 Text(
@@ -1774,6 +1471,350 @@ fun AppearanceStudioScreen(
                         },
                     )
                 }
+            }
+
+            StudioFineTuningBlock(title = stringResource(R.string.studio_preview_and_styles)) {
+                // Interactive preview
+                StudioInteractivePreview(
+                    snapshot = previewSnapshot,
+                    isComparingSaved = isComparingSaved,
+                    coverMode = coverMode,
+                    onCoverModeChange = { coverMode = it },
+                )
+
+                // Compare + Apply action bar
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(999.dp),
+                        color =
+                            if (isComparingSaved) {
+                                MaterialTheme.colorScheme.tertiaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.surfaceContainerHigh
+                            },
+                        modifier =
+                            Modifier
+                                .weight(1f)
+                                .pointerInput(Unit) {
+                                    detectTapGestures(
+                                        onPress = {
+                                            isComparingSaved = true
+                                            try {
+                                                tryAwaitRelease()
+                                            } finally {
+                                                isComparingSaved = false
+                                            }
+                                        },
+                                    )
+                                },
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 11.dp),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(
+                                painter = painterResource(R.drawable.restore),
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = stringResource(R.string.studio_hold_to_compare),
+                                style = MaterialTheme.typography.labelLarge,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+
+                    Button(
+                        onClick = applyDraft,
+                        enabled = hasUnsavedChanges,
+                        shapes = ButtonDefaults.shapes(),
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.check),
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(stringResource(R.string.studio_apply))
+                    }
+                }
+
+                if (hasUnsavedChanges) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End,
+                    ) {
+                        TextButton(
+                            onClick = {
+                                haptic(ArchiveTuneHapticKind.SELECTION)
+                                discardDraft()
+                            },
+                        ) {
+                            Text(stringResource(R.string.studio_discard))
+                        }
+                    }
+                }
+
+                if (savedToLibraryNotice && hasUnsavedChanges) {
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(
+                            text = stringResource(R.string.studio_saved_to_library_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                        )
+                    }
+                }
+
+                // Starter presets
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = stringResource(R.string.studio_starter_presets),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        items(StudioStarterPresets, key = { it.id }) { preset ->
+                            val selected = draft.normalized() == preset.snapshot.normalized()
+                            FilterChip(
+                                selected = selected,
+                                onClick = {
+                                    haptic(ArchiveTuneHapticKind.SELECTION)
+                                    updateDraft(preset.snapshot.normalized())
+                                },
+                                label = { Text(preset.localizedTitle(isRussian)) },
+                            )
+                        }
+                    }
+                }
+
+                // My Styles & Export / Import
+                Surface(
+                    shape = RoundedCornerShape(18.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Column(
+                        modifier = Modifier.padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = stringResource(R.string.studio_my_styles),
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                            FilledTonalButton(
+                                onClick = {
+                                    saveStyleNameDraft = ""
+                                    showSaveStyleDialog = true
+                                },
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                                shapes = ButtonDefaults.shapes(),
+                            ) {
+                                Icon(painterResource(R.drawable.add), null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(stringResource(R.string.studio_save_as_my_style))
+                            }
+                        }
+
+                        if (savedProfiles.isEmpty()) {
+                            Text(
+                                text = stringResource(R.string.studio_my_styles_empty),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        } else {
+                            savedProfiles.forEach { profile ->
+                                val isActive = profile.id == activeProfileId && activeProfileId.isNotBlank()
+                                val isDraftSelected = profile.id == draftProfileId && !isActive
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color =
+                                        when {
+                                            isActive -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)
+                                            isDraftSelected -> MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.50f)
+                                            else -> MaterialTheme.colorScheme.surfaceContainer
+                                        },
+                                    modifier = Modifier.fillMaxWidth(),
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                            ) {
+                                                Text(
+                                                    text = profile.name,
+                                                    style = MaterialTheme.typography.labelLarge,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                    modifier = Modifier.weight(1f, fill = false),
+                                                )
+                                                if (isActive || isDraftSelected) {
+                                                    Surface(
+                                                        shape = RoundedCornerShape(999.dp),
+                                                        color =
+                                                            if (isActive) {
+                                                                MaterialTheme.colorScheme.primary
+                                                            } else {
+                                                                MaterialTheme.colorScheme.secondary
+                                                            },
+                                                    ) {
+                                                        Text(
+                                                            text =
+                                                                stringResource(
+                                                                    if (isActive) {
+                                                                        R.string.studio_active_badge
+                                                                    } else {
+                                                                        R.string.studio_draft_badge
+                                                                    },
+                                                                ),
+                                                            style = MaterialTheme.typography.labelSmall,
+                                                            color =
+                                                                if (isActive) {
+                                                                    MaterialTheme.colorScheme.onPrimary
+                                                                } else {
+                                                                    MaterialTheme.colorScheme.onSecondary
+                                                                },
+                                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp),
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                            Text(
+                                                text = sectionSummaryNavigation(profile.snapshot.navigation),
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                            )
+                                        }
+                                        TextButton(
+                                            onClick = {
+                                                haptic(ArchiveTuneHapticKind.SELECTION)
+                                                draft = profile.snapshot.normalized()
+                                                draftProfileId = profile.id
+                                                hasUserEditedDraft = true
+                                                savedToLibraryNotice = false
+                                            },
+                                        ) {
+                                            Text(stringResource(R.string.studio_load_to_draft))
+                                        }
+                                        MaterialIconButton(
+                                            onClick = {
+                                                renameTargetId = profile.id
+                                                renameDraft = profile.name
+                                            },
+                                            modifier = Modifier.size(34.dp),
+                                        ) {
+                                            Icon(
+                                                painter = painterResource(R.drawable.edit),
+                                                contentDescription = stringResource(R.string.studio_rename_style),
+                                                modifier = Modifier.size(18.dp),
+                                            )
+                                        }
+                                        MaterialIconButton(
+                                            onClick = {
+                                                val updated =
+                                                    SavedProfilesStore.duplicate(
+                                                        existing = savedProfiles,
+                                                        sourceId = profile.id,
+                                                        newId = UUID.randomUUID().toString(),
+                                                        copySuffix = if (isRussian) "(копия)" else "(Copy)",
+                                                        nowMs = System.currentTimeMillis(),
+                                                    )
+                                                savedProfilesJson = SavedProfilesStore.encode(updated)
+                                            },
+                                            modifier = Modifier.size(34.dp),
+                                        ) {
+                                            Icon(
+                                                painter = painterResource(R.drawable.content_copy),
+                                                contentDescription = stringResource(R.string.studio_duplicate_style),
+                                                modifier = Modifier.size(18.dp),
+                                            )
+                                        }
+                                        MaterialIconButton(
+                                            onClick = {
+                                                savedProfilesJson =
+                                                    SavedProfilesStore.encode(
+                                                        SavedProfilesStore.delete(savedProfiles, profile.id),
+                                                    )
+                                                if (draftProfileId == profile.id) {
+                                                    draftProfileId = null
+                                                }
+                                                if (activeProfileId == profile.id) {
+                                                    activeProfileId = ""
+                                                }
+                                            },
+                                            modifier = Modifier.size(34.dp),
+                                        ) {
+                                            Icon(
+                                                painter = painterResource(R.drawable.delete),
+                                                contentDescription = stringResource(R.string.studio_delete_style),
+                                                modifier = Modifier.size(18.dp),
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            OutlinedButton(
+                                onClick = { exportLauncher.launch("archivetune-style.json") },
+                                contentPadding = PaddingValues(horizontal = 10.dp),
+                                shapes = ButtonDefaults.shapes(),
+                                modifier = Modifier.weight(1f),
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.studio_export_profile),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                            OutlinedButton(
+                                onClick = { importLauncher.launch(arrayOf("application/json", "text/plain", "*/*")) },
+                                contentPadding = PaddingValues(horizontal = 10.dp),
+                                shapes = ButtonDefaults.shapes(),
+                                modifier = Modifier.weight(1f),
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.studio_import_profile),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
+                    }
+                }
+
             }
 
             // Bottom Apply / Discard convenience bar when scrolled down with unsaved edits
@@ -1900,6 +1941,7 @@ private fun StudioSectionCard(
 
 @Composable
 private fun StudioFineTuningBlock(
+    title: String = stringResource(R.string.studio_fine_tuning),
     content: @Composable () -> Unit,
 ) {
     var expanded by rememberSaveable { mutableStateOf(false) }
@@ -1908,7 +1950,7 @@ private fun StudioFineTuningBlock(
             onClick = { expanded = !expanded },
             contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp),
         ) {
-            Text(stringResource(R.string.studio_fine_tuning))
+            Text(title)
             Spacer(modifier = Modifier.width(4.dp))
             Icon(
                 painter = painterResource(if (expanded) R.drawable.expand_less else R.drawable.expand_more),

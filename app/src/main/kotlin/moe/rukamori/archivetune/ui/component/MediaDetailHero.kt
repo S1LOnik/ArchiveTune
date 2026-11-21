@@ -14,6 +14,7 @@ import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -42,6 +43,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
@@ -83,11 +85,22 @@ public fun MediaDetailHero(
     description: String? = null,
     additionalPrimaryActions: (@Composable RowScope.(Color) -> Unit)? = null,
     isToggleAddEnabled: Boolean = true,
+    showFullArtwork: Boolean = false,
 ) {
     val surfaceColor = MaterialTheme.colorScheme.surface
     val menuState = LocalMenuState.current
+    val artworkModel =
+        remember(thumbnailUrl) {
+            thumbnailUrl?.resize(
+                width = MediaDetailHeroArtworkSizePx,
+                height = MediaDetailHeroArtworkSizePx,
+                sizeBuckets = MediaDetailHeroArtworkSizeBuckets,
+                ytimgResizePolicy = YtimgResizePolicy.PreserveOriginal,
+            )
+        }
+    val separateArtwork = showFullArtwork && artworkModel != null
     val heroContentColor =
-        if (surfaceColor.luminance() > 0.5f) {
+        if (separateArtwork || surfaceColor.luminance() > 0.5f) {
             MaterialTheme.colorScheme.onSurface
         } else {
             Color.White
@@ -97,53 +110,49 @@ public fun MediaDetailHero(
         modifier =
             modifier
                 .fillMaxWidth()
-                .heightIn(min = MediaDetailHeroMinHeight)
+                .heightIn(min = if (separateArtwork) 0.dp else MediaDetailHeroMinHeight)
                 .background(surfaceColor),
     ) {
-        if (thumbnailUrl != null) {
-            AsyncImage(
-                model =
-                    thumbnailUrl.resize(
-                        width = MediaDetailHeroArtworkSizePx,
-                        height = MediaDetailHeroArtworkSizePx,
-                        sizeBuckets = MediaDetailHeroArtworkSizeBuckets,
-                        ytimgResizePolicy = YtimgResizePolicy.PreserveOriginal,
-                    ),
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.matchParentSize(),
-            )
-        } else {
+        if (!separateArtwork) {
+            if (artworkModel != null) {
+                AsyncImage(
+                    model = artworkModel,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.matchParentSize(),
+                )
+            } else {
+                Box(
+                    modifier =
+                        Modifier
+                            .matchParentSize()
+                            .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        painter = painterResource(fallbackIcon),
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(96.dp),
+                    )
+                }
+            }
+
             Box(
                 modifier =
                     Modifier
                         .matchParentSize()
-                        .background(MaterialTheme.colorScheme.surfaceContainerHigh),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    painter = painterResource(fallbackIcon),
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(96.dp),
-                )
-            }
-        }
-
-        Box(
-            modifier =
-                Modifier
-                    .matchParentSize()
-                    .background(
-                        Brush.verticalGradient(
-                            0f to Color.Black.copy(alpha = 0.42f),
-                            0.18f to Color.Transparent,
-                            0.42f to Color.Transparent,
-                            0.72f to surfaceColor.copy(alpha = 0.78f),
-                            1f to surfaceColor,
+                        .background(
+                            Brush.verticalGradient(
+                                0f to Color.Black.copy(alpha = 0.42f),
+                                0.18f to Color.Transparent,
+                                0.42f to Color.Transparent,
+                                0.72f to surfaceColor.copy(alpha = 0.78f),
+                                1f to surfaceColor,
+                            ),
                         ),
-                    ),
-        )
+            )
+        }
 
         Column(
             modifier =
@@ -153,12 +162,26 @@ public fun MediaDetailHero(
                     .widthIn(max = MediaDetailContentMaxWidth)
                     .padding(
                         start = MediaDetailHorizontalPadding,
-                        top = systemBarsTopPadding + AppBarHeight + 96.dp,
+                        top = systemBarsTopPadding + AppBarHeight + if (separateArtwork) 16.dp else 96.dp,
                         end = MediaDetailHorizontalPadding,
                         bottom = 24.dp,
                     ),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
+            if (separateArtwork) {
+                AsyncImage(
+                    model = artworkModel,
+                    contentDescription = null,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier
+                        .widthIn(max = 440.dp)
+                        .fillMaxWidth()
+                        .aspectRatio(1f)
+                        .clip(MaterialTheme.shapes.large),
+                )
+                Spacer(Modifier.size(18.dp))
+            }
+
             Text(
                 text = title,
                 style = MaterialTheme.typography.headlineLarge,

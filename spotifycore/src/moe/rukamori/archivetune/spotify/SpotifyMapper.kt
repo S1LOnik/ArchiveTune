@@ -7,6 +7,7 @@
 
 package moe.rukamori.archivetune.spotify
 
+import moe.rukamori.archivetune.spotify.models.SpotifyImage
 import moe.rukamori.archivetune.spotify.models.SpotifyPlaylist
 import moe.rukamori.archivetune.spotify.models.SpotifyTrack
 
@@ -95,10 +96,10 @@ object SpotifyMapper {
      * Returns the best thumbnail URL from a Spotify track's album art.
      */
     fun getTrackThumbnail(track: SpotifyTrack): String? =
-        track.album?.images?.let { images ->
-            images.firstOrNull { it.width in 200..400 }?.url
-                ?: images.firstOrNull()?.url
-        }
+        track.album?.images?.let(::getLargestImage)
+
+    fun getLargestImage(images: List<SpotifyImage>): String? =
+        images.filter { it.url.isNotBlank() }.maxByOrNull { maxOf(it.width ?: 0, it.height ?: 0) }?.url
 
     /**
      * Pre-computes normalized title/artist and their bigrams for a Spotify track.
