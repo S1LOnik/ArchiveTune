@@ -100,24 +100,14 @@ jobs:
             echo "::warning::KEYSTORE_BASE64 secret missing - APK will be signed with a random debug key"
           fi
 
-      - name: Set up the Rust Android toolchain
-        shell: bash
-        run: |
-          rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android
-          cd "$RUNNER_TEMP"
-          curl --fail --location --retry 3 --silent --show-error \
-            https://dl.google.com/android/repository/android-ndk-r30-linux.zip \
-            --output android-ndk-r30-linux.zip
-          echo '753611f410d002cfcd3f3dc2ef49aad532089d3180b436c060a90bf0fcb64df2  android-ndk-r30-linux.zip' | sha256sum --check
-          unzip -q android-ndk-r30-linux.zip
-          rm android-ndk-r30-linux.zip
-          echo "AUTOMIX_NDK=$RUNNER_TEMP/android-ndk-r30" >> "$GITHUB_ENV"
+      - name: Set up AutoMix Rust toolchain
+        uses: ./.github/actions/setup-automix
 
       - name: Build Release APKs
         shell: bash
         run: |
-          ./gradlew :app:assembleGmsMobileUniversalRelease --no-daemon -PautoMixNdk="$AUTOMIX_NDK"
-          ./gradlew :app:assembleGmsMobileArm64Release --no-daemon -PautoMixNdk="$AUTOMIX_NDK"
+          ./gradlew :app:assembleGmsMobileUniversalRelease --no-daemon
+          ./gradlew :app:assembleGmsMobileArm64Release --no-daemon
           if [ -d cleaner ]; then
             chmod +x cleaner/gradlew
             (cd cleaner && ./gradlew :app:assembleRelease --no-daemon) || true

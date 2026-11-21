@@ -38,6 +38,18 @@ jobs:
         with:
           cache-cleanup: on-success
 
+      - name: Set up AutoMix Rust toolchain
+        uses: ./.github/actions/setup-automix
+        with:
+          android: 'false'
+
+      - name: Check Rust Core
+        working-directory: app/native/automix
+        run: |
+          cargo fmt --check
+          cargo clippy --locked --all-targets -- -D warnings
+          cargo test --locked
+
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 

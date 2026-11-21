@@ -1,0 +1,23 @@
+name: Set up AutoMix Rust toolchain
+description: Install the pinned Rust compiler and SDK packages for AutoMix builds.
+inputs:
+  android:
+    description: Install the NDK and the four Android Rust targets.
+    default: 'true'
+runs:
+  using: composite
+  steps:
+    - name: Install Rust
+      shell: bash
+      run: |
+        rustup toolchain install 1.100.0 --profile minimal --component clippy,rustfmt
+        echo 'RUSTUP_TOOLCHAIN=1.100.0' >> "$GITHUB_ENV"
+    - name: Install Android SDK platform
+      shell: bash
+      run: sdkmanager 'platforms;android-37.2'
+    - name: Install Android targets and NDK
+      if: inputs.android == 'true'
+      shell: bash
+      run: |
+        rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android
+        sdkmanager 'ndk;30.0.16248370'

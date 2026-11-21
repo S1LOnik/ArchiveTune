@@ -102,6 +102,9 @@ jobs:
           cache-cleanup: on-success
           cache-read-only: ${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/dev' }}
           
+      - name: Set up AutoMix Rust toolchain
+        uses: ./.github/actions/setup-automix
+
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
@@ -317,6 +320,9 @@ jobs:
           cache-cleanup: on-success
           cache-read-only: ${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/dev' }}
           
+      - name: Set up AutoMix Rust toolchain
+        uses: ./.github/actions/setup-automix
+
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
