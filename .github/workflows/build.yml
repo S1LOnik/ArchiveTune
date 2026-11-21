@@ -253,13 +253,6 @@ jobs:
           merge-multiple: true
           path: app/build/outputs/apk/download
 
-      - name: Restore Telegram session cache
-        uses: actions/cache@v6
-        id: telegram_session_cache
-        with:
-          path: bot_session.session
-          key: telegram-session-${{ runner.os }}-bot_session
-
       - name: Send APKs to Telegram
         env:
           API_ID: ${{ secrets.TELEGRAM_API_ID }}

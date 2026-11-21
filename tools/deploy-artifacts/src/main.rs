@@ -1,4 +1,5 @@
 use glob::glob;
+use grammers_client::media::InputMedia;
 use grammers_client::message::InputMessage;
 use grammers_client::session::storages::MemorySession;
 use grammers_client::{tl, Client, SenderPool};
@@ -168,6 +169,33 @@ pub fn build_caption(
     )
 }
 
+fn telegram_caption(markdown: &str) -> (String, Vec<tl::enums::MessageEntity>) {
+    let mut text = String::with_capacity(markdown.len());
+    let mut entities = Vec::new();
+    let mut offset = 0;
+    for line in markdown.lines() {
+        if !text.is_empty() {
+            text.push('\n');
+            offset += 1;
+        }
+        // Bold only the generated label. Commit metadata stays literal.
+        if let Some((label, value)) = line
+            .strip_prefix("**")
+            .and_then(|rest| rest.split_once("**"))
+        {
+            let length = label.encode_utf16().count() as i32;
+            entities.push(tl::types::MessageEntityBold { offset, length }.into());
+            text.push_str(label);
+            text.push_str(value);
+            offset += length + value.encode_utf16().count() as i32;
+        } else {
+            text.push_str(line);
+            offset += line.encode_utf16().count() as i32;
+        }
+    }
+    (text, entities)
+}
+
 pub async fn send_files_mtproto(
     api_id: i32,
     api_hash: &str,
@@ -212,24 +240,45 @@ pub async fn send_files_mtproto(
         })
     };
 
-    for (idx, file_path) in existing_files.iter().enumerate() {
-        let uploaded = client
-            .upload_file(file_path)
-            .await
-            .map_err(|e| format!("Upload failed for {}: {e}", file_path.display()))?;
-
-        let mut msg = InputMessage::new().file(uploaded);
-        if idx == 0 {
-            msg = msg.text(caption);
+    let (caption_text, caption_entities) = telegram_caption(caption);
+    // Telegram permits up to ten documents per album.
+    for files in existing_files.chunks(10) {
+        if let [file] = files {
+            let uploaded = client
+                .upload_file(file)
+                .await
+                .map_err(|e| format!("Upload failed for {}: {e}", file.display()))?;
+            let message = InputMessage::new()
+                .file(uploaded)
+                .text(&caption_text)
+                .fmt_entities(caption_entities.clone())
+                .reply_to(topic_id);
+            client
+                .send_message(&peer, message)
+                .await
+                .map_err(|e| format!("Send document failed: {e}"))?;
+            continue;
         }
-        if let Some(t_id) = topic_id {
-            msg = msg.reply_to(Some(t_id));
-        }
 
+        let mut album = Vec::with_capacity(files.len());
+        for file in files {
+            let uploaded = client
+                .upload_file(file)
+                .await
+                .map_err(|e| format!("Upload failed for {}: {e}", file.display()))?;
+            let mut document = InputMedia::new().document(uploaded);
+            if album.is_empty() {
+                document = document
+                    .caption(&caption_text)
+                    .fmt_entities(caption_entities.clone())
+                    .reply_to(topic_id);
+            }
+            album.push(document);
+        }
         client
-            .send_message(&peer, msg)
+            .send_album(&peer, album)
             .await
-            .map_err(|e| format!("Send message failed: {e}"))?;
+            .map_err(|e| format!("Send APK album failed: {e}"))?;
     }
 
     println!("\nFiles sent successfully");
@@ -418,6 +467,31 @@ mod tests {
         assert_eq!(resolved_multi.len(), 1);
 
         let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn test_telegram_caption_preserves_lines_and_literal_commit_metadata() {
+        let (text, entities) =
+            telegram_caption("**Commit by:** 🎵 User\n**Commit message:** [Fix](link) **literal**");
+        assert_eq!(
+            text,
+            "Commit by: 🎵 User\nCommit message: [Fix](link) **literal**"
+        );
+        assert_eq!(
+            entities,
+            vec![
+                tl::types::MessageEntityBold {
+                    offset: 0,
+                    length: 10
+                }
+                .into(),
+                tl::types::MessageEntityBold {
+                    offset: 19,
+                    length: 15
+                }
+                .into(),
+            ]
+        );
     }
 
     #[test]
