@@ -1,42 +1,20 @@
+/*
+ * ArchiveTune (2026)
+ * © Rukamori — github.com/rukamori
+ * GPL-3.0 License | Contributors: see git history
+ * Do not remove or alter this notice. - Per GPL-3.0 Section 4 & Section 5
+ */
 
 package moe.rukamori.archivetune.audiosource
 
-import java.text.Normalizer
-import java.util.Locale
-import kotlin.math.abs
+import androidx.annotation.Keep
 
+@Keep
 internal object TrackMatching {
     const val MIN_MATCH_SCORE = 60
 
-    private val STOP_WORDS = setOf("the", "a", "an", "of", "and", "feat", "ft", "featuring", "with")
-
-    private val VERSION_TOKENS =
-        setOf("remix", "acoustic", "live", "instrumental", "demo", "edit", "mix", "version")
-
-    private const val DURATION_TOLERANCE_MS = 45_000L
-
-    fun score(
-        wantedTitle: String,
-        wantedArtists: List<String>,
-        candidateTitle: String,
-        candidateArtist: String,
-        wantedDurationMs: Long?,
-        candidateDurationMs: Long?,
-    ): Int {
-        if (wantedTitle.isBlank() || candidateTitle.isBlank()) return Int.MIN_VALUE
-        if (hasVersionMismatch(" $wantedTitle ", " $candidateTitle ")) return Int.MIN_VALUE
-        val titleOverlap = tokenOverlap(significantTokens(wantedTitle), significantTokens(candidateTitle))
-        if (titleOverlap < 0.5) return Int.MIN_VALUE
-        var score = (titleOverlap * 100).toInt()
-        if (wantedArtists.isNotEmpty() && candidateArtist.isNotBlank()) {
-            val artistOverlap =
-                wantedArtists.maxOf { tokenOverlap(significantTokens(it), significantTokens(candidateArtist)) }
-            score += (artistOverlap * 60).toInt()
-        }
-        if (wantedDurationMs != null && candidateDurationMs != null) {
-            if (durationMatches(wantedDurationMs, candidateDurationMs)) score += 30 else score -= 40
-        }
-        return score
+    init {
+        System.loadLibrary("archivetune_automix")
     }
 
     data class Target(
@@ -54,86 +32,97 @@ internal object TrackMatching {
         val durationMs: Long?,
     )
 
+    fun score(
+        wantedTitle: String,
+        wantedArtists: List<String>,
+        candidateTitle: String,
+        candidateArtist: String,
+        wantedDurationMs: Long?,
+        candidateDurationMs: Long?,
+    ): Int =
+        nativeScore(
+            wantedTitle = wantedTitle,
+            wantedArtists = wantedArtists.toTypedArray(),
+            candidateTitle = candidateTitle,
+            candidateArtist = candidateArtist,
+            wantedDurationMs = wantedDurationMs ?: -1L,
+            candidateDurationMs = candidateDurationMs ?: -1L,
+        )
+
     fun best(
         target: Target,
         candidates: List<Candidate>,
-    ): Candidate? =
-        candidates
-            .asSequence()
-            .map { candidate ->
-                candidate to
-                    score(
-                        wantedTitle = normalizeTitle(target.title),
-                        wantedArtists = target.artists.map { normalize(it) },
-                        candidateTitle = normalizeTitle(candidate.title),
-                        candidateArtist = normalize(candidate.artists.firstOrNull()),
-                        wantedDurationMs = target.durationMs,
-                        candidateDurationMs = candidate.durationMs,
-                    )
-            }.filter { (_, score) -> score >= MIN_MATCH_SCORE }
-            .maxByOrNull { (_, score) -> score }
-            ?.first
+    ): Candidate? {
+        if (candidates.isEmpty()) return null
+        val candidateTitles = candidates.map { it.title }.toTypedArray()
+        val candidateArtists = candidates.map { it.artists.firstOrNull().orEmpty() }.toTypedArray()
+        val candidateDurations = LongArray(candidates.size) { i -> candidates[i].durationMs ?: -1L }
 
-    private fun significantTokens(value: String): Set<String> =
-        value
-            .split(' ')
-            .map { it.trim() }
-            .filter { it.length >= 2 && it !in STOP_WORDS }
-            .toSet()
+        val bestIdx = nativeBestMatchIndex(
+            targetTitle = target.title,
+            targetArtists = target.artists.toTypedArray(),
+            targetDurationMs = target.durationMs ?: -1L,
+            candidateTitles = candidateTitles,
+            candidatePrimaryArtists = candidateArtists,
+            candidateDurationsMs = candidateDurations,
+        )
 
-    private fun tokenOverlap(
-        wanted: Set<String>,
-        candidate: Set<String>,
-    ): Double {
-        if (wanted.isEmpty() || candidate.isEmpty()) return 0.0
-        val shared = wanted.intersect(candidate).size
-
-        return shared.toDouble() / wanted.size.coerceAtLeast(candidate.size).toDouble()
+        return if (bestIdx >= 0 && bestIdx < candidates.size) candidates[bestIdx] else null
     }
 
     fun durationMatches(
         wantedDurationMs: Long?,
         candidateDurationMs: Long?,
-    ): Boolean {
-        if (wantedDurationMs == null || candidateDurationMs == null) return true
-        return abs(wantedDurationMs - candidateDurationMs) <= DURATION_TOLERANCE_MS
-    }
-
-    private fun hasVersionMismatch(
-        wanted: String,
-        candidate: String,
-    ): Boolean = VERSION_TOKENS.any { token -> wanted.contains(" $token ") != candidate.contains(" $token ") }
+    ): Boolean =
+        nativeDurationMatches(
+            wantedDurationMs ?: -1L,
+            candidateDurationMs ?: -1L,
+        )
 
     fun normalize(value: String?): String =
-        value
-            ?.lowercase(Locale.US)
-            ?.let { Normalizer.normalize(it, Normalizer.Form.NFD) }
-            ?.replace(Regex("\\p{Mn}+"), "")
-            ?.replace(Regex("[^a-z0-9]+"), " ")
-            ?.trim()
-            .orEmpty()
+        if (value == null) "" else nativeNormalize(value)
 
     fun normalizeTitle(value: String): String =
-        normalize(value)
-            .replace(Regex("""\b(feat|ft|featuring)\b.*$"""), "")
-            .replace(Regex("""\b(explicit|clean|remaster|remastered|version|audio|official)\b"""), " ")
-            .replace(Regex("\\s+"), " ")
-            .trim()
+        nativeNormalizeTitle(value)
 
     fun searchTitle(value: String): String =
-        value
-            .trim()
-            .replace(Regex("""\s*[\[(]\s*(feat\.?|ft\.?|featuring)\b.*?[\])]""", RegexOption.IGNORE_CASE), "")
-            .replace(
-                Regex("""\s*-\s*(explicit|clean|remaster(?:ed)?|audio|official)\b.*$""", RegexOption.IGNORE_CASE),
-                "",
-            ).replace(Regex("\\s+"), " ")
-            .trim()
+        nativeSearchTitle(value)
 
     fun searchArtist(value: String): String =
-        value
-            .trim()
-            .substringBefore(',')
-            .replace(Regex("\\s+"), " ")
-            .trim()
+        nativeSearchArtist(value)
+
+    @JvmStatic
+    private external fun nativeDurationMatches(wantedDurationMs: Long, candidateDurationMs: Long): Boolean
+
+    @JvmStatic
+    private external fun nativeNormalize(value: String): String
+
+    @JvmStatic
+    private external fun nativeNormalizeTitle(value: String): String
+
+    @JvmStatic
+    private external fun nativeSearchTitle(value: String): String
+
+    @JvmStatic
+    private external fun nativeSearchArtist(value: String): String
+
+    @JvmStatic
+    private external fun nativeScore(
+        wantedTitle: String,
+        wantedArtists: Array<String>,
+        candidateTitle: String,
+        candidateArtist: String,
+        wantedDurationMs: Long,
+        candidateDurationMs: Long,
+    ): Int
+
+    @JvmStatic
+    private external fun nativeBestMatchIndex(
+        targetTitle: String,
+        targetArtists: Array<String>,
+        targetDurationMs: Long,
+        candidateTitles: Array<String>,
+        candidatePrimaryArtists: Array<String>,
+        candidateDurationsMs: LongArray,
+    ): Int
 }

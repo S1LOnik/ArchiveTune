@@ -7,10 +7,13 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::ptr;
 
 use jni::JNIEnv;
-use jni::objects::{JClass, JFloatArray, JObject};
-use jni::sys::{JNI_FALSE, JNI_TRUE, jboolean, jdouble, jdoubleArray, jint, jlong};
+use jni::objects::{JClass, JFloatArray, JLongArray, JObject, JObjectArray, JString};
+use jni::sys::{JNI_FALSE, JNI_TRUE, jboolean, jdouble, jdoubleArray, jint, jlong, jstring};
 
-use crate::{Spectrum, estimate_tempo};
+use crate::{
+    Spectrum, best_match_index, duration_matches, estimate_tempo, normalize, normalize_title,
+    score, search_artist, search_title,
+};
 
 fn contain_panic<T>(failure: T, call: impl FnOnce() -> T) -> T {
     catch_unwind(AssertUnwindSafe(call)).unwrap_or(failure)
@@ -120,6 +123,270 @@ extern "system" fn Java_moe_rukamori_archivetune_playback_automix_AutoMixTempo_n
         }
 
         output_array.into_raw()
+    })
+}
+
+#[unsafe(no_mangle)]
+extern "system" fn Java_moe_rukamori_archivetune_audiosource_TrackMatching_nativeDurationMatches(
+    _env: JNIEnv,
+    _class: JClass,
+    wanted_ms: jlong,
+    candidate_ms: jlong,
+) -> jboolean {
+    contain_panic(JNI_FALSE, || {
+        let w = if wanted_ms >= 0 {
+            Some(wanted_ms)
+        } else {
+            None
+        };
+        let c = if candidate_ms >= 0 {
+            Some(candidate_ms)
+        } else {
+            None
+        };
+        if duration_matches(w, c) {
+            JNI_TRUE
+        } else {
+            JNI_FALSE
+        }
+    })
+}
+
+#[unsafe(no_mangle)]
+extern "system" fn Java_moe_rukamori_archivetune_audiosource_TrackMatching_nativeNormalize(
+    mut env: JNIEnv,
+    _class: JClass,
+    value: JString,
+) -> jstring {
+    contain_panic(ptr::null_mut(), || {
+        let text: Option<String> = if value.is_null() {
+            None
+        } else {
+            env.get_string(&value).ok().map(|s| s.into())
+        };
+        let norm = normalize(text.as_deref());
+        env.new_string(norm)
+            .map(|s| s.into_raw())
+            .unwrap_or(ptr::null_mut())
+    })
+}
+
+#[unsafe(no_mangle)]
+extern "system" fn Java_moe_rukamori_archivetune_audiosource_TrackMatching_nativeNormalizeTitle(
+    mut env: JNIEnv,
+    _class: JClass,
+    value: JString,
+) -> jstring {
+    contain_panic(ptr::null_mut(), || {
+        let text: String = if value.is_null() {
+            String::new()
+        } else {
+            env.get_string(&value).map(|s| s.into()).unwrap_or_default()
+        };
+        let norm = normalize_title(&text);
+        env.new_string(norm)
+            .map(|s| s.into_raw())
+            .unwrap_or(ptr::null_mut())
+    })
+}
+
+#[unsafe(no_mangle)]
+extern "system" fn Java_moe_rukamori_archivetune_audiosource_TrackMatching_nativeSearchTitle(
+    mut env: JNIEnv,
+    _class: JClass,
+    value: JString,
+) -> jstring {
+    contain_panic(ptr::null_mut(), || {
+        let text: String = if value.is_null() {
+            String::new()
+        } else {
+            env.get_string(&value).map(|s| s.into()).unwrap_or_default()
+        };
+        let st = search_title(&text);
+        env.new_string(st)
+            .map(|s| s.into_raw())
+            .unwrap_or(ptr::null_mut())
+    })
+}
+
+#[unsafe(no_mangle)]
+extern "system" fn Java_moe_rukamori_archivetune_audiosource_TrackMatching_nativeSearchArtist(
+    mut env: JNIEnv,
+    _class: JClass,
+    value: JString,
+) -> jstring {
+    contain_panic(ptr::null_mut(), || {
+        let text: String = if value.is_null() {
+            String::new()
+        } else {
+            env.get_string(&value).map(|s| s.into()).unwrap_or_default()
+        };
+        let sa = search_artist(&text);
+        env.new_string(sa)
+            .map(|s| s.into_raw())
+            .unwrap_or(ptr::null_mut())
+    })
+}
+
+#[unsafe(no_mangle)]
+extern "system" fn Java_moe_rukamori_archivetune_audiosource_TrackMatching_nativeScore(
+    mut env: JNIEnv,
+    _class: JClass,
+    wanted_title: JString,
+    wanted_artists: JObjectArray,
+    candidate_title: JString,
+    candidate_artist: JString,
+    wanted_duration_ms: jlong,
+    candidate_duration_ms: jlong,
+) -> jint {
+    contain_panic(i32::MIN, || {
+        let w_title: String = if wanted_title.is_null() {
+            String::new()
+        } else {
+            env.get_string(&wanted_title)
+                .map(|s| s.into())
+                .unwrap_or_default()
+        };
+        let c_title: String = if candidate_title.is_null() {
+            String::new()
+        } else {
+            env.get_string(&candidate_title)
+                .map(|s| s.into())
+                .unwrap_or_default()
+        };
+        let c_artist: String = if candidate_artist.is_null() {
+            String::new()
+        } else {
+            env.get_string(&candidate_artist)
+                .map(|s| s.into())
+                .unwrap_or_default()
+        };
+
+        let mut w_artists = Vec::new();
+        if !wanted_artists.is_null() {
+            let len = env.get_array_length(&wanted_artists).unwrap_or(0);
+            for i in 0..len {
+                if let Ok(elem) = env.get_object_array_element(&wanted_artists, i) {
+                    let jstr = JString::from(elem);
+                    let s: String = env
+                        .get_string(&jstr)
+                        .map(|js| js.into())
+                        .unwrap_or_default();
+                    w_artists.push(s);
+                }
+            }
+        }
+        let w_artists_refs: Vec<&str> = w_artists.iter().map(|s| s.as_str()).collect();
+
+        let w_dur = if wanted_duration_ms >= 0 {
+            Some(wanted_duration_ms)
+        } else {
+            None
+        };
+        let c_dur = if candidate_duration_ms >= 0 {
+            Some(candidate_duration_ms)
+        } else {
+            None
+        };
+
+        score(&w_title, &w_artists_refs, &c_title, &c_artist, w_dur, c_dur)
+    })
+}
+
+#[unsafe(no_mangle)]
+extern "system" fn Java_moe_rukamori_archivetune_audiosource_TrackMatching_nativeBestMatchIndex(
+    mut env: JNIEnv,
+    _class: JClass,
+    target_title: JString,
+    target_artists: JObjectArray,
+    target_duration_ms: jlong,
+    candidate_titles: JObjectArray,
+    candidate_primary_artists: JObjectArray,
+    candidate_durations_ms: JLongArray,
+) -> jint {
+    contain_panic(-1, || {
+        let t_title: String = if target_title.is_null() {
+            String::new()
+        } else {
+            env.get_string(&target_title)
+                .map(|s| s.into())
+                .unwrap_or_default()
+        };
+
+        let mut t_artists = Vec::new();
+        if !target_artists.is_null() {
+            let len = env.get_array_length(&target_artists).unwrap_or(0);
+            for i in 0..len {
+                if let Ok(elem) = env.get_object_array_element(&target_artists, i) {
+                    let jstr = JString::from(elem);
+                    let s: String = env
+                        .get_string(&jstr)
+                        .map(|js| js.into())
+                        .unwrap_or_default();
+                    t_artists.push(s);
+                }
+            }
+        }
+        let t_artists_refs: Vec<&str> = t_artists.iter().map(|s| s.as_str()).collect();
+        let t_dur = if target_duration_ms >= 0 {
+            Some(target_duration_ms)
+        } else {
+            None
+        };
+
+        let count = if candidate_titles.is_null() {
+            0
+        } else {
+            env.get_array_length(&candidate_titles).unwrap_or(0) as usize
+        };
+
+        let mut c_titles = Vec::with_capacity(count);
+        for i in 0..(count as jint) {
+            let s: String = if let Ok(elem) = env.get_object_array_element(&candidate_titles, i) {
+                let jstr = JString::from(elem);
+                env.get_string(&jstr)
+                    .map(|js| js.into())
+                    .unwrap_or_default()
+            } else {
+                String::new()
+            };
+            c_titles.push(s);
+        }
+        let c_titles_refs: Vec<&str> = c_titles.iter().map(|s| s.as_str()).collect();
+
+        let mut c_artists = Vec::with_capacity(count);
+        for i in 0..(count as jint) {
+            let s: String = if candidate_primary_artists.is_null() {
+                String::new()
+            } else if let Ok(elem) = env.get_object_array_element(&candidate_primary_artists, i) {
+                let jstr = JString::from(elem);
+                env.get_string(&jstr)
+                    .map(|js| js.into())
+                    .unwrap_or_default()
+            } else {
+                String::new()
+            };
+            c_artists.push(s);
+        }
+        let c_artists_refs: Vec<&str> = c_artists.iter().map(|s| s.as_str()).collect();
+
+        let mut c_durations = vec![0i64; count];
+        if !candidate_durations_ms.is_null() {
+            let _ = env.get_long_array_region(&candidate_durations_ms, 0, &mut c_durations);
+        }
+        let c_dur_opts: Vec<Option<i64>> = c_durations
+            .iter()
+            .map(|&d| if d >= 0 { Some(d) } else { None })
+            .collect();
+
+        best_match_index(
+            &t_title,
+            &t_artists_refs,
+            t_dur,
+            &c_titles_refs,
+            &c_artists_refs,
+            &c_dur_opts,
+        )
     })
 }
 

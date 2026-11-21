@@ -11,6 +11,8 @@ crate-type = ["rlib", "cdylib"]
 [dependencies]
 jni = "0.21.1"
 realfft = "3.5.0"
+regex = "1.11"
+unicode-normalization = "0.1"
 
 [profile.release]
 opt-level = 3
