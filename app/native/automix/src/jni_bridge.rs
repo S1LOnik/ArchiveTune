@@ -4,12 +4,13 @@
 // Do not remove or alter this notice. - Per GPL-3.0 Section 4 & Section 5
 
 use std::panic::{AssertUnwindSafe, catch_unwind};
+use std::ptr;
 
 use jni::JNIEnv;
-use jni::objects::{JFloatArray, JObject};
-use jni::sys::{JNI_FALSE, JNI_TRUE, jboolean, jint, jlong};
+use jni::objects::{JClass, JFloatArray, JObject};
+use jni::sys::{JNI_FALSE, JNI_TRUE, jboolean, jdouble, jdoubleArray, jint, jlong};
 
-use crate::Spectrum;
+use crate::{Spectrum, estimate_tempo};
 
 fn contain_panic<T>(failure: T, call: impl FnOnce() -> T) -> T {
     catch_unwind(AssertUnwindSafe(call)).unwrap_or(failure)
@@ -74,6 +75,52 @@ extern "system" fn Java_moe_rukamori_archivetune_playback_automix_AutoMixSpectru
             drop(unsafe { Box::from_raw(handle as *mut Spectrum) });
         }
     });
+}
+
+#[unsafe(no_mangle)]
+extern "system" fn Java_moe_rukamori_archivetune_playback_automix_AutoMixTempo_nativeEstimateTempo(
+    env: JNIEnv,
+    _class: JClass,
+    flux: JFloatArray,
+    flux_rate: jdouble,
+) -> jdoubleArray {
+    contain_panic(ptr::null_mut(), || {
+        let len = match env.get_array_length(&flux) {
+            Ok(len) if len >= 64 => len as usize,
+            _ => return ptr::null_mut(),
+        };
+
+        let mut flux_vec = vec![0.0f32; len];
+        if env.get_float_array_region(&flux, 0, &mut flux_vec).is_err() {
+            return ptr::null_mut();
+        }
+
+        let estimate = match estimate_tempo(&flux_vec, flux_rate) {
+            Some(est) => est,
+            None => return ptr::null_mut(),
+        };
+
+        let output_array = match env.new_double_array(4) {
+            Ok(arr) => arr,
+            Err(_) => return ptr::null_mut(),
+        };
+
+        let values = [
+            estimate.bpm,
+            estimate.interval_ms,
+            estimate.confidence,
+            estimate.phase_ms,
+        ];
+
+        if env
+            .set_double_array_region(&output_array, 0, &values)
+            .is_err()
+        {
+            return ptr::null_mut();
+        }
+
+        output_array.into_raw()
+    })
 }
 
 #[cfg(test)]

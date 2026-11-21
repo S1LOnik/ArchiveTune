@@ -305,7 +305,7 @@ class AutoMixAnalyzer(
     ): AutoMixAnalysis {
         val fluxRate = features.sampleRate.toDouble() / features.fftHop
         val fluxArray = features.flux.toFloatArray()
-        val tempo = estimateTempo(fluxArray, fluxRate)
+        val tempo = AutoMixTempo.estimate(fluxArray, fluxRate)
         val energy = features.energyCurve.toFloatArray()
         val vocal = normalizeVocalCurve(features.vocalCurve.toFloatArray())
         val level = robustMean(energy.toList()).coerceAtLeast(1e-6f)
@@ -442,88 +442,6 @@ class AutoMixAnalyzer(
         val spread = sorted[sorted.size * 19 / 20] - median
         if (spread <= 1e-6f) return FloatArray(raw.size) { 0.5f }
         return FloatArray(raw.size) { ((it - median) / spread).coerceIn(0f, 1f) }
-    }
-
-    private class TempoEstimate(
-        val bpm: Double,
-        val intervalMs: Double,
-        val confidence: Double,
-        val phaseMs: Double,
-    )
-
-    private fun estimateTempo(
-        flux: FloatArray,
-        fluxRate: Double,
-    ): TempoEstimate? {
-        if (flux.size < 64) return null
-        val factor = max(1, (fluxRate / 187.0).toInt())
-        val compactSize = flux.size / factor
-        if (compactSize < 32) return null
-        val compact = FloatArray(compactSize) { i ->
-            var m = 0f
-            for (k in 0 until factor) m = max(m, flux[i * factor + k])
-            m
-        }
-        val compactRate = fluxRate / factor
-
-        val mean = compact.average().toFloat()
-        val centered = FloatArray(compact.size) { compact[it] - mean }
-        var power = 0.0
-        for (v in centered) power += v.toDouble() * v
-        if (power <= 1e-9) return null
-
-        val minLag = (compactRate * 60.0 / 180.0).toInt().coerceAtLeast(2)
-        val maxLag = (compactRate * 60.0 / 60.0).toInt().coerceAtMost(centered.size / 2)
-        if (maxLag <= minLag) return null
-
-        var bestLag = -1
-        var bestScore = 0.0
-        var scoreSum = 0.0
-        for (lag in minLag..maxLag) {
-            var dot = 0.0
-            for (t in 0 until centered.size - lag) {
-                dot += centered[t].toDouble() * centered[t + lag]
-            }
-            val score = dot / power
-            scoreSum += score
-            if (score > bestScore) {
-                bestScore = score
-                bestLag = lag
-            }
-        }
-        if (bestLag <= 0) return null
-
-        val avg = scoreSum / (maxLag - minLag + 1)
-        val prominence = (bestScore - avg) / (abs(bestScore) + abs(avg) + 1e-9)
-        val confidence = (prominence * 2.0).coerceIn(0.0, 1.0)
-
-        val rawIntervalMs = 1000.0 * bestLag / compactRate
-        var bpm = 60_000.0 / rawIntervalMs
-        while (bpm < 70.0) bpm *= 2.0
-        while (bpm > 180.0) bpm /= 2.0
-
-        val bar = bestLag * 4
-        var bestPhase = 0
-        var bestComb = -1.0
-        for (phase in 0 until bar) {
-            var comb = 0.0
-            var t = phase
-            while (t < centered.size) {
-                comb += centered[t].toDouble()
-                t += bar
-            }
-            if (comb > bestComb) {
-                bestComb = comb
-                bestPhase = phase
-            }
-        }
-        val phaseMs = 1000.0 * bestPhase / compactRate
-        return TempoEstimate(
-            bpm = bpm,
-            intervalMs = 60_000.0 / bpm,
-            confidence = confidence,
-            phaseMs = phaseMs,
-        )
     }
 
     private fun cacheKey(trackId: String): String {

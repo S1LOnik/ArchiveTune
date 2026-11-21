@@ -1,0 +1,19 @@
+# Baseline AutoMix estimateTempo golden outputs
+test:silence rate:100.0 size:128
+null
+test:fewer_than_64 rate:100.0 size:63
+null
+test:regular_pulses rate:100.0 size:500
+result bpm:120.0 intervalMs:500.0 confidence:1.0 phaseMs:0.0
+test:noise rate:100.0 size:500
+null
+test:phase_shift rate:100.0 size:500
+result bpm:120.0 intervalMs:500.0 confidence:1.0 phaseMs:150.0
+test:half_double_ambiguity rate:100.0 size:600
+result bpm:150.0 intervalMs:400.0 confidence:1.0 phaseMs:0.0
+test:long_array rate:100.0 size:2500
+result bpm:133.33333333333334 intervalMs:449.99999999999994 confidence:1.0 phaseMs:0.0
+test:noisy_pulses rate:100.0 size:500
+result bpm:90.9090909090909 intervalMs:660.0 confidence:1.0 phaseMs:860.0
+test:decimation_rate rate:400.0 size:800
+result bpm:150.0 intervalMs:400.0 confidence:1.0 phaseMs:0.0

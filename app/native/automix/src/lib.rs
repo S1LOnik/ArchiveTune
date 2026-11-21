@@ -5,5 +5,7 @@
 
 mod jni_bridge;
 mod spectrum;
+mod tempo;
 
 pub use spectrum::{Spectrum, SpectrumError};
+pub use tempo::{TempoEstimate, estimate_tempo};
