@@ -5,11 +5,13 @@
 
 pub mod embedded_lyrics;
 mod jni_bridge;
+pub mod planner;
 mod spectrum;
 mod tempo;
 pub mod track_matching;
 
 pub use embedded_lyrics::extract_embedded_lyrics;
+pub use planner::{AutoMixAnalysisRaw, AutoMixPlanRaw, AutoMixStyleRaw, plan_automix};
 pub use spectrum::{Spectrum, SpectrumError};
 pub use tempo::{TempoEstimate, estimate_tempo};
 pub use track_matching::{

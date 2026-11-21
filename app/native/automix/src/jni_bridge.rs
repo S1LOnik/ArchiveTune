@@ -7,12 +7,17 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::ptr;
 
 use jni::JNIEnv;
-use jni::objects::{JByteArray, JClass, JFloatArray, JLongArray, JObject, JObjectArray, JString};
-use jni::sys::{JNI_FALSE, JNI_TRUE, jboolean, jdouble, jdoubleArray, jint, jlong, jstring};
+use jni::objects::{
+    JByteArray, JClass, JDoubleArray, JFloatArray, JLongArray, JObject, JObjectArray, JString,
+};
+use jni::sys::{
+    JNI_FALSE, JNI_TRUE, jboolean, jdouble, jdoubleArray, jint, jlong, jobjectArray, jstring,
+};
 
 use crate::{
-    Spectrum, best_match_index, duration_matches, estimate_tempo, extract_embedded_lyrics,
-    normalize, normalize_title, score, search_artist, search_title,
+    AutoMixAnalysisRaw, Spectrum, best_match_index, duration_matches, estimate_tempo,
+    extract_embedded_lyrics, normalize, normalize_title, plan_automix, score, search_artist,
+    search_title,
 };
 
 fn contain_panic<T>(failure: T, call: impl FnOnce() -> T) -> T {
@@ -438,6 +443,191 @@ extern "system" fn Java_moe_rukamori_archivetune_localmedia_EmbeddedLyricsExtrac
                 .unwrap_or(ptr::null_mut()),
             None => ptr::null_mut(),
         }
+    })
+}
+
+#[allow(clippy::too_many_arguments)]
+fn extract_analysis<'a>(
+    env: &mut JNIEnv,
+    scalars: &JDoubleArray,
+    mix_in: &JLongArray,
+    mix_out: &JLongArray,
+    energy: &JFloatArray,
+    vocal: &JFloatArray,
+    scalars_buf: &'a mut [f64; 10],
+    mix_in_buf: &'a mut Vec<i64>,
+    mix_out_buf: &'a mut Vec<i64>,
+    energy_buf: &'a mut Vec<f32>,
+    vocal_buf: &'a mut Vec<f32>,
+) -> Option<AutoMixAnalysisRaw<'a>> {
+    if scalars.is_null() {
+        return None;
+    }
+    let s_len = env.get_array_length(scalars).ok()?;
+    if s_len < 10 {
+        return None;
+    }
+    env.get_double_array_region(scalars, 0, scalars_buf).ok()?;
+
+    if !mix_in.is_null() {
+        let l = env.get_array_length(mix_in).unwrap_or(0);
+        mix_in_buf.resize(l as usize, 0);
+        let _ = env.get_long_array_region(mix_in, 0, mix_in_buf);
+    }
+
+    if !mix_out.is_null() {
+        let l = env.get_array_length(mix_out).unwrap_or(0);
+        mix_out_buf.resize(l as usize, 0);
+        let _ = env.get_long_array_region(mix_out, 0, mix_out_buf);
+    }
+
+    if !energy.is_null() {
+        let l = env.get_array_length(energy).unwrap_or(0);
+        energy_buf.resize(l as usize, 0.0);
+        let _ = env.get_float_array_region(energy, 0, energy_buf);
+    }
+
+    if !vocal.is_null() {
+        let l = env.get_array_length(vocal).unwrap_or(0);
+        vocal_buf.resize(l as usize, 0.0);
+        let _ = env.get_float_array_region(vocal, 0, vocal_buf);
+    }
+
+    Some(AutoMixAnalysisRaw {
+        duration_ms: scalars_buf[0] as i64,
+        bpm: scalars_buf[1],
+        beat_interval_ms: scalars_buf[2],
+        beat_confidence: scalars_buf[3],
+        downbeat_phase_ms: scalars_buf[4],
+        audible_start_ms: scalars_buf[5] as i64,
+        intro_end_ms: scalars_buf[6] as i64,
+        outro_start_ms: scalars_buf[7] as i64,
+        content_end_ms: scalars_buf[8] as i64,
+        final_fade_onset_ms: scalars_buf[9] as i64,
+        mix_in_candidates_ms: mix_in_buf.as_slice(),
+        mix_out_candidates_ms: mix_out_buf.as_slice(),
+        energy_curve: energy_buf.as_slice(),
+        vocal_activity: vocal_buf.as_slice(),
+    })
+}
+
+#[allow(clippy::too_many_arguments)]
+#[unsafe(no_mangle)]
+extern "system" fn Java_moe_rukamori_archivetune_playback_automix_AutoMixPlanner_nativePlan(
+    mut env: JNIEnv,
+    _class: JClass,
+    cur_scalars: JDoubleArray,
+    cur_mix_in: JLongArray,
+    cur_mix_out: JLongArray,
+    cur_energy: JFloatArray,
+    cur_vocal: JFloatArray,
+    nxt_scalars: JDoubleArray,
+    nxt_mix_in: JLongArray,
+    nxt_mix_out: JLongArray,
+    nxt_energy: JFloatArray,
+    nxt_vocal: JFloatArray,
+    current_duration_ms: jlong,
+    next_duration_ms: jlong,
+    position_ms: jlong,
+    fallback_fade_ms: jlong,
+    min_fade_ms: jlong,
+    gapless_album: jboolean,
+) -> jobjectArray {
+    contain_panic(ptr::null_mut(), || {
+        let mut cur_scalars_buf = [0.0; 10];
+        let mut cur_mix_in_buf = Vec::new();
+        let mut cur_mix_out_buf = Vec::new();
+        let mut cur_energy_buf = Vec::new();
+        let mut cur_vocal_buf = Vec::new();
+
+        let cur = extract_analysis(
+            &mut env,
+            &cur_scalars,
+            &cur_mix_in,
+            &cur_mix_out,
+            &cur_energy,
+            &cur_vocal,
+            &mut cur_scalars_buf,
+            &mut cur_mix_in_buf,
+            &mut cur_mix_out_buf,
+            &mut cur_energy_buf,
+            &mut cur_vocal_buf,
+        );
+
+        let mut nxt_scalars_buf = [0.0; 10];
+        let mut nxt_mix_in_buf = Vec::new();
+        let mut nxt_mix_out_buf = Vec::new();
+        let mut nxt_energy_buf = Vec::new();
+        let mut nxt_vocal_buf = Vec::new();
+
+        let nxt = extract_analysis(
+            &mut env,
+            &nxt_scalars,
+            &nxt_mix_in,
+            &nxt_mix_out,
+            &nxt_energy,
+            &nxt_vocal,
+            &mut nxt_scalars_buf,
+            &mut nxt_mix_in_buf,
+            &mut nxt_mix_out_buf,
+            &mut nxt_energy_buf,
+            &mut nxt_vocal_buf,
+        );
+
+        let plan = plan_automix(
+            cur.as_ref(),
+            nxt.as_ref(),
+            current_duration_ms,
+            next_duration_ms,
+            position_ms,
+            fallback_fade_ms,
+            min_fade_ms,
+            gapless_album == JNI_TRUE,
+        );
+
+        let double_arr = match env.new_double_array(12) {
+            Ok(arr) => arr,
+            Err(_) => return ptr::null_mut(),
+        };
+
+        let nums: [f64; 12] = [
+            plan.style as i32 as f64,
+            plan.transition_start_ms as f64,
+            plan.transition_end_ms as f64,
+            plan.fade_ms as f64,
+            plan.incoming_cue_ms as f64,
+            plan.incoming_playback_rate,
+            if plan.bass_swap { 1.0 } else { 0.0 },
+            plan.bass_swap_fraction,
+            plan.filter_sweep,
+            plan.vocal_overlap,
+            if plan.marker_visible { 1.0 } else { 0.0 },
+            if plan.blocked { 1.0 } else { 0.0 },
+        ];
+
+        if env.set_double_array_region(&double_arr, 0, &nums).is_err() {
+            return ptr::null_mut();
+        }
+
+        let reason_jstr = match env.new_string(plan.reason) {
+            Ok(s) => s,
+            Err(_) => return ptr::null_mut(),
+        };
+
+        let obj_class = match env.find_class("java/lang/Object") {
+            Ok(c) => c,
+            Err(_) => return ptr::null_mut(),
+        };
+
+        let result_array = match env.new_object_array(2, obj_class, JObject::null()) {
+            Ok(arr) => arr,
+            Err(_) => return ptr::null_mut(),
+        };
+
+        let _ = env.set_object_array_element(&result_array, 0, JObject::from(double_arr));
+        let _ = env.set_object_array_element(&result_array, 1, JObject::from(reason_jstr));
+
+        result_array.into_raw()
     })
 }
 
