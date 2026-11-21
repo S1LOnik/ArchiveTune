@@ -56,8 +56,8 @@ jobs:
 
       - name: Generate translation contributor credits
         run: |
-          if [ -f scripts/generate_translation_contributors.py ]; then
-            python scripts/generate_translation_contributors.py || true
+          if [ -f scripts/generate_translation_contributors.sh ]; then
+            bash scripts/generate_translation_contributors.sh || true
           fi
 
       - name: Determine Version & Tag

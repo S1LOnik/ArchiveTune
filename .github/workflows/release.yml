@@ -60,13 +60,8 @@ jobs:
           submodules: true
           fetch-depth: 0
 
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v6
-        with:
-          python-version: '3.11'
-
       - name: Generate translation contributor credits
-        run: python scripts/generate_translation_contributors.py
+        run: bash scripts/generate_translation_contributors.sh
 
       - name: Set up JDK 21
         uses: actions/setup-java@v6
@@ -193,13 +188,8 @@ jobs:
           submodules: true
           fetch-depth: 0
 
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v6
-        with:
-          python-version: '3.11'
-
       - name: Generate translation contributor credits
-        run: python scripts/generate_translation_contributors.py
+        run: bash scripts/generate_translation_contributors.sh
 
       - name: Set up JDK 21
         uses: actions/setup-java@v5
