@@ -21,7 +21,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
-import android.content.pm.ServiceInfo
 import android.database.ContentObserver
 import android.database.SQLException
 import android.media.AudioDeviceCallback
@@ -299,7 +298,6 @@ import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.pow
 import kotlin.math.roundToLong
-import kotlin.time.Duration.Companion.seconds
 
 @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class, UnstableApi::class)
 @AndroidEntryPoint
@@ -411,6 +409,7 @@ class MusicService :
     private var smoothFadeJob: Job? = null
     private var hasBoundClients = false
     private var idleStopJob: Job? = null
+    private var periodicQueueSaveJob: Job? = null
 
     private lateinit var connectivityManager: ConnectivityManager
     lateinit var connectivityObserver: NetworkConnectivityObserver
@@ -868,9 +867,6 @@ class MusicService :
 
     val maxSafeGainFactor = MAX_AUDIO_NORMALIZATION_FACTOR
 
-    @Volatile
-    private var hasCalledStartForeground = false
-
     val togetherSessionState =
         MutableStateFlow<moe.rukamori.archivetune.together.TogetherSessionState>(
             moe.rukamori.archivetune.together.TogetherSessionState.Idle,
@@ -1092,67 +1088,17 @@ class MusicService :
         return generated
     }
 
-    private fun ensureStartedAsForeground() {
-        if (hasCalledStartForeground) return
-
-        val notification =
-            try {
-                val contentIntent =
-                    PendingIntent.getActivity(
-                        this,
-                        0,
-                        Intent(this, MainActivity::class.java),
-                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-                    )
-
-                NotificationCompat
-                    .Builder(this, CHANNEL_ID)
-                    .setSmallIcon(R.drawable.small_icon)
-                    .setContentTitle(getString(R.string.music_player))
-                    .setContentText(getString(R.string.app_name))
-                    .setContentIntent(contentIntent)
-                    .setCategory(Notification.CATEGORY_SERVICE)
-                    .setPriority(NotificationCompat.PRIORITY_LOW)
-                    .setOngoing(true)
-                    .setOnlyAlertOnce(true)
-                    .build()
-            } catch (e: Exception) {
-                reportException(e)
-                return
-            }
-
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                startForeground(
-                    NOTIFICATION_ID,
-                    notification,
-                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK,
-                )
-            } else {
-                startForeground(NOTIFICATION_ID, notification)
-            }
-            hasCalledStartForeground = true
-        } catch (e: Exception) {
-            reportException(e)
-        }
-    }
-
-    private fun promoteToStartedService() {
-        runCatching { startService(Intent(this, MusicService::class.java)) }
-            .onFailure { reportException(it) }
-    }
-
     private fun cancelIdleStop() {
         idleStopJob?.cancel()
         idleStopJob = null
     }
 
-    private fun hasResumablePlaybackNotification(): Boolean {
+    private fun canStopWhenIdle(): Boolean {
         val state = player.playbackState
-        return player.mediaItemCount > 0 &&
-            player.currentMediaItem != null &&
-            state != Player.STATE_IDLE &&
-            state != Player.STATE_ENDED
+        val playbackRequested = player.playWhenReady && (state == Player.STATE_READY || state == Player.STATE_BUFFERING)
+        return !hasBoundClients &&
+            !playbackRequested &&
+            togetherSessionState.value is moe.rukamori.archivetune.together.TogetherSessionState.Idle
     }
 
     private fun stopForegroundAndSelf() {
@@ -1164,44 +1110,26 @@ class MusicService :
                 stopForeground(true)
             }
         }
-        hasCalledStartForeground = false
         stopSelf()
     }
 
     private fun scheduleStopIfIdle() {
-        if (hasBoundClients) return
-        if (hasResumablePlaybackNotification()) {
-            cancelIdleStop()
-            promoteToStartedService()
-            ensureStartedAsForeground()
-            return
-        }
-        val togetherIdle = togetherSessionState.value is moe.rukamori.archivetune.together.TogetherSessionState.Idle
-        if (!togetherIdle) {
+        if (!canStopWhenIdle()) {
             cancelIdleStop()
             return
         }
+        if (idleStopJob?.isActive == true) return
 
-        val state = player.playbackState
-        val delayMs =
-            when (state) {
-                Player.STATE_ENDED, Player.STATE_IDLE -> 30_000L
-                else -> 60_000L
-            }
-
-        cancelIdleStop()
         idleStopJob =
             scope.launch {
-                delay(delayMs)
-                if (hasBoundClients) return@launch
-                if (hasResumablePlaybackNotification()) return@launch
-                if (togetherSessionState.value !is moe.rukamori.archivetune.together.TogetherSessionState.Idle) return@launch
-                stopForegroundAndSelf()
+                delay(PLAYBACK_IDLE_TIMEOUT_MS)
+                if (canStopWhenIdle()) stopForegroundAndSelf()
             }
     }
 
     override fun onCreate() {
         super.onCreate()
+        setForegroundServiceTimeoutMs(PLAYBACK_IDLE_TIMEOUT_MS)
         equalizerPlaybackController.attach(this)
         ensureScopesActive()
 
@@ -1244,7 +1172,7 @@ class MusicService :
                 .setLoadControl(createPrimaryLoadControl())
                 .setTrackSelector(DefaultTrackSelector(this, SafeTrackSelectionFactory()))
                 .setHandleAudioBecomingNoisy(true)
-                .setWakeMode(C.WAKE_MODE_NETWORK)
+                .setWakeMode(C.WAKE_MODE_LOCAL)
                 .setAudioAttributes(
                     playbackAudioAttributes(),
                     false,
@@ -1708,16 +1636,6 @@ class MusicService :
             }
             withContext(Dispatchers.Main) {
                 queueRestoreCompleted.value = true
-            }
-        }
-
-        scope.launch {
-            while (isActive) {
-                delay(if (player.isPlaying) 10.seconds else 30.seconds)
-                val shouldSave = withContext(Dispatchers.IO) { dataStore.get(PersistentQueueKey, true) }
-                if (shouldSave && player.mediaItemCount > 0) {
-                    saveQueueToDisk()
-                }
             }
         }
     }
@@ -2791,7 +2709,7 @@ class MusicService :
         }
 
         if (isCrossfading) return
-        if (!player.playWhenReady || sleepTimer.pauseWhenSongEnd) {
+        if (!player.isPlaying || sleepTimer.pauseWhenSongEnd) {
             localPlayer.pauseAtEndOfMediaItems = false
             releaseSecondaryCrossfadePlayer()
             return
@@ -2844,7 +2762,7 @@ class MusicService :
 
                 val triggerAt = audibleEnd - effectiveDuration - CROSSFADE_END_GUARD_MS
                 var hasPreparedSecondaryPlayer = false
-                while (isActive) {
+                while (isActive && player.isPlaying) {
                     if ((!crossfadeEnabled && !smartDjAutomixEnabled) || isCrossfading) return@launch
                     if (player.currentMediaItem?.mediaId != currentMediaId || player.currentMediaItemIndex != currentIndex) {
                         return@launch
@@ -2988,7 +2906,7 @@ class MusicService :
             .setLoadControl(createCrossfadeLoadControl())
             .setTrackSelector(DefaultTrackSelector(this, SafeTrackSelectionFactory()))
             .setHandleAudioBecomingNoisy(false)
-            .setWakeMode(C.WAKE_MODE_NETWORK)
+            .setWakeMode(C.WAKE_MODE_LOCAL)
             .setAudioAttributes(playbackAudioAttributes(), false)
             .setSeekBackIncrementMs(5000)
             .setSeekForwardIncrementMs(5000)
@@ -4165,7 +4083,7 @@ class MusicService :
 
     fun refreshPlaybackNotification() {
         updateNotification()
-        onUpdateNotification(mediaSession, hasResumablePlaybackNotification())
+        triggerNotificationUpdate()
     }
 
     private suspend fun recoverSong(
@@ -4314,11 +4232,7 @@ class MusicService :
             }
             return
         }
-        if (playWhenReady) {
-            cancelIdleStop()
-            promoteToStartedService()
-            ensureStartedAsForeground()
-        }
+        if (playWhenReady) cancelIdleStop()
         cancelRestoredQueueHydration()
         ensureScopesActive()
         cancelCrossfade(resetVolume = true, resetPauseAtEnd = true)
@@ -7387,9 +7301,22 @@ class MusicService :
                 }
             }
         }
-        if (isPlaying && !isCrossfading) {
-            scheduleCrossfade()
-        }
+        if (!isCrossfading) scheduleCrossfade()
+        updateWakeLock()
+        periodicQueueSaveJob?.cancel()
+        periodicQueueSaveJob =
+            if (isPlaying) {
+                scope.launch {
+                    while (isActive) {
+                        delay(10_000)
+                        if (persistentQueueEnabledCache && player.isPlaying && player.mediaItemCount > 0) {
+                            saveQueueToDisk()
+                        }
+                    }
+                }
+            } else {
+                null
+            }
         updateAudiblePlaybackRecovery()
 
         widgetUpdater.update()
@@ -7401,8 +7328,9 @@ class MusicService :
 
     private fun updateNextStreamPreload() {
         val configuration = playbackPreloadConfiguration
-        if (configuration == null || !configuration.enabled || player.playbackState != Player.STATE_READY) {
+        if (configuration == null || !configuration.enabled || !player.isPlaying) {
             nextStreamPreloader.cancel()
+            if (preloadMaxQualityJob?.isActive == true) lastPreloadedMaxQualityMediaId = null
             preloadMaxQualityJob?.cancel()
             preloadMaxQualityJob = null
             return
@@ -7489,7 +7417,7 @@ class MusicService :
         events: Player.Events,
     ) {
         if (events.containsAny(
-                Player.EVENT_PLAYBACK_STATE_CHANGED,
+                Player.EVENT_IS_PLAYING_CHANGED,
                 Player.EVENT_MEDIA_ITEM_TRANSITION,
                 Player.EVENT_TIMELINE_CHANGED,
                 Player.EVENT_SHUFFLE_MODE_ENABLED_CHANGED,
@@ -7595,14 +7523,7 @@ class MusicService :
             if (player.playWhenReady && shouldKeepAudioEffectSessionOpen()) {
                 ensureAudioFocusForActivePlayback()
             }
-            updateWakeLock()
-            if (hasResumablePlaybackNotification()) {
-                cancelIdleStop()
-                promoteToStartedService()
-                ensureStartedAsForeground()
-            } else {
-                scheduleStopIfIdle()
-            }
+            scheduleStopIfIdle()
         }
 
         if (events.containsAny(EVENT_TIMELINE_CHANGED, EVENT_POSITION_DISCONTINUITY)) {
@@ -9363,10 +9284,10 @@ class MusicService :
     ): Int {
         if (intent?.action == ACTION_MEDIA_NOTIFICATION_DISMISSED) {
             handleMediaNotificationDismissed(intent)
+            scheduleStopIfIdle()
             return START_NOT_STICKY
         }
 
-        ensureStartedAsForeground()
         when (intent?.action) {
 
             "moe.rukamori.archivetune.WIDGET_PLAY_PAUSE" -> {
@@ -9390,23 +9311,8 @@ class MusicService :
             }
         }
         super.onStartCommand(intent, flags, startId)
+        scheduleStopIfIdle()
         return START_NOT_STICKY
-    }
-
-    override fun onUpdateNotification(
-        session: MediaSession,
-        startInForegroundRequired: Boolean,
-    ) {
-        val shouldShowNotification =
-            shouldShowPlaybackNotification(
-                startInForegroundRequired = startInForegroundRequired,
-                hasResumablePlayback = hasResumablePlaybackNotification(),
-            )
-        if (!shouldShowNotification) return
-
-        ensureStartedAsForeground()
-        runCatching { super.onUpdateNotification(session, true) }
-            .onFailure { reportException(it) }
     }
 
     // ── Widget Support ────────────────────────────────────────────────────────────
@@ -9434,11 +9340,6 @@ class MusicService :
             isHostSessionActive: Boolean,
             isPlaybackInactive: Boolean,
         ): Boolean = (isHostSessionActive && isPlaybackInactive) || stopMusicOnTaskClearEnabled
-
-        internal fun shouldShowPlaybackNotification(
-            startInForegroundRequired: Boolean,
-            hasResumablePlayback: Boolean,
-        ): Boolean = startInForegroundRequired || hasResumablePlayback
 
         const val ROOT = "root"
         const val HOME = "home"
@@ -9469,6 +9370,7 @@ class MusicService :
         private const val DISCORD_SYNC_TAG = "DiscordSync"
         private const val DISCORD_HOLD_TIMEOUT_MS = 7_000L
         const val CHANNEL_ID = "music_channel_01"
+        private const val PLAYBACK_IDLE_TIMEOUT_MS = 60_000L
         const val ACTION_BLUETOOTH_CONNECT = "moe.rukamori.archivetune.action.BLUETOOTH_CONNECT"
         const val ACTION_MEDIA_NOTIFICATION_DISMISSED =
             "moe.rukamori.archivetune.action.MEDIA_NOTIFICATION_DISMISSED"
