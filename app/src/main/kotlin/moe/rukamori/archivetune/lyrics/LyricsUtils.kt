@@ -9,12 +9,32 @@ package moe.rukamori.archivetune.lyrics
 
 import android.icu.text.Transliterator
 import android.text.format.DateUtils
+import androidx.annotation.Keep
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import moe.rukamori.archivetune.betterlyrics.QRCParser
 import moe.rukamori.archivetune.betterlyrics.TTMLParser
 import moe.rukamori.archivetune.db.entities.LyricsEntity
 import java.lang.Character.UnicodeScript
+
+@Serializable
+private data class ParsedLyricsEntryDto(
+    val time: Long,
+    val text: String,
+    val words: List<ParsedWordTimestampDto>? = null,
+    val agent: String? = null,
+    val providerTranslationText: String? = null,
+    val durationMs: Long = 0L,
+)
+
+@Serializable
+private data class ParsedWordTimestampDto(
+    val text: String,
+    val startTime: Double,
+    val endTime: Double,
+)
 
 data class LyricsRomanizationPreferences(
     val romanizeJapanese: Boolean,
@@ -34,29 +54,17 @@ data class LyricsRomanizationPreferences(
         get() = aiHandled || isEnabled
 }
 
+@Keep
 @Suppress("RegExpRedundantEscape")
 object LyricsUtils {
     init {
         System.loadLibrary("archivetune_automix")
     }
 
-    private data class ParsedLyricsEntryDto(
-        val time: Long,
-        val text: String,
-        val words: List<ParsedWordTimestampDto>? = null,
-        val agent: String? = null,
-        val providerTranslationText: String? = null,
-        val durationMs: Long = 0L,
-    )
-
-    private data class ParsedWordTimestampDto(
-        val text: String,
-        val startTime: Double,
-        val endTime: Double,
-    )
-
-    private val lyricsGson = com.google.gson.Gson()
-    private val lyricsListType = object : com.google.gson.reflect.TypeToken<List<ParsedLyricsEntryDto>>() {}.type
+    private val lyricsJson = Json {
+        ignoreUnknownKeys = true
+        isLenient = true
+    }
 
     @JvmStatic
     private external fun nativeParseLyrics(lyrics: String): String?
@@ -684,7 +692,7 @@ object LyricsUtils {
 
     fun parseLyrics(lyrics: String): List<LyricsEntry> {
         val json = nativeParseLyrics(lyrics) ?: return emptyList()
-        val dtos: List<ParsedLyricsEntryDto> = lyricsGson.fromJson(json, lyricsListType) ?: return emptyList()
+        val dtos = lyricsJson.decodeFromString<List<ParsedLyricsEntryDto>>(json)
         return dtos.map { dto ->
             LyricsEntry(
                 time = dto.time,

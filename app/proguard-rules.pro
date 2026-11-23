@@ -178,8 +178,10 @@
 -keep class androidx.security.crypto.** { *; }
 -dontwarn androidx.security.crypto.**
 
-## Gson serialization for Librespot credentials
+## Gson serialization for Librespot credentials and generic TypeToken consumers
 -keep class com.google.gson.** { *; }
+-keep,allowobfuscation,allowshrinking class com.google.gson.reflect.TypeToken
+-keep,allowobfuscation,allowshrinking class * extends com.google.gson.reflect.TypeToken
 -dontwarn com.google.gson.**
 
 ## Protobuf & Enum preservation (required for Librespot session builder and Auth types)
