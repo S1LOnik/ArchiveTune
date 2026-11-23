@@ -2453,12 +2453,10 @@ private fun ColumnScope.FlamingoAlbum(
 
         FlamingoWrapper {
             if (videoShowing) {
-                // [FIX-ZCODE] Wave 12: Enforce square cropped aspect ratio and scale-down animation on pause for video
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(1f)
                         .padding(start = dp, end = dp, bottom = dp)
+                        .aspectRatio(1f)
                         .clip(RoundedCornerShape(artworkCornerRadius))
                         .then(modifier),
                     contentAlignment = Alignment.Center,

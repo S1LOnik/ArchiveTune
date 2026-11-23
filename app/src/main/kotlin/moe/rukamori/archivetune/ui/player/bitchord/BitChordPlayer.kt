@@ -146,7 +146,9 @@ import moe.rukamori.archivetune.extensions.metadata
 import moe.rukamori.archivetune.extensions.move
 import moe.rukamori.archivetune.ui.utils.ShowMediaInfo
 import moe.rukamori.archivetune.ui.menu.PlayerMenu
-import moe.rukamori.archivetune.ui.utils.resize
+import moe.rukamori.archivetune.ui.player.rememberThumbnailSwapState
+import moe.rukamori.archivetune.ui.utils.highRes
+import moe.rukamori.archivetune.utils.rememberLowDataModeActive
 import moe.rukamori.archivetune.utils.rememberPreference
 import moe.rukamori.archivetune.viewmodels.LyricsMenuViewModel
 import moe.rukamori.archivetune.LocalAnimationsDisabled
@@ -622,9 +624,12 @@ fun BitChordPlayerContent(
 
     val heroMode = playerFillsWindow(LocalConfiguration.current.screenWidthDp.dp)
 
-    val artUrl = remember(mediaMetadata.id, mediaMetadata.thumbnailUrl) {
-        mediaMetadata.thumbnailUrl?.resize(width = ART_PX, height = ART_PX, maxresAllowed = true)
-    }
+    val artUrl = rememberThumbnailSwapState(
+        videoId = mediaMetadata.id,
+        ytmUrl = mediaMetadata.thumbnailUrl?.highRes(),
+        lowDataMode = rememberLowDataModeActive(),
+        isMusicVideo = mediaMetadata.isMusicVideo,
+    ).displayUrl
     var artLoaded by remember(artUrl) { mutableStateOf(false) }
 
     var heroSettled by remember { mutableStateOf(false) }
