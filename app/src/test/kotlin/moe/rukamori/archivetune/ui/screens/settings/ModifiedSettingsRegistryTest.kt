@@ -52,7 +52,7 @@ class ModifiedSettingsRegistryTest {
         val modernPrefs = preferencesOf(PlayerDesignStyleKey to PlayerDesignStyle.SPATIALFLOW.name)
         val entries = ModifiedSettingsRegistry.collectModified(modernPrefs, isLowRamDevice = false)
         assertEquals(1, entries.size)
-        assertEquals("settings/appearance?scrollTo=player_design_style", entries.first().route)
+        assertEquals("settings/appearance_studio/player?scrollTo=player_design_style", entries.first().route)
     }
 
     @Test
