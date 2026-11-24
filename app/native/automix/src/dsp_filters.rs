@@ -45,7 +45,7 @@ impl SvfFilterProcessor {
         if channel_count == 0 || channel_count > 32 {
             return Err("channel_count must be within 1..=32");
         }
-        if sample_rate < 8_000 || sample_rate > 768_000 {
+        if !(8_000..=768_000).contains(&sample_rate) {
             return Err("sample_rate must be within 8000..=768000");
         }
         let mut proc = Self {
@@ -149,10 +149,10 @@ impl SvfFilterProcessor {
         if self.is_parked() {
             return false;
         }
-        let low_active = self.target_low_hz < OPEN_HZ - SETTLED_HZ
-            || self.current_low_hz < OPEN_HZ - SETTLED_HZ;
-        let high_active = self.target_high_hz > OFF_HZ + SETTLED_HZ
-            || self.current_high_hz > OFF_HZ + SETTLED_HZ;
+        let low_active =
+            self.target_low_hz < OPEN_HZ - SETTLED_HZ || self.current_low_hz < OPEN_HZ - SETTLED_HZ;
+        let high_active =
+            self.target_high_hz > OFF_HZ + SETTLED_HZ || self.current_high_hz > OFF_HZ + SETTLED_HZ;
         if !low_active && !high_active {
             return false;
         }
@@ -186,10 +186,10 @@ impl SvfFilterProcessor {
         if self.is_parked() {
             return false;
         }
-        let low_active = self.target_low_hz < OPEN_HZ - SETTLED_HZ
-            || self.current_low_hz < OPEN_HZ - SETTLED_HZ;
-        let high_active = self.target_high_hz > OFF_HZ + SETTLED_HZ
-            || self.current_high_hz > OFF_HZ + SETTLED_HZ;
+        let low_active =
+            self.target_low_hz < OPEN_HZ - SETTLED_HZ || self.current_low_hz < OPEN_HZ - SETTLED_HZ;
+        let high_active =
+            self.target_high_hz > OFF_HZ + SETTLED_HZ || self.current_high_hz > OFF_HZ + SETTLED_HZ;
         if !low_active && !high_active {
             return false;
         }
@@ -260,8 +260,8 @@ pub fn smooth_curve(curve: &[f32], span: usize) -> Vec<f32> {
         acc += v;
         count += 1;
     }
-    for idx in 0..len {
-        out[idx] = if count > 0 { acc / (count as f32) } else { 0.0 };
+    for (idx, value) in out.iter_mut().enumerate() {
+        *value = if count > 0 { acc / (count as f32) } else { 0.0 };
         let add = idx + span + 1;
         if add < len {
             acc += curve[add];
@@ -600,7 +600,10 @@ mod tests {
             .collect();
         assert!(proc.process_f32_in_place(&mut tone));
         let tail_rms = measure_levels(&tone[1024..]).1;
-        assert!(tail_rms < 0.05, "expected lowpass attenuation, got {tail_rms}");
+        assert!(
+            tail_rms < 0.05,
+            "expected lowpass attenuation, got {tail_rms}"
+        );
     }
 
     #[test]
@@ -611,7 +614,10 @@ mod tests {
         let mut dc = vec![0.5f32; 4096];
         assert!(proc.process_f32_in_place(&mut dc));
         let tail_rms = measure_levels(&dc[3072..]).1;
-        assert!(tail_rms < 0.02, "expected highpass DC rejection, got {tail_rms}");
+        assert!(
+            tail_rms < 0.02,
+            "expected highpass DC rejection, got {tail_rms}"
+        );
     }
 
     #[test]

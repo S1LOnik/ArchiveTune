@@ -184,8 +184,16 @@ pub fn analyze_envelope_f32(
             last_active = frame_idx;
         }
         if channels >= 2 {
-            let l = if frame[0].is_finite() { frame[0] as f64 } else { 0.0 };
-            let r = if frame[1].is_finite() { frame[1] as f64 } else { 0.0 };
+            let l = if frame[0].is_finite() {
+                frame[0] as f64
+            } else {
+                0.0
+            };
+            let r = if frame[1].is_finite() {
+                frame[1] as f64
+            } else {
+                0.0
+            };
             lr_dot += l * r;
             l_sq += l * l;
             r_sq += r * r;

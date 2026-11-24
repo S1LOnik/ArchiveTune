@@ -74,27 +74,20 @@ fn read_le_u32(b: &[u8]) -> Option<u32> {
 }
 
 fn read_be_u64(b: &[u8]) -> Option<u64> {
-    b.get(0..8).map(|s| {
-        u64::from_be_bytes([s[0], s[1], s[2], s[3], s[4], s[5], s[6], s[7]])
-    })
+    b.get(0..8)
+        .map(|s| u64::from_be_bytes([s[0], s[1], s[2], s[3], s[4], s[5], s[6], s[7]]))
 }
 
 fn read_le_u64(b: &[u8]) -> Option<u64> {
-    b.get(0..8).map(|s| {
-        u64::from_le_bytes([s[0], s[1], s[2], s[3], s[4], s[5], s[6], s[7]])
-    })
+    b.get(0..8)
+        .map(|s| u64::from_le_bytes([s[0], s[1], s[2], s[3], s[4], s[5], s[6], s[7]]))
 }
 
 fn decode_syncsafe_u32(b: &[u8]) -> Option<u32> {
     if b.len() < 4 || b[..4].iter().any(|&x| x >= 0x80) {
         return None;
     }
-    Some(
-        ((b[0] as u32) << 21)
-            | ((b[1] as u32) << 14)
-            | ((b[2] as u32) << 7)
-            | (b[3] as u32),
-    )
+    Some(((b[0] as u32) << 21) | ((b[1] as u32) << 14) | ((b[2] as u32) << 7) | (b[3] as u32))
 }
 
 fn parse_slash_int(raw: &str) -> Option<i32> {
@@ -188,7 +181,9 @@ fn trim_utf16_nul(bytes: &[u8]) -> &[u8] {
 
 fn decode_utf16_le(bytes: &[u8]) -> String {
     let units: Vec<u16> = bytes
-        .chunks_exact(2)
+        .as_chunks::<2>()
+        .0
+        .iter()
         .map(|c| u16::from_le_bytes([c[0], c[1]]))
         .collect();
     String::from_utf16_lossy(&units)
@@ -196,7 +191,9 @@ fn decode_utf16_le(bytes: &[u8]) -> String {
 
 fn decode_utf16_be(bytes: &[u8]) -> String {
     let units: Vec<u16> = bytes
-        .chunks_exact(2)
+        .as_chunks::<2>()
+        .0
+        .iter()
         .map(|c| u16::from_be_bytes([c[0], c[1]]))
         .collect();
     String::from_utf16_lossy(&units)
@@ -345,8 +342,7 @@ fn apply_id3_frame(
         }
         "TPE2" | "TP2" => {
             if meta.album_artist.is_none() {
-                meta.album_artist =
-                    sanitize_tag_text(&decode_id3_string(encoding, &content[1..]));
+                meta.album_artist = sanitize_tag_text(&decode_id3_string(encoding, &content[1..]));
             }
         }
         "TALB" | "TAL" => {
@@ -370,15 +366,13 @@ fn apply_id3_frame(
             }
         }
         "TLEN" | "TLE" => {
-            if meta.duration_ms.is_none() {
-                if let Ok(ms) = decode_id3_string(encoding, &content[1..])
+            if meta.duration_ms.is_none()
+                && let Ok(ms) = decode_id3_string(encoding, &content[1..])
                     .trim()
                     .parse::<i64>()
-                {
-                    if ms > 0 {
-                        meta.duration_ms = Some(ms);
-                    }
-                }
+                && ms > 0
+            {
+                meta.duration_ms = Some(ms);
             }
         }
         "USLT" | "ULT" => {
@@ -400,14 +394,13 @@ fn apply_id3_frame(
             }
         }
         "APIC" | "PIC" => {
-            if meta.artwork_offset.is_none() {
-                if let Some((rel_off, img_len, mime)) = locate_id3_picture(frame_id, content) {
-                    if let Some(base) = abs_frame_offset {
-                        meta.artwork_offset = Some(base + rel_off);
-                        meta.artwork_len = Some(img_len);
-                        meta.artwork_mime = Some(mime);
-                    }
-                }
+            if meta.artwork_offset.is_none()
+                && let Some((rel_off, img_len, mime)) = locate_id3_picture(frame_id, content)
+                && let Some(base) = abs_frame_offset
+            {
+                meta.artwork_offset = Some(base + rel_off);
+                meta.artwork_len = Some(img_len);
+                meta.artwork_mime = Some(mime);
             }
         }
         _ => {}
@@ -560,22 +553,14 @@ fn parse_mpeg_audio_only(data: &[u8], start_offset: usize) -> Option<AudioTagMet
     };
     let xing_off = off + 4 + side_info;
     let mut duration_ms = None;
-    if let Some(tag) = data.get(xing_off..xing_off + 4) {
-        if tag == b"Xing" || tag == b"Info" {
-            if let Some(flags) = data.get(xing_off + 4..xing_off + 8).and_then(read_be_u32) {
-                if (flags & 0x01) != 0 {
-                    if let Some(frames) = data
-                        .get(xing_off + 8..xing_off + 12)
-                        .and_then(read_be_u32)
-                    {
-                        duration_ms = Some(
-                            ((frames as i64) * (samples_per_frame as i64) * 1000)
-                                / (sample_rate as i64),
-                        );
-                    }
-                }
-            }
-        }
+    if let Some(tag) = data.get(xing_off..xing_off + 4)
+        && (tag == b"Xing" || tag == b"Info")
+        && let Some(flags) = data.get(xing_off + 4..xing_off + 8).and_then(read_be_u32)
+        && (flags & 0x01) != 0
+        && let Some(frames) = data.get(xing_off + 8..xing_off + 12).and_then(read_be_u32)
+    {
+        duration_ms =
+            Some(((frames as i64) * (samples_per_frame as i64) * 1000) / (sample_rate as i64));
     }
 
     if duration_ms.is_none() && bitrate_kbps > 0 {
@@ -681,7 +666,10 @@ fn apply_vorbis_comment(block: &[u8], meta: &mut AudioTagMetadata) {
     pos += 4;
     let safe_count = count.min(512);
     for _ in 0..safe_count {
-        let Some(entry_len) = block.get(pos..pos + 4).and_then(read_le_u32).map(|v| v as usize)
+        let Some(entry_len) = block
+            .get(pos..pos + 4)
+            .and_then(read_le_u32)
+            .map(|v| v as usize)
         else {
             break;
         };
@@ -689,10 +677,10 @@ fn apply_vorbis_comment(block: &[u8], meta: &mut AudioTagMetadata) {
         if pos + entry_len > block.len() {
             break;
         }
-        if let Ok(entry) = std::str::from_utf8(&block[pos..pos + entry_len]) {
-            if let Some((k, v)) = entry.split_once('=') {
-                apply_key_value_tag(k, v, meta);
-            }
+        if let Ok(entry) = std::str::from_utf8(&block[pos..pos + entry_len])
+            && let Some((k, v)) = entry.split_once('=')
+        {
+            apply_key_value_tag(k, v, meta);
         }
         pos += entry_len;
     }
@@ -703,31 +691,38 @@ fn apply_key_value_tag(key: &str, value: &str, meta: &mut AudioTagMetadata) {
         return;
     };
     match key.trim().to_ascii_uppercase().as_str() {
-        "TITLE" => meta.title.get_or_insert(cleaned),
-        "ARTIST" => meta.artist.get_or_insert(cleaned),
-        "ALBUMARTIST" | "ALBUM ARTIST" => meta.album_artist.get_or_insert(cleaned),
-        "ALBUM" => meta.album.get_or_insert(cleaned),
+        "TITLE" => {
+            meta.title.get_or_insert(cleaned);
+        }
+        "ARTIST" => {
+            meta.artist.get_or_insert(cleaned);
+        }
+        "ALBUMARTIST" | "ALBUM ARTIST" => {
+            meta.album_artist.get_or_insert(cleaned);
+        }
+        "ALBUM" => {
+            meta.album.get_or_insert(cleaned);
+        }
         "TRACKNUMBER" => {
             if meta.track_number.is_none() {
                 meta.track_number = parse_slash_int(&cleaned);
             }
-            return;
         }
         "DISCNUMBER" => {
             if meta.disc_number.is_none() {
                 meta.disc_number = parse_slash_int(&cleaned);
             }
-            return;
         }
         "DATE" | "YEAR" => {
             if meta.year.is_none() {
                 meta.year = parse_year_int(&cleaned);
             }
-            return;
         }
-        "LYRICS" | "UNSYNCEDLYRICS" => meta.lyrics.get_or_insert(cleaned),
-        _ => return,
-    };
+        "LYRICS" | "UNSYNCEDLYRICS" => {
+            meta.lyrics.get_or_insert(cleaned);
+        }
+        _ => {}
+    }
 }
 
 fn parse_ogg(data: &[u8]) -> Option<AudioTagMetadata> {
@@ -776,14 +771,13 @@ fn parse_ogg(data: &[u8]) -> Option<AudioTagMetadata> {
     let tail_start = data.len().saturating_sub(65_536);
     if let Some(last_page) = rfind_subslice(&data[tail_start..], b"OggS") {
         let abs = tail_start + last_page;
-        if abs + 14 <= data.len() {
-            if let Some(granule) = read_le_u64(&data[abs + 6..abs + 14]) {
-                if let Some(sr) = meta.sample_rate.filter(|&s| s > 0) {
-                    let net_samples = granule.saturating_sub(pre_skip) as i64;
-                    if net_samples > 0 {
-                        meta.duration_ms = Some((net_samples * 1000) / (sr as i64));
-                    }
-                }
+        if abs + 14 <= data.len()
+            && let Some(granule) = read_le_u64(&data[abs + 6..abs + 14])
+            && let Some(sr) = meta.sample_rate.filter(|&s| s > 0)
+        {
+            let net_samples = granule.saturating_sub(pre_skip) as i64;
+            if net_samples > 0 {
+                meta.duration_ms = Some((net_samples * 1000) / (sr as i64));
             }
         }
     }
@@ -795,9 +789,7 @@ fn rfind_subslice(haystack: &[u8], needle: &[u8]) -> Option<usize> {
     if needle.is_empty() || haystack.len() < needle.len() {
         return None;
     }
-    haystack
-        .windows(needle.len())
-        .rposition(|w| w == needle)
+    haystack.windows(needle.len()).rposition(|w| w == needle)
 }
 
 fn parse_wav(data: &[u8]) -> Option<AudioTagMetadata> {
@@ -828,20 +820,21 @@ fn parse_wav(data: &[u8]) -> Option<AudioTagMetadata> {
             data_bytes = size as u64;
         } else if id == b"LIST" && chunk.starts_with(b"INFO") {
             parse_wav_list_info(&chunk[4..], &mut meta);
-        } else if (id == b"id3 " || id == b"ID3 ") && chunk.starts_with(b"ID3") {
-            if let Some(id3_meta) = parse_mp3_with_id3(chunk) {
-                if meta.title.is_none() {
-                    meta.title = id3_meta.title;
-                }
-                if meta.artist.is_none() {
-                    meta.artist = id3_meta.artist;
-                }
-                if meta.album.is_none() {
-                    meta.album = id3_meta.album;
-                }
-                if meta.year.is_none() {
-                    meta.year = id3_meta.year;
-                }
+        } else if (id == b"id3 " || id == b"ID3 ")
+            && chunk.starts_with(b"ID3")
+            && let Some(id3_meta) = parse_mp3_with_id3(chunk)
+        {
+            if meta.title.is_none() {
+                meta.title = id3_meta.title;
+            }
+            if meta.artist.is_none() {
+                meta.artist = id3_meta.artist;
+            }
+            if meta.album.is_none() {
+                meta.album = id3_meta.album;
+            }
+            if meta.year.is_none() {
+                meta.year = id3_meta.year;
             }
         }
 
@@ -916,7 +909,10 @@ fn walk_mp4_boxes(
         let raw_size = read_be_u32(&data[pos..pos + 4]).unwrap_or(0) as u64;
         let box_type = &data[pos + 4..pos + 8];
         let (hdr_len, box_len) = if raw_size == 1 && pos + 16 <= end {
-            (16usize, read_be_u64(&data[pos + 8..pos + 16]).unwrap_or(0) as usize)
+            (
+                16usize,
+                read_be_u64(&data[pos + 8..pos + 16]).unwrap_or(0) as usize,
+            )
         } else if raw_size == 0 {
             (8usize, end - pos)
         } else {
@@ -1147,8 +1143,7 @@ mod tests {
         buf.extend_from_slice(&[0, 0, 34]);
         let mut si = [0u8; 34];
         // 44100 Hz, 2 ch, 16 bps, 441000 samples (= 10s)
-        let packed: u64 =
-            (44_100u64 << 44) | ((2 - 1) << 41) | ((16 - 1) << 36) | 441_000u64;
+        let packed: u64 = (44_100u64 << 44) | ((2 - 1) << 41) | ((16 - 1) << 36) | 441_000u64;
         si[10..18].copy_from_slice(&packed.to_be_bytes());
         buf.extend_from_slice(&si);
 

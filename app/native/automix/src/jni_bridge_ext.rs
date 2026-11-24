@@ -37,13 +37,11 @@ use crate::playlist_dedup::{
     deduplicate_track_indices, extract_youtube_playlist_id, extract_youtube_video_id,
     normalize_isrc, parse_m3u_to_json, smart_shuffle_indices, strip_tracking_query_params,
 };
-use crate::qrc_parser::{
-    has_word_timings, is_qrc, parse_qrc_to_json, qrc_to_enhanced_lrc,
-};
+use crate::qrc_parser::{has_word_timings, is_qrc, parse_qrc_to_json, qrc_to_enhanced_lrc};
 use crate::romanization::{
-    detect_dominant_language, hiragana_to_katakana, katakana_to_romaji, looks_chinese,
-    looks_hindi, looks_japanese, looks_korean, needs_other_romanization, romanize_cyrillic,
-    romanize_hindi, romanize_korean,
+    detect_dominant_language, hiragana_to_katakana, katakana_to_romaji, looks_chinese, looks_hindi,
+    looks_japanese, looks_korean, needs_other_romanization, romanize_cyrillic, romanize_hindi,
+    romanize_korean,
 };
 use crate::stream_selector::{
     TargetAudioQuality, extract_dash_segment_urls, extract_flac_metadata_blocks,
@@ -352,15 +350,12 @@ extern "system" fn Java_moe_rukamori_archivetune_playback_automix_AutoMixNativeD
         let _ = write!(
             out,
             "{{\"audibleStartMs\":{},\"introEndMs\":{},\"outroStartMs\":{},",
-            summary.audible_start_ms,
-            summary.intro_end_ms,
-            summary.outro_start_ms,
+            summary.audible_start_ms, summary.intro_end_ms, summary.outro_start_ms,
         );
         let _ = write!(
             out,
             "\"contentEndMs\":{},\"finalFadeOnsetMs\":{}",
-            summary.content_end_ms,
-            summary.final_fade_onset_ms,
+            summary.content_end_ms, summary.final_fade_onset_ms,
         );
         out.push_str(",\"mixInCandidatesMs\":[");
         for (i, v) in summary.mix_in_candidates_ms.iter().enumerate() {
@@ -1260,9 +1255,7 @@ extern "system" fn Java_moe_rukamori_archivetune_utils_NativeMediaUtils_nativeSe
             || env
                 .get_long_array_region(&last_access_ms, 0, &mut t_buf)
                 .is_err()
-            || env
-                .get_int_array_region(&pin_flags, 0, &mut p_buf)
-                .is_err()
+            || env.get_int_array_region(&pin_flags, 0, &mut p_buf).is_err()
         {
             return to_jint_array(&mut env, &[]);
         }
@@ -1351,8 +1344,7 @@ extern "system" fn Java_moe_rukamori_archivetune_playback_automix_AutoMixNativeD
         let quantized = quantize_f32_to_i16_tpdf(&buf, seed as u64);
         match env.new_short_array(quantized.len() as jint) {
             Ok(arr) => {
-                if !quantized.is_empty()
-                    && env.set_short_array_region(&arr, 0, &quantized).is_err()
+                if !quantized.is_empty() && env.set_short_array_region(&arr, 0, &quantized).is_err()
                 {
                     return ptr::null_mut();
                 }
@@ -1392,7 +1384,9 @@ extern "system" fn Java_moe_rukamori_archivetune_playback_automix_AutoMixNativeD
     measured_lufs: jdouble,
     target_lufs: jdouble,
 ) -> jdouble {
-    contain_panic(0.0, || replay_gain_db_for_target(measured_lufs, target_lufs))
+    contain_panic(0.0, || {
+        replay_gain_db_for_target(measured_lufs, target_lufs)
+    })
 }
 
 #[allow(clippy::too_many_arguments)]

@@ -113,10 +113,10 @@ pub fn extract_lyric_content(content: &str) -> String {
                 if let Some(end_q) = after_q.find('"') {
                     return unescape_xml(&after_q[..end_q]);
                 }
-            } else if let Some(after_q) = after_eq.strip_prefix('\'') {
-                if let Some(end_q) = after_q.find('\'') {
-                    return unescape_xml(&after_q[..end_q]);
-                }
+            } else if let Some(after_q) = after_eq.strip_prefix('\'')
+                && let Some(end_q) = after_q.find('\'')
+            {
+                return unescape_xml(&after_q[..end_q]);
             }
         }
     }
@@ -202,10 +202,10 @@ fn parse_word_tuple(spec: &str) -> Option<(i64, i64)> {
     let mut parts = spec.split(',');
     let s_str = parts.next()?;
     let d_str = parts.next()?;
-    if let Some(flag) = parts.next() {
-        if flag.is_empty() || flag.len() > 8 || !flag.bytes().all(|b| b.is_ascii_digit()) {
-            return None;
-        }
+    if let Some(flag) = parts.next()
+        && (flag.is_empty() || flag.len() > 8 || !flag.bytes().all(|b| b.is_ascii_digit()))
+    {
+        return None;
     }
     if parts.next().is_some() {
         return None;
@@ -289,7 +289,8 @@ fn is_metadata_line(line: &MutableParsedLine, meta: &TrackMetadata) -> bool {
         .map(normalize_for_comparison)
         .unwrap_or_default();
 
-    if !norm_title.is_empty() && norm_text.contains(&norm_title)
+    if !norm_title.is_empty()
+        && norm_text.contains(&norm_title)
         && (norm_artist.is_empty() || norm_text.contains(&norm_artist))
     {
         return true;
@@ -329,10 +330,7 @@ fn remove_char_prefix(words: &mut Vec<TimedWord>, char_count: usize) {
             retained.push(word.clone());
         }
     }
-    while retained
-        .first()
-        .is_some_and(|w| w.text.trim().is_empty())
-    {
+    while retained.first().is_some_and(|w| w.text.trim().is_empty()) {
         retained.remove(0);
     }
     if let Some(first) = retained.first_mut() {
@@ -350,7 +348,10 @@ fn extract_singer(
     if is_first_few && is_metadata_line(line, meta) {
         return false;
     }
-    let Some((colon_byte, _)) = line.text.char_indices().find(|&(_, c)| c == ':' || c == '：')
+    let Some((colon_byte, _)) = line
+        .text
+        .char_indices()
+        .find(|&(_, c)| c == ':' || c == '：')
     else {
         line.agent = ctx.current_singer.clone();
         return true;
@@ -560,9 +561,9 @@ mod tests {
         let raw = concat!(
             "<QrcInfos><LyricInfo><Lyric_1 LyricContent=\"",
             "[ti:Demo]&#10;[ar:Singer]&#10;",
-            "[0,500]作(0,250)词：(250,250)Author&#10;",
-            "[1000,2000]男：(1000,200)Hello (1200,800)world&#10;",
-            "[3500,1500]合：(3500,500)Yeah(4000,500)!",
+            "[0,750]作(0,250)词：(250,250)Author(500,250)&#10;",
+            "[1000,2000]男：(1000,200)Hello (1200,800)world(2000,1000)&#10;",
+            "[3500,1500]合：(3500,500)Yeah!(4000,1000)",
             "\"/></LyricInfo></QrcInfos>"
         );
         assert!(is_qrc(raw));

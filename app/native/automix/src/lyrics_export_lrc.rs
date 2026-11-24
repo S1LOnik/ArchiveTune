@@ -132,14 +132,13 @@ pub fn lrc_to_srt(lrc: &str, default_tail_ms: i64) -> String {
     let mut timed: Vec<(i64, String)> = Vec::new();
     for raw in lrc.lines() {
         let trimmed = raw.trim();
-        if let Some(after_open) = trimmed.strip_prefix('[') {
-            if let Some((tag, body)) = after_open.split_once(']') {
-                if let Some(ms) = parse_lrc_tag_ms(tag) {
-                    let clean = strip_angle_word_timings(body).trim().to_string();
-                    if !clean.is_empty() {
-                        timed.push((ms, clean));
-                    }
-                }
+        if let Some(after_open) = trimmed.strip_prefix('[')
+            && let Some((tag, body)) = after_open.split_once(']')
+            && let Some(ms) = parse_lrc_tag_ms(tag)
+        {
+            let clean = strip_angle_word_timings(body).trim().to_string();
+            if !clean.is_empty() {
+                timed.push((ms, clean));
             }
         }
     }

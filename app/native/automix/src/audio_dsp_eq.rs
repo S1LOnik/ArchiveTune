@@ -54,13 +54,7 @@ impl Default for BiquadCoeffs {
 }
 
 impl BiquadCoeffs {
-    pub fn design(
-        kind: BiquadKind,
-        sample_rate: f64,
-        freq_hz: f64,
-        q: f64,
-        gain_db: f64,
-    ) -> Self {
+    pub fn design(kind: BiquadKind, sample_rate: f64, freq_hz: f64, q: f64, gain_db: f64) -> Self {
         if sample_rate <= 0.0 || freq_hz <= 0.0 || q <= 0.0 {
             return Self::default();
         }
@@ -279,10 +273,11 @@ impl ParametricEqBank {
         band.freq_hz = freq_hz;
         band.q = q;
         band.gain_db = gain_db;
-        band.enabled = enabled && (!matches!(
-            kind,
-            BiquadKind::Peaking | BiquadKind::LowShelf | BiquadKind::HighShelf
-        ) || gain_db.abs() >= 1e-4);
+        band.enabled = enabled
+            && (!matches!(
+                kind,
+                BiquadKind::Peaking | BiquadKind::LowShelf | BiquadKind::HighShelf
+            ) || gain_db.abs() >= 1e-4);
         band.coeffs = if band.enabled {
             BiquadCoeffs::design(kind, self.sample_rate, freq_hz, q, gain_db)
         } else {
@@ -402,7 +397,7 @@ pub fn apply_stereo_crossfeed_f32(samples: &mut [f32], level: f32) {
     }
     let direct = 1.0 - amt * 0.5;
     let cross = amt * 0.5;
-    for pair in samples.chunks_exact_mut(2) {
+    for pair in samples.as_chunks_mut::<2>().0 {
         let l = pair[0];
         let r = pair[1];
         pair[0] = l * direct + r * cross;
@@ -416,7 +411,7 @@ pub fn apply_stereo_width_f32(samples: &mut [f32], width: f32) {
     if (w - 1.0).abs() < 1e-4 || samples.len() < 2 {
         return;
     }
-    for pair in samples.chunks_exact_mut(2) {
+    for pair in samples.as_chunks_mut::<2>().0 {
         let mid = 0.5 * (pair[0] + pair[1]);
         let side = 0.5 * (pair[0] - pair[1]) * w;
         pair[0] = (mid + side).clamp(-1.0, 1.0);
@@ -432,7 +427,13 @@ pub fn estimate_integrated_lufs(interleaved: &[f32], sample_rate: i32, channels:
     }
     let sr = sample_rate as f64;
     // Stage 1: +4 dB high-shelf boost around 1681 Hz; Stage 2: 38 Hz high-pass
-    let shelf = BiquadCoeffs::design(BiquadKind::HighShelf, sr, 1681.97, 0.7071, 4.0);
+    let shelf = BiquadCoeffs::design(
+        BiquadKind::HighShelf,
+        sr,
+        1681.97,
+        std::f64::consts::FRAC_1_SQRT_2,
+        4.0,
+    );
     let hpf = BiquadCoeffs::design(BiquadKind::HighPass, sr, 38.135, 0.5003, 0.0);
 
     let active_ch = channels.min(2);
@@ -527,7 +528,10 @@ mod tests {
         assert!(eq.set_band(5, BiquadKind::Peaking, 1_000.0, 1.4, 6.0, true));
         assert!(eq.has_active_processing());
         let resp = eq.frequency_response_db(1_000.0);
-        assert!((resp - 6.0).abs() < 0.25, "expected ~+6 dB at 1 kHz, got {resp}");
+        assert!(
+            (resp - 6.0).abs() < 0.25,
+            "expected ~+6 dB at 1 kHz, got {resp}"
+        );
 
         let mut sine: Vec<f32> = (0..4800)
             .map(|i| 0.2 * (2.0 * F32_PI * 1_000.0 * (i as f32) / 48_000.0).sin())

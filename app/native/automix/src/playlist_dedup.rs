@@ -175,15 +175,13 @@ pub fn extract_youtube_video_id(url_or_id: &str) -> Option<String> {
     }
 
     if let Some(q_idx) = trimmed.find('?') {
-        let query = trimmed[q_idx + 1..]
-            .split('#')
-            .next()
-            .unwrap_or("");
+        let query = trimmed[q_idx + 1..].split('#').next().unwrap_or("");
         for param in query.split('&') {
-            if let Some((k, v)) = param.split_once('=') {
-                if k == "v" && is_valid_yt_id(v) {
-                    return Some(v.to_string());
-                }
+            if let Some((k, v)) = param.split_once('=')
+                && k == "v"
+                && is_valid_yt_id(v)
+            {
+                return Some(v.to_string());
             }
         }
     }
@@ -191,10 +189,7 @@ pub fn extract_youtube_video_id(url_or_id: &str) -> Option<String> {
     let path_only = trimmed.split('?').next().unwrap_or(trimmed);
     let path_clean = path_only.split('#').next().unwrap_or(path_only);
     if let Some(pos) = lower.find("youtu.be/") {
-        let seg = path_clean[pos + 9..]
-            .split('/')
-            .next()
-            .unwrap_or("");
+        let seg = path_clean[pos + 9..].split('/').next().unwrap_or("");
         if is_valid_yt_id(seg) {
             return Some(seg.to_string());
         }
@@ -218,14 +213,16 @@ pub fn extract_youtube_playlist_id(url: &str) -> Option<String> {
     let q_idx = url.find('?')?;
     let query = url[q_idx + 1..].split('#').next().unwrap_or("");
     for param in query.split('&') {
-        if let Some((k, v)) = param.split_once('=') {
-            if k == "list" && !v.is_empty() && v.len() <= 128 {
-                let valid = v
-                    .bytes()
-                    .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_');
-                if valid {
-                    return Some(v.to_string());
-                }
+        if let Some((k, v)) = param.split_once('=')
+            && k == "list"
+            && !v.is_empty()
+            && v.len() <= 128
+        {
+            let valid = v
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_');
+            if valid {
+                return Some(v.to_string());
             }
         }
     }
