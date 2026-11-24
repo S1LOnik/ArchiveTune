@@ -8,10 +8,8 @@ pub fn pcm_s24_le_to_f32(bytes: &[u8]) -> Vec<f32> {
     let count = bytes.len() / 3;
     let mut out = Vec::with_capacity(count);
     const INV: f32 = 1.0 / 8_388_608.0;
-    for chunk in bytes.chunks_exact(3) {
-        let raw = ((chunk[0] as i32) << 8)
-            | ((chunk[1] as i32) << 16)
-            | ((chunk[2] as i32) << 24);
+    for chunk in bytes.as_chunks::<3>().0 {
+        let raw = ((chunk[0] as i32) << 8) | ((chunk[1] as i32) << 16) | ((chunk[2] as i32) << 24);
         let signed = raw >> 8;
         out.push((signed as f32) * INV);
     }
@@ -23,10 +21,8 @@ pub fn pcm_s24_be_to_f32(bytes: &[u8]) -> Vec<f32> {
     let count = bytes.len() / 3;
     let mut out = Vec::with_capacity(count);
     const INV: f32 = 1.0 / 8_388_608.0;
-    for chunk in bytes.chunks_exact(3) {
-        let raw = ((chunk[2] as i32) << 8)
-            | ((chunk[1] as i32) << 16)
-            | ((chunk[0] as i32) << 24);
+    for chunk in bytes.as_chunks::<3>().0 {
+        let raw = ((chunk[2] as i32) << 8) | ((chunk[1] as i32) << 16) | ((chunk[0] as i32) << 24);
         let signed = raw >> 8;
         out.push((signed as f32) * INV);
     }
@@ -38,7 +34,7 @@ pub fn pcm_s32_le_to_f32(bytes: &[u8]) -> Vec<f32> {
     let count = bytes.len() / 4;
     let mut out = Vec::with_capacity(count);
     const INV: f32 = 1.0 / 2_147_483_648.0;
-    for chunk in bytes.chunks_exact(4) {
+    for chunk in bytes.as_chunks::<4>().0 {
         let signed = i32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
         out.push((signed as f32) * INV);
     }
@@ -182,9 +178,9 @@ pub fn detect_gapless_frame_bounds(
     }
     let total_frames = samples.len() / channels;
     let thresh = threshold.max(1e-5);
-    let first = samples.chunks_exact(channels).position(|f| {
-        f.iter().any(|&s| s.is_finite() && s.abs() > thresh)
-    });
+    let first = samples
+        .chunks_exact(channels)
+        .position(|f| f.iter().any(|&s| s.is_finite() && s.abs() > thresh));
     let Some(start) = first else {
         return (0, 0);
     };
@@ -216,7 +212,10 @@ mod tests {
         // Adjacent 0.95 samples around Nyquist peak exceed 1.0 between samples
         let sig = [0.0f32, -0.35, 0.95, 0.95, -0.35, 0.0];
         let (tp, _db) = measure_true_peak_4x(&sig);
-        assert!(tp > 0.95, "expected intersample interpolation > 0.95, got {tp}");
+        assert!(
+            tp > 0.95,
+            "expected intersample interpolation > 0.95, got {tp}"
+        );
     }
 
     #[test]

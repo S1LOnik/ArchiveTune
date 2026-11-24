@@ -43,9 +43,7 @@ pub fn classify_char(ch: char) -> ScriptKind {
         0x0900..=0x097F => ScriptKind::Devanagari,
         0x0E00..=0x0E7F => ScriptKind::Thai,
         0x10A0..=0x10FF | 0x1C90..=0x1CBF => ScriptKind::Georgian,
-        0x1100..=0x11FF | 0x3130..=0x318F | 0xA960..=0xA97F | 0xAC00..=0xD7AF => {
-            ScriptKind::Hangul
-        }
+        0x1100..=0x11FF | 0x3130..=0x318F | 0xA960..=0xA97F | 0xAC00..=0xD7AF => ScriptKind::Hangul,
         0x3040..=0x309F => ScriptKind::Hiragana,
         0x30A0..=0x30FF | 0x31F0..=0x31FF | 0xFF65..=0xFF9F => ScriptKind::Katakana,
         0x4E00..=0x9FFF | 0x3400..=0x4DBF | 0xF900..=0xFAFF => ScriptKind::Han,
@@ -407,12 +405,12 @@ pub fn katakana_to_romaji(katakana: &str, next_katakana: Option<&str>) -> String
     let mut i = 0;
 
     while i < chars.len() {
-        if i + 1 < chars.len() {
-            if let Some(digraph) = lookup_two_char_kana(chars[i], chars[i + 1]) {
-                out.push_str(digraph);
-                i += 2;
-                continue;
-            }
+        if i + 1 < chars.len()
+            && let Some(digraph) = lookup_two_char_kana(chars[i], chars[i + 1])
+        {
+            out.push_str(digraph);
+            i += 2;
+            continue;
         }
 
         let current = chars[i];
@@ -429,13 +427,13 @@ pub fn katakana_to_romaji(katakana: &str, next_katakana: Option<&str>) -> String
                 };
                 let next_rom = lookup_one_char_kana(nc_kata);
                 if let Some(rom) = next_rom {
-                    if let Some(first) = rom.chars().next() {
-                        if first.is_ascii_alphabetic() {
-                            if rom.starts_with("ch") {
-                                out.push('t');
-                            } else {
-                                out.push(first.to_ascii_lowercase());
-                            }
+                    if let Some(first) = rom.chars().next()
+                        && first.is_ascii_alphabetic()
+                    {
+                        if rom.starts_with("ch") {
+                            out.push('t');
+                        } else {
+                            out.push(first.to_ascii_lowercase());
                         }
                     }
                 } else if nc.is_ascii_alphabetic() {
@@ -447,10 +445,10 @@ pub fn katakana_to_romaji(katakana: &str, next_katakana: Option<&str>) -> String
         }
 
         if current == 'ー' {
-            if let Some(last) = out.chars().last() {
-                if matches!(last, 'a' | 'i' | 'u' | 'e' | 'o') {
-                    out.push(last);
-                }
+            if let Some(last) = out.chars().last()
+                && matches!(last, 'a' | 'i' | 'u' | 'e' | 'o')
+            {
+                out.push(last);
             }
             i += 1;
             continue;
@@ -476,8 +474,8 @@ pub fn katakana_to_romaji(katakana: &str, next_katakana: Option<&str>) -> String
 }
 
 const HANGUL_INITIALS: [&str; 19] = [
-    "g", "kk", "n", "d", "tt", "r", "m", "b", "pp", "s", "ss", "", "j", "jj", "ch", "k", "t",
-    "p", "h",
+    "g", "kk", "n", "d", "tt", "r", "m", "b", "pp", "s", "ss", "", "j", "jj", "ch", "k", "t", "p",
+    "h",
 ];
 
 const HANGUL_MEDIALS: [&str; 21] = [
@@ -491,13 +489,13 @@ const HANGUL_FINALS: [&str; 28] = [
 ];
 
 const INITIAL_JAMO_CHARS: [char; 19] = [
-    'ㄱ', 'ㄲ', 'ㄴ', 'ㄷ', 'ㄸ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅃ', 'ㅅ', 'ㅆ', 'ㅇ', 'ㅈ', 'ㅉ', 'ㅊ',
-    'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ',
+    'ㄱ', 'ㄲ', 'ㄴ', 'ㄷ', 'ㄸ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅃ', 'ㅅ', 'ㅆ', 'ㅇ', 'ㅈ', 'ㅉ', 'ㅊ', 'ㅋ',
+    'ㅌ', 'ㅍ', 'ㅎ',
 ];
 
 const FINAL_JAMO_CHARS: [char; 28] = [
-    '\0', 'ㄱ', 'ㄲ', 'ㄳ', 'ㄴ', 'ㄵ', 'ㄶ', 'ㄷ', 'ㄹ', 'ㄺ', 'ㄻ', 'ㄼ', 'ㄽ', 'ㄾ', 'ㄿ',
-    'ㅀ', 'ㅁ', 'ㅂ', 'ㅄ', 'ㅅ', 'ㅆ', 'ㅇ', 'ㅈ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ',
+    '\0', 'ㄱ', 'ㄲ', 'ㄳ', 'ㄴ', 'ㄵ', 'ㄶ', 'ㄷ', 'ㄹ', 'ㄺ', 'ㄻ', 'ㄼ', 'ㄽ', 'ㄾ', 'ㄿ', 'ㅀ',
+    'ㅁ', 'ㅂ', 'ㅄ', 'ㅅ', 'ㅆ', 'ㅇ', 'ㅈ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ',
 ];
 
 #[derive(Clone, Copy)]

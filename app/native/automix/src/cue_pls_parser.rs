@@ -73,13 +73,13 @@ pub fn parse_cue_sheet(cue: &str) -> Vec<CueTrack> {
             let mut parts = line[6..].split_whitespace();
             let idx_kind = parts.next().unwrap_or("");
             let ts = parts.next().unwrap_or("");
-            if let Some(ms) = parse_cue_timestamp_ms(ts) {
-                if let Some(track) = active.as_mut() {
-                    if idx_kind == "00" {
-                        track.pregap_ms = Some(ms);
-                    } else if idx_kind == "01" {
-                        track.start_ms = ms;
-                    }
+            if let Some(ms) = parse_cue_timestamp_ms(ts)
+                && let Some(track) = active.as_mut()
+            {
+                if idx_kind == "00" {
+                    track.pregap_ms = Some(ms);
+                } else if idx_kind == "01" {
+                    track.start_ms = ms;
                 }
             }
         }
@@ -92,10 +92,10 @@ pub fn parse_cue_sheet(cue: &str) -> Vec<CueTrack> {
 
 fn extract_quoted_arg(raw: &str) -> Option<String> {
     let trimmed = raw.trim();
-    if let Some(after_q) = trimmed.strip_prefix('"') {
-        if let Some(end_q) = after_q.find('"') {
-            return Some(after_q[..end_q].to_string());
-        }
+    if let Some(after_q) = trimmed.strip_prefix('"')
+        && let Some(end_q) = after_q.find('"')
+    {
+        return Some(after_q[..end_q].to_string());
     }
     trimmed.split_whitespace().next().map(str::to_string)
 }
@@ -142,25 +142,23 @@ pub fn parse_pls_playlist(content: &str) -> Vec<PlsEntry> {
         let key_lower = k.trim().to_ascii_lowercase();
         let val = v.trim();
         if let Some(num_str) = key_lower.strip_prefix("file") {
-            if let Ok(idx) = num_str.parse::<usize>() {
-                if !val.is_empty() {
-                    files.insert(idx, val.to_string());
-                }
+            if let Ok(idx) = num_str.parse::<usize>()
+                && !val.is_empty()
+            {
+                files.insert(idx, val.to_string());
             }
         } else if let Some(num_str) = key_lower.strip_prefix("title") {
-            if let Ok(idx) = num_str.parse::<usize>() {
-                if !val.is_empty() {
-                    titles.insert(idx, val.to_string());
-                }
+            if let Ok(idx) = num_str.parse::<usize>()
+                && !val.is_empty()
+            {
+                titles.insert(idx, val.to_string());
             }
-        } else if let Some(num_str) = key_lower.strip_prefix("length") {
-            if let Ok(idx) = num_str.parse::<usize>() {
-                if let Ok(len) = val.parse::<i64>() {
-                    if len >= 0 {
-                        lengths.insert(idx, len);
-                    }
-                }
-            }
+        } else if let Some(num_str) = key_lower.strip_prefix("length")
+            && let Ok(idx) = num_str.parse::<usize>()
+            && let Ok(len) = val.parse::<i64>()
+            && len >= 0
+        {
+            lengths.insert(idx, len);
         }
     }
 
@@ -180,10 +178,7 @@ pub fn parse_pls_playlist(content: &str) -> Vec<PlsEntry> {
 /// Infers `(track_number, artist, title)` from common local audio filenames when ID3/Vorbis tags
 /// are absent (e.g. `03. Artist - Song Title (FLAC 24-bit).flac`).
 pub fn infer_metadata_from_filename(filename: &str) -> (Option<i32>, Option<String>, String) {
-    let base_name = filename
-        .rsplit(['/', '\\'])
-        .next()
-        .unwrap_or(filename);
+    let base_name = filename.rsplit(['/', '\\']).next().unwrap_or(filename);
     let stem = match base_name.rfind('.') {
         Some(dot) if dot > 0 => &base_name[..dot],
         _ => base_name,
@@ -202,19 +197,18 @@ pub fn infer_metadata_from_filename(filename: &str) -> (Option<i32>, Option<Stri
             .strip_prefix('-')
             .or_else(|| trimmed_after.strip_prefix('.'))
         {
-            if let Ok(n) = rest[..digit_count].parse::<i32>() {
-                if n > 0 {
-                    track_num = Some(n);
-                    rest = stripped.trim_start();
-                }
+            if let Ok(n) = rest[..digit_count].parse::<i32>()
+                && n > 0
+            {
+                track_num = Some(n);
+                rest = stripped.trim_start();
             }
-        } else if after_digits.starts_with(' ') {
-            if let Ok(n) = rest[..digit_count].parse::<i32>() {
-                if (1..=99).contains(&n) {
-                    track_num = Some(n);
-                    rest = trimmed_after;
-                }
-            }
+        } else if after_digits.starts_with(' ')
+            && let Ok(n) = rest[..digit_count].parse::<i32>()
+            && (1..=99).contains(&n)
+        {
+            track_num = Some(n);
+            rest = trimmed_after;
         }
     }
 

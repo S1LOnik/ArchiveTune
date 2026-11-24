@@ -57,12 +57,12 @@ pub fn unescape_xml(input: &str) -> String {
         let after = &rest[amp + 1..];
         if let Some(semi) = after.find(';') {
             let entity = &after[..semi];
-            if semi <= 12 {
-                if let Some(ch) = decode_entity(entity) {
-                    out.push(ch);
-                    rest = &after[semi + 1..];
-                    continue;
-                }
+            if semi <= 12
+                && let Some(ch) = decode_entity(entity)
+            {
+                out.push(ch);
+                rest = &after[semi + 1..];
+                continue;
             }
         }
         out.push('&');
@@ -110,7 +110,7 @@ pub fn push_json_str(out: &mut String, value: &str) {
 }
 
 /// Parses TTML media timing expressions (`HH:MM:SS.fff`, `MM:SS.fff`, `SS.fff`, `ms`, `s`, `m`, `h`, `t`, `f`).
-pub fn parse_ttml_time(raw: &str, ctx: &TimeContext) -> Option<f64> {
+fn parse_ttml_time(raw: &str, ctx: &TimeContext) -> Option<f64> {
     let trimmed = raw.trim();
     if trimmed.is_empty() {
         return None;
@@ -433,22 +433,25 @@ fn collect_metadata(node: &XmlNode, ctx: &TimeContext, meta: &mut ParsedMetadata
 
     if local.eq_ignore_ascii_case("translations") {
         for trans in children {
-            if trans.local_name().is_some_and(|n| n.eq_ignore_ascii_case("translation")) {
-                if let XmlNode::Element {
+            if trans
+                .local_name()
+                .is_some_and(|n| n.eq_ignore_ascii_case("translation"))
+                && let XmlNode::Element {
                     children: t_children,
                     ..
                 } = trans
-                {
-                    for text_node in t_children {
-                        if text_node.local_name().is_some_and(|n| n.eq_ignore_ascii_case("text")) {
-                            if let Some(target_key) = text_node.attr("for") {
-                                let mut buf = String::new();
-                                text_node.collect_text(&mut buf);
-                                let cleaned = buf.trim().to_string();
-                                if !cleaned.is_empty() {
-                                    meta.translations.insert(target_key.to_string(), cleaned);
-                                }
-                            }
+            {
+                for text_node in t_children {
+                    if text_node
+                        .local_name()
+                        .is_some_and(|n| n.eq_ignore_ascii_case("text"))
+                        && let Some(target_key) = text_node.attr("for")
+                    {
+                        let mut buf = String::new();
+                        text_node.collect_text(&mut buf);
+                        let cleaned = buf.trim().to_string();
+                        if !cleaned.is_empty() {
+                            meta.translations.insert(target_key.to_string(), cleaned);
                         }
                     }
                 }
@@ -463,30 +466,33 @@ fn collect_metadata(node: &XmlNode, ctx: &TimeContext, meta: &mut ParsedMetadata
                 .local_name()
                 .is_some_and(|n| n.eq_ignore_ascii_case("transliteration"))
             {
-                let lang = tr.attr("xml:lang").or_else(|| tr.attr("lang")).map(str::to_string);
+                let lang = tr
+                    .attr("xml:lang")
+                    .or_else(|| tr.attr("lang"))
+                    .map(str::to_string);
                 if let XmlNode::Element {
                     children: t_children,
                     ..
                 } = tr
                 {
                     for text_node in t_children {
-                        if text_node.local_name().is_some_and(|n| n.eq_ignore_ascii_case("text")) {
-                            if let Some(target_key) = text_node.attr("for") {
-                                let mut full_text = String::new();
-                                let mut words = Vec::new();
-                                collect_translit_text_and_words(
-                                    text_node,
-                                    ctx,
-                                    &mut full_text,
-                                    &mut words,
-                                );
-                                let cleaned = full_text.trim().to_string();
-                                if !cleaned.is_empty() {
-                                    meta.transliterations.insert(
-                                        target_key.to_string(),
-                                        (cleaned, words, lang.clone()),
-                                    );
-                                }
+                        if text_node
+                            .local_name()
+                            .is_some_and(|n| n.eq_ignore_ascii_case("text"))
+                            && let Some(target_key) = text_node.attr("for")
+                        {
+                            let mut full_text = String::new();
+                            let mut words = Vec::new();
+                            collect_translit_text_and_words(
+                                text_node,
+                                ctx,
+                                &mut full_text,
+                                &mut words,
+                            );
+                            let cleaned = full_text.trim().to_string();
+                            if !cleaned.is_empty() {
+                                meta.transliterations
+                                    .insert(target_key.to_string(), (cleaned, words, lang.clone()));
                             }
                         }
                     }
@@ -510,7 +516,10 @@ fn collect_translit_text_and_words(
     match node {
         XmlNode::Text(t) => full.push_str(t),
         XmlNode::Element { children, .. } => {
-            if node.local_name().is_some_and(|n| n.eq_ignore_ascii_case("span")) {
+            if node
+                .local_name()
+                .is_some_and(|n| n.eq_ignore_ascii_case("span"))
+            {
                 let has_time = node
                     .attr("begin")
                     .is_some_and(|b| parse_ttml_time(b, ctx).is_some());
@@ -543,10 +552,11 @@ pub fn parse_ttml(xml: &str) -> Vec<TtmlLine> {
     };
     let Some(tt_node) = roots
         .iter()
-        .find(|n| n.local_name().is_some_and(|name| name.eq_ignore_ascii_case("tt")))
-        .or_else(|| {
-            roots.iter().find(|n| matches!(n, XmlNode::Element { .. }))
+        .find(|n| {
+            n.local_name()
+                .is_some_and(|name| name.eq_ignore_ascii_case("tt"))
         })
+        .or_else(|| roots.iter().find(|n| matches!(n, XmlNode::Element { .. })))
     else {
         return Vec::new();
     };
@@ -596,7 +606,10 @@ fn collect_p_elements<'a>(
         .attr("ttm:agent")
         .or_else(|| node.attr("agent"))
         .or(inherited_agent);
-    if node.local_name().is_some_and(|n| n.eq_ignore_ascii_case("p")) {
+    if node
+        .local_name()
+        .is_some_and(|n| n.eq_ignore_ascii_case("p"))
+    {
         out.push((node, current_agent.map(str::to_string)));
         return;
     }
@@ -646,11 +659,9 @@ fn parse_p_element(
         );
     }
 
-    // Attach trailing space into preceding word so word highlighting matches Apple Music spans.
     trim_parentheses_from_background(&mut words);
 
-    let computed_start = line_begin
-        .or_else(|| words.first().map(|w| w.start_time))?;
+    let computed_start = line_begin.or_else(|| words.first().map(|w| w.start_time))?;
     let computed_end = line_end_raw
         .or_else(|| words.last().map(|w| w.end_time))
         .unwrap_or(computed_start)
@@ -733,12 +744,14 @@ fn walk_p_children(
             XmlNode::Text(t) => {
                 if !in_background {
                     main_text.push_str(t);
-                    if !t.is_empty() && t.chars().all(char::is_whitespace) {
-                        if let Some(last) = words.last_mut() {
-                            if !last.text.ends_with(' ') {
-                                last.text.push(' ');
-                            }
-                        }
+                    // Keep separators with foreground words for word highlighting.
+                    if !t.is_empty()
+                        && t.chars().all(char::is_whitespace)
+                        && let Some(last) = words.last_mut()
+                        && !last.is_background
+                        && !last.text.ends_with(' ')
+                    {
+                        last.text.push(' ');
                     }
                 }
             }
@@ -764,35 +777,37 @@ fn walk_p_children(
                 }
 
                 let is_bg_here = in_background || matches!(role, Some("x-bg"));
-                let is_span = node.local_name().is_some_and(|n| n.eq_ignore_ascii_case("span"));
-                if is_span {
-                    if let Some(begin) = node.attr("begin").and_then(|v| parse_ttml_time(v, ctx)) {
-                        let end = node
-                            .attr("end")
-                            .and_then(|v| parse_ttml_time(v, ctx))
-                            .or_else(|| {
-                                node.attr("dur")
-                                    .and_then(|d| parse_ttml_time(d, ctx))
-                                    .map(|dur| begin + dur)
-                            })
-                            .unwrap_or(begin)
-                            .max(begin);
+                let is_span = node
+                    .local_name()
+                    .is_some_and(|n| n.eq_ignore_ascii_case("span"));
+                if is_span
+                    && let Some(begin) = node.attr("begin").and_then(|v| parse_ttml_time(v, ctx))
+                {
+                    let end = node
+                        .attr("end")
+                        .and_then(|v| parse_ttml_time(v, ctx))
+                        .or_else(|| {
+                            node.attr("dur")
+                                .and_then(|d| parse_ttml_time(d, ctx))
+                                .map(|dur| begin + dur)
+                        })
+                        .unwrap_or(begin)
+                        .max(begin);
 
-                        let mut span_text = String::new();
-                        node.collect_text(&mut span_text);
-                        if !is_bg_here {
-                            main_text.push_str(&span_text);
-                        }
-                        if !span_text.trim().is_empty() {
-                            words.push(TtmlWord {
-                                text: span_text,
-                                start_time: begin,
-                                end_time: end,
-                                is_background: is_bg_here,
-                            });
-                        }
-                        continue;
+                    let mut span_text = String::new();
+                    node.collect_text(&mut span_text);
+                    if !is_bg_here {
+                        main_text.push_str(&span_text);
                     }
+                    if !span_text.trim().is_empty() {
+                        words.push(TtmlWord {
+                            text: span_text,
+                            start_time: begin,
+                            end_time: end,
+                            is_background: is_bg_here,
+                        });
+                    }
+                    continue;
                 }
 
                 walk_p_children(
@@ -942,7 +957,10 @@ mod tests {
         let line = &parsed[0];
         assert_eq!(line.text, "Привет мир");
         assert_eq!(line.agent.as_deref(), Some("v1"));
-        assert_eq!(line.provider_translation_text.as_deref(), Some("Hello world"));
+        assert_eq!(
+            line.provider_translation_text.as_deref(),
+            Some("Hello world")
+        );
         assert_eq!(line.words.len(), 3);
         assert!(line.words[2].is_background);
         assert_eq!(line.words[2].text, "yeah");

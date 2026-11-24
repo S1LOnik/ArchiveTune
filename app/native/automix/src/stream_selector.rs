@@ -116,7 +116,9 @@ fn first_xml_attr(xml: &str, attr_name: &str) -> Option<String> {
     let mut offset = 0usize;
     while let Some(rel) = lower[offset..].find(&needle) {
         let abs = offset + rel;
-        let prev = abs.checked_sub(1).and_then(|idx| xml.as_bytes().get(idx).copied());
+        let prev = abs
+            .checked_sub(1)
+            .and_then(|idx| xml.as_bytes().get(idx).copied());
         if prev.is_none_or(|b| b.is_ascii_whitespace()) {
             let val_start = abs + needle.len();
             if let Some(end_q) = xml[val_start..].find('"') {
@@ -129,7 +131,9 @@ fn first_xml_attr(xml: &str, attr_name: &str) -> Option<String> {
 }
 
 fn extract_tag_attr(xml: &str, tag_name: &str, attr_name: &str) -> Option<String> {
-    extract_all_tag_attrs(xml, tag_name, attr_name).into_iter().next()
+    extract_all_tag_attrs(xml, tag_name, attr_name)
+        .into_iter()
+        .next()
 }
 
 fn extract_all_tag_attrs(xml: &str, tag_name: &str, attr_name: &str) -> Vec<String> {
@@ -141,15 +145,15 @@ fn extract_all_tag_attrs(xml: &str, tag_name: &str, attr_name: &str) -> Vec<Stri
         let abs = pos + rel;
         let after = abs + open_pat.len();
         let next_b = xml.as_bytes().get(after).copied();
-        if next_b.is_some_and(|b| b.is_ascii_whitespace() || b == b'>' || b == b'/') {
-            if let Some(gt_rel) = xml[after..].find('>') {
-                let tag_slice = &xml[after..after + gt_rel];
-                if let Some(val) = first_xml_attr(tag_slice, attr_name) {
-                    results.push(val);
-                }
-                pos = after + gt_rel + 1;
-                continue;
+        if next_b.is_some_and(|b| b.is_ascii_whitespace() || b == b'>' || b == b'/')
+            && let Some(gt_rel) = xml[after..].find('>')
+        {
+            let tag_slice = &xml[after..after + gt_rel];
+            if let Some(val) = first_xml_attr(tag_slice, attr_name) {
+                results.push(val);
             }
+            pos = after + gt_rel + 1;
+            continue;
         }
         pos = after;
     }
@@ -163,19 +167,19 @@ fn count_segment_timeline_entries(xml: &str) -> usize {
     while let Some(rel) = lower[pos..].find("<s") {
         let abs = pos + rel;
         let next = xml.as_bytes().get(abs + 2).copied();
-        if next.is_some_and(|b| b.is_ascii_whitespace()) {
-            if let Some(gt_rel) = xml[abs..].find('>') {
-                let tag = &xml[abs..abs + gt_rel];
-                if first_xml_attr(tag, "d").is_some() {
-                    let repeat = first_xml_attr(tag, "r")
-                        .and_then(|r| r.parse::<isize>().ok())
-                        .filter(|&r| r > 0)
-                        .unwrap_or(0) as usize;
-                    total = total.saturating_add(repeat + 1);
-                }
-                pos = abs + gt_rel + 1;
-                continue;
+        if next.is_some_and(|b| b.is_ascii_whitespace())
+            && let Some(gt_rel) = xml[abs..].find('>')
+        {
+            let tag = &xml[abs..abs + gt_rel];
+            if first_xml_attr(tag, "d").is_some() {
+                let repeat = first_xml_attr(tag, "r")
+                    .and_then(|r| r.parse::<isize>().ok())
+                    .filter(|&r| r > 0)
+                    .unwrap_or(0) as usize;
+                total = total.saturating_add(repeat + 1);
             }
+            pos = abs + gt_rel + 1;
+            continue;
         }
         pos = abs + 2;
     }
@@ -198,15 +202,15 @@ pub fn resolve_dash_url(base_url: &str, path: &str) -> String {
     if !(lower_base.starts_with("http://") || lower_base.starts_with("https://")) {
         return path.to_string();
     }
-    if path.starts_with('/') {
-        if let Some(scheme_end) = base_url.find("://") {
-            let after_scheme = &base_url[scheme_end + 3..];
-            let host_end = after_scheme
-                .find('/')
-                .map(|p| scheme_end + 3 + p)
-                .unwrap_or(base_url.len());
-            return format!("{}{}", &base_url[..host_end], path);
-        }
+    if path.starts_with('/')
+        && let Some(scheme_end) = base_url.find("://")
+    {
+        let after_scheme = &base_url[scheme_end + 3..];
+        let host_end = after_scheme
+            .find('/')
+            .map(|p| scheme_end + 3 + p)
+            .unwrap_or(base_url.len());
+        return format!("{}{}", &base_url[..host_end], path);
     }
     let prefix = if let Some(q) = base_url.find('?') {
         &base_url[..q]
@@ -372,22 +376,10 @@ pub fn rank_audio_formats(
         return Vec::new();
     }
 
-    let effective = match quality {
-        TargetAudioQuality::Auto => {
-            if network_metered {
-                TargetAudioQuality::High
-            } else {
-                TargetAudioQuality::Highest
-            }
-        }
-        q => q,
-    };
-
-    let target_bitrate: Option<i32> = match effective {
-        TargetAudioQuality::Low => Some(70_000),
-        TargetAudioQuality::High => Some(160_000),
-        TargetAudioQuality::Highest => Some(320_000),
-        TargetAudioQuality::Auto => None,
+    let target_bitrate = match (quality, network_metered) {
+        (TargetAudioQuality::Low, _) => Some(70_000),
+        (TargetAudioQuality::High, _) | (TargetAudioQuality::Auto, true) => Some(160_000),
+        (TargetAudioQuality::Highest, _) | (TargetAudioQuality::Auto, false) => None,
     };
 
     let mut items: Vec<AudioFormatCandidate<'_>> = (0..n)
@@ -405,9 +397,7 @@ pub fn rank_audio_formats(
         b.is_direct_url
             .cmp(&a.is_direct_url)
             .then_with(|| b.bitrate.cmp(&a.bitrate))
-            .then_with(|| {
-                codec_preference_rank(b.codec).cmp(&codec_preference_rank(a.codec))
-            })
+            .then_with(|| codec_preference_rank(b.codec).cmp(&codec_preference_rank(a.codec)))
             .then_with(|| b.sample_rate.cmp(&a.sample_rate))
     };
 
@@ -415,16 +405,12 @@ pub fn rank_audio_formats(
         b.is_direct_url
             .cmp(&a.is_direct_url)
             .then_with(|| a.bitrate.cmp(&b.bitrate))
-            .then_with(|| {
-                codec_preference_rank(b.codec).cmp(&codec_preference_rank(a.codec))
-            })
+            .then_with(|| codec_preference_rank(b.codec).cmp(&codec_preference_rank(a.codec)))
             .then_with(|| b.sample_rate.cmp(&a.sample_rate))
     };
 
     match target_bitrate {
-        None | Some(320_000)
-            if effective == TargetAudioQuality::Highest || target_bitrate.is_none() =>
-        {
+        None => {
             items.sort_by(cmp_higher);
             items.into_iter().map(|c| c.index).collect()
         }
@@ -434,10 +420,7 @@ pub fn rank_audio_formats(
                 .filter(|c| c.bitrate <= limit)
                 .cloned()
                 .collect();
-            let mut fallback: Vec<_> = items
-                .into_iter()
-                .filter(|c| c.bitrate > limit)
-                .collect();
+            let mut fallback: Vec<_> = items.into_iter().filter(|c| c.bitrate > limit).collect();
             preferred.sort_by(cmp_higher);
             fallback.sort_by(cmp_lower_above);
             preferred
@@ -515,11 +498,15 @@ pub fn fuzzy_similarity_score(query: &str, candidate: &str) -> f64 {
 
     let q_clipped: String = q_norm.chars().take(96).collect();
     let c_clipped: String = c_norm.chars().take(96).collect();
-    let max_len = q_clipped.chars().count().max(c_clipped.chars().count()).max(1);
+    let max_len = q_clipped
+        .chars()
+        .count()
+        .max(c_clipped.chars().count())
+        .max(1);
     let dist = damerau_levenshtein(&q_clipped, &c_clipped);
     let edit_sim = (1.0 - (dist as f64) / (max_len as f64)).clamp(0.0, 1.0);
 
-    bonus.max(overlap * 0.55 + edit_sim * 0.45)
+    bonus.max(overlap * 0.35 + edit_sim * 0.65)
 }
 
 #[cfg(test)]
@@ -565,27 +552,19 @@ mod tests {
         ];
         let bitrates = [128_000, 145_000, 256_000];
         let rates = [44_100, 48_000, 48_000];
-        let direct = [true, true, false];
+        let direct = [true, false, true];
 
-        let ranked_high = rank_audio_formats(
-            &codecs,
-            &bitrates,
-            &rates,
-            &direct,
-            TargetAudioQuality::High,
-            false,
-        );
-        assert_eq!(ranked_high, vec![1, 0, 2]);
-
-        let ranked_highest = rank_audio_formats(
-            &codecs,
-            &bitrates,
-            &rates,
-            &direct,
-            TargetAudioQuality::Highest,
-            false,
-        );
-        assert_eq!(ranked_highest, vec![1, 0, 2]);
+        for (quality, metered, expected) in [
+            (TargetAudioQuality::High, false, [0, 1, 2]),
+            (TargetAudioQuality::Highest, false, [2, 0, 1]),
+            (TargetAudioQuality::Auto, true, [0, 1, 2]),
+            (TargetAudioQuality::Auto, false, [2, 0, 1]),
+        ] {
+            assert_eq!(
+                rank_audio_formats(&codecs, &bitrates, &rates, &direct, quality, metered),
+                expected,
+            );
+        }
     }
 
     #[test]

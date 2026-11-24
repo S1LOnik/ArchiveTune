@@ -156,9 +156,7 @@ pub fn time_stretch_wsola_mono(input: &[f32], sample_rate: i32, tempo: f32) -> V
     if (ratio - 1.0).abs() < 1e-3 {
         return input.to_vec();
     }
-    let win_len = (((sample_rate as f32) * 0.04).round() as usize)
-        .clamp(256, 4096)
-        & !1usize;
+    let win_len = (((sample_rate as f32) * 0.04).round() as usize).clamp(256, 4096) & !1usize;
     let half_win = win_len / 2;
     let search_tol = (half_win / 2).max(16);
     if input.len() <= win_len + search_tol {

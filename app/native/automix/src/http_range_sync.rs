@@ -68,9 +68,7 @@ pub fn plan_byte_range_chunks(
     let mut chunks = Vec::with_capacity(estimated);
     let mut cursor = start_offset;
     while cursor < total_len {
-        let end = cursor
-            .saturating_add(safe_chunk - 1)
-            .min(total_len - 1);
+        let end = cursor.saturating_add(safe_chunk - 1).min(total_len - 1);
         chunks.push(ByteRangeChunk { start: cursor, end });
         cursor = end.saturating_add(1);
     }
@@ -88,11 +86,11 @@ pub fn merge_byte_ranges(mut spans: Vec<ByteRangeChunk>) -> Vec<ByteRangeChunk> 
         if span.end < span.start {
             continue;
         }
-        if let Some(last) = merged.last_mut() {
-            if span.start <= last.end.saturating_add(1) {
-                last.end = last.end.max(span.end);
-                continue;
-            }
+        if let Some(last) = merged.last_mut()
+            && span.start <= last.end.saturating_add(1)
+        {
+            last.end = last.end.max(span.end);
+            continue;
         }
         merged.push(span);
     }
@@ -102,7 +100,9 @@ pub fn merge_byte_ranges(mut spans: Vec<ByteRangeChunk>) -> Vec<ByteRangeChunk> 
 /// Computes bounded retry backoff delay in milliseconds using deterministic full-jitter SplitMix64.
 pub fn retry_backoff_ms(attempt: u32, base_ms: u64, max_ms: u64, seed: u64) -> u64 {
     let clamped_exp = attempt.min(16);
-    let raw = base_ms.saturating_mul(1u64 << clamped_exp).min(max_ms.max(base_ms));
+    let raw = base_ms
+        .saturating_mul(1u64 << clamped_exp)
+        .min(max_ms.max(base_ms));
     let half = raw / 2;
     let mix = seed
         .wrapping_add((attempt as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15))
@@ -160,9 +160,15 @@ mod tests {
     #[test]
     fn merges_contiguous_spans_and_selects_lru_evictions() {
         let merged = merge_byte_ranges(vec![
-            ByteRangeChunk { start: 100, end: 199 },
+            ByteRangeChunk {
+                start: 100,
+                end: 199,
+            },
             ByteRangeChunk { start: 0, end: 99 },
-            ByteRangeChunk { start: 300, end: 350 },
+            ByteRangeChunk {
+                start: 300,
+                end: 350,
+            },
         ]);
         assert_eq!(merged.len(), 2);
         assert_eq!(merged[0], ByteRangeChunk { start: 0, end: 199 });
