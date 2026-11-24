@@ -62,6 +62,7 @@ import moe.rukamori.archivetune.playback.stream.AudioStreamRequest
 import moe.rukamori.archivetune.playback.stream.ResolveAudioStreamUseCase
 import moe.rukamori.archivetune.playback.stream.ResolvedAudioStream
 import moe.rukamori.archivetune.playback.stream.StreamPurpose
+import moe.rukamori.archivetune.playback.stream.applyPlaybackAddressFamilyFallback
 import moe.rukamori.archivetune.soundcloud.SoundCloudAudioProvider
 import moe.rukamori.archivetune.utils.StreamClientUtils
 import moe.rukamori.archivetune.utils.YTPlayerUtils
@@ -106,6 +107,7 @@ class DownloadUtil
             OkHttpClient
                 .Builder()
                 .proxy(YouTube.streamOkHttpProxy)
+                .applyPlaybackAddressFamilyFallback(context)
                 .followRedirects(true)
                 .followSslRedirects(true)
                 .retryOnConnectionFailure(true)

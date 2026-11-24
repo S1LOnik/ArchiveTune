@@ -477,6 +477,24 @@ class InnerTube {
         }
     }
 
+    suspend fun timedLyrics(
+        browseId: String,
+        params: String? = null,
+    ) = withRetry {
+        val client = YouTubeClient.ANDROID_MUSIC
+        httpClient.post(client.requestApiUrl("browse")) {
+            ytClient(client, setLogin = false, includeVisitorData = false)
+            setBody(
+                BrowseBody(
+                    context = client.toContext(locale, null, null),
+                    browseId = browseId,
+                    params = params,
+                    continuation = null,
+                ),
+            )
+        }
+    }
+
     suspend fun next(
         client: YouTubeClient,
         videoId: String?,

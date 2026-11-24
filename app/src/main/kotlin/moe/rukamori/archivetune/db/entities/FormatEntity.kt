@@ -171,7 +171,7 @@ fun FormatEntity.autoRateDisplay(priority: RatePriority = RatePriority.BITRATE_F
             when {
                 hasBitrate -> formattedBitrate() ?: ""
                 hasSampleRate -> formattedSampleRate() ?: ""
-                else -> "Unknown"
+                else -> ""
             }
         }
 
@@ -179,7 +179,7 @@ fun FormatEntity.autoRateDisplay(priority: RatePriority = RatePriority.BITRATE_F
             when {
                 hasSampleRate -> formattedSampleRate() ?: ""
                 hasBitrate -> formattedBitrate() ?: ""
-                else -> "Unknown"
+                else -> ""
             }
         }
     }

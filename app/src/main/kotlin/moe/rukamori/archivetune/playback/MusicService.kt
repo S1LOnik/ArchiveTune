@@ -257,6 +257,7 @@ import moe.rukamori.archivetune.constants.SoundCloudAudioQuality
 import moe.rukamori.archivetune.constants.SoundCloudAudioQualityKey
 import moe.rukamori.archivetune.constants.SoundCloudAuthTokenKey
 import moe.rukamori.archivetune.constants.SoundCloudEnabledKey
+import moe.rukamori.archivetune.playback.stream.applyPlaybackAddressFamilyFallback
 import moe.rukamori.archivetune.soundcloud.SoundCloudAudioProvider
 import moe.rukamori.archivetune.storage.StorageFolderKind
 import moe.rukamori.archivetune.storage.StorageLocationRepository
@@ -432,6 +433,7 @@ class MusicService :
         OkHttpClient
             .Builder()
             .proxy(YouTube.streamOkHttpProxy)
+            .applyPlaybackAddressFamilyFallback(this)
             .followRedirects(true)
             .followSslRedirects(true)
             .connectTimeout(30, TimeUnit.SECONDS)

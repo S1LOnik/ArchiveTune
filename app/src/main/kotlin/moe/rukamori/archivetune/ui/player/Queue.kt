@@ -327,7 +327,7 @@ fun Queue(
                                 window.mediaItem.metadata?.title,
                             ),
                         actionLabel = context.getString(R.string.undo),
-                        duration = SnackbarDuration.Short,
+                        duration = SnackbarDuration.Long,
                     )
                 if (snackbarResult == SnackbarResult.ActionPerformed) {
                     playerConnection.player.addMediaItem(window.mediaItem)
@@ -364,7 +364,7 @@ fun Queue(
                                     context.getString(R.string.removed_n_songs_from_queue, windows.size)
                                 },
                             actionLabel = context.getString(R.string.undo),
-                            duration = SnackbarDuration.Short,
+                            duration = SnackbarDuration.Long,
                         )
                     if (snackbarResult == SnackbarResult.ActionPerformed) {
                         sortedWindows.forEach { window ->
