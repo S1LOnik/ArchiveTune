@@ -1403,49 +1403,78 @@ object YTPlayerUtils {
 
         if (audioFormats.isEmpty()) return emptyList()
 
-        val effectiveQuality =
-            when (audioQuality) {
-                AudioQuality.AUTO -> if (networkMetered) AudioQuality.HIGH else AudioQuality.HIGHEST
-                else -> audioQuality
+        val nativeOrder =
+            if (NativeMediaUtils.available && audioFormats.size > 1) {
+                val qualityCode =
+                    when (audioQuality) {
+                        AudioQuality.LOW -> 0
+                        AudioQuality.HIGH -> 1
+                        AudioQuality.HIGHEST -> 2
+                        AudioQuality.AUTO -> 3
+                    }
+                val codecs = Array(audioFormats.size) { idx -> audioFormats[idx].mimeType }
+                val bitrates = IntArray(audioFormats.size) { idx -> audioFormats[idx].bitrate }
+                val sampleRates = IntArray(audioFormats.size) { idx -> audioFormats[idx].audioSampleRate ?: 0 }
+                val directFlags = IntArray(audioFormats.size) { idx -> if (audioFormats[idx].url != null) 1 else 0 }
+                NativeMediaUtils.rankAudioFormats(
+                    codecs = codecs,
+                    bitrates = bitrates,
+                    sampleRates = sampleRates,
+                    isDirectFlags = directFlags,
+                    qualityOrdinal = qualityCode,
+                    networkMetered = networkMetered,
+                )
+            } else {
+                IntArray(0)
             }
-
-        val targetBitrateBps =
-            when (effectiveQuality) {
-                AudioQuality.LOW -> 70_000
-                AudioQuality.HIGH -> 160_000
-                AudioQuality.HIGHEST -> 320_000
-                AudioQuality.AUTO -> null
-            }
-
-        val preferHigher =
-            compareByDescending<PlayerResponse.StreamingData.Format> { it.url != null }
-                .thenByDescending { it.bitrate }
-                .thenByDescending { codecRank(extractCodec(it.mimeType)) }
-                .thenByDescending { it.audioSampleRate ?: 0 }
-
-        val preferLowerAboveTarget =
-            compareByDescending<PlayerResponse.StreamingData.Format> { it.url != null }
-                .thenBy { it.bitrate }
-                .thenByDescending { codecRank(extractCodec(it.mimeType)) }
-                .thenByDescending { it.audioSampleRate ?: 0 }
 
         val candidates =
-            when {
-                targetBitrateBps == null || effectiveQuality == AudioQuality.HIGHEST -> {
-                    audioFormats.sortedWith(preferHigher)
-                }
+            if (nativeOrder.size == audioFormats.size) {
+                nativeOrder.map { audioFormats[it] }
+            } else {
+                val effectiveQuality =
+                    when (audioQuality) {
+                        AudioQuality.AUTO -> if (networkMetered) AudioQuality.HIGH else AudioQuality.HIGHEST
+                        else -> audioQuality
+                    }
 
-                else -> {
-                    val preferred =
-                        audioFormats
-                            .filter { it.bitrate <= targetBitrateBps }
-                            .sortedWith(preferHigher)
-                    val fallback =
-                        audioFormats
-                            .filter { it.bitrate > targetBitrateBps }
-                            .sortedWith(preferLowerAboveTarget)
+                val targetBitrateBps =
+                    when (effectiveQuality) {
+                        AudioQuality.LOW -> 70_000
+                        AudioQuality.HIGH -> 160_000
+                        AudioQuality.HIGHEST -> 320_000
+                        AudioQuality.AUTO -> null
+                    }
 
-                    preferred + fallback
+                val preferHigher =
+                    compareByDescending<PlayerResponse.StreamingData.Format> { it.url != null }
+                        .thenByDescending { it.bitrate }
+                        .thenByDescending { codecRank(extractCodec(it.mimeType)) }
+                        .thenByDescending { it.audioSampleRate ?: 0 }
+
+                val preferLowerAboveTarget =
+                    compareByDescending<PlayerResponse.StreamingData.Format> { it.url != null }
+                        .thenBy { it.bitrate }
+                        .thenByDescending { codecRank(extractCodec(it.mimeType)) }
+                        .thenByDescending { it.audioSampleRate ?: 0 }
+
+                when {
+                    targetBitrateBps == null || effectiveQuality == AudioQuality.HIGHEST -> {
+                        audioFormats.sortedWith(preferHigher)
+                    }
+
+                    else -> {
+                        val preferred =
+                            audioFormats
+                                .filter { it.bitrate <= targetBitrateBps }
+                                .sortedWith(preferHigher)
+                        val fallback =
+                            audioFormats
+                                .filter { it.bitrate > targetBitrateBps }
+                                .sortedWith(preferLowerAboveTarget)
+
+                        preferred + fallback
+                    }
                 }
             }
 

@@ -927,18 +927,26 @@ object TidalAudioProvider {
             .toString()
 
     internal fun progressiveDashSegmentUrls(manifestText: String): List<String> =
-        runCatching { extractDashSegmentUrls(manifestText.sanitizeXmlEntities()) }
-            .getOrDefault(emptyList())
+        TidalNativeBridge.extractDashSegmentUrls(manifestText)
+            ?: runCatching { extractDashSegmentUrls(manifestText.sanitizeXmlEntities()) }
+                .getOrDefault(emptyList())
 
-    internal fun progressiveDashFlacMetadata(initBytes: ByteArray): ByteArray = extractFlacMetadataBlocks(initBytes)
+    internal fun progressiveDashFlacMetadata(initBytes: ByteArray): ByteArray =
+        TidalNativeBridge.extractFlacMetadataBlocks(initBytes)
+            ?: extractFlacMetadataBlocks(initBytes)
 
-    internal fun progressiveDashAudioPayload(segmentBytes: ByteArray): ByteArray =
-        java.io.ByteArrayOutputStream(segmentBytes.size).use { output ->
+    internal fun progressiveDashAudioPayload(segmentBytes: ByteArray): ByteArray {
+        TidalNativeBridge.extractMdatPayloads(segmentBytes)?.let { return it }
+        return java.io.ByteArrayOutputStream(segmentBytes.size).use { output ->
             writeMdatPayloads(segmentBytes, output)
             output.toByteArray()
         }
+    }
 
     fun normalizeIsrc(value: String?): String? {
+        if (TidalNativeBridge.available) {
+            return TidalNativeBridge.normalizeIsrc(value)
+        }
         val compact = value
             ?.uppercase(Locale.US)
             ?.replace(ISRC_STRIP_REGEX, "")

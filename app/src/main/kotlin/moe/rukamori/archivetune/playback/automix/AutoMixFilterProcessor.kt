@@ -8,14 +8,15 @@
 package moe.rukamori.archivetune.playback.automix
 
 import android.util.Log
+import androidx.annotation.Keep
 import androidx.media3.common.C
 import androidx.media3.common.audio.AudioProcessor
 import androidx.media3.common.audio.BaseAudioProcessor
 import androidx.media3.common.util.UnstableApi
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import kotlin.math.sin
 
+@Keep
 @UnstableApi
 class AutoMixFilterProcessor : BaseAudioProcessor() {
     @Volatile
@@ -27,24 +28,23 @@ class AutoMixFilterProcessor : BaseAudioProcessor() {
     private var channelCount = 0
     private var sampleRate = 0
     private var isFloat = false
+    private var nativeHandle = 0L
 
-    private var currentLowPassHz = OPEN_HZ
-    private var currentHighPassHz = OFF_HZ
-
-    private var lowLow = FloatArray(0)
-    private var lowBand = FloatArray(0)
-    private var highLow = FloatArray(0)
-    private var highBand = FloatArray(0)
-
-    private var lowF = 0f
-    private var highF = 0f
+    private var shortScratch = ShortArray(0)
+    private var floatScratch = FloatArray(0)
 
     fun setCutoffs(
         lowPassHz: Double,
         highPassHz: Double,
     ) {
-        targetLowPassHz = lowPassHz.toFloat().coerceIn(MIN_HZ, OPEN_HZ)
-        targetHighPassHz = highPassHz.toFloat().coerceIn(OFF_HZ, MAX_HIGH_PASS_HZ)
+        val low = lowPassHz.toFloat().coerceIn(MIN_HZ, OPEN_HZ)
+        val high = highPassHz.toFloat().coerceIn(OFF_HZ, MAX_HIGH_PASS_HZ)
+        targetLowPassHz = low
+        targetHighPassHz = high
+        val h = nativeHandle
+        if (h != 0L) {
+            nativeSetFilterCutoffs(h, low, high)
+        }
     }
 
     fun open() = setCutoffs(OPEN_HZ.toDouble(), OFF_HZ.toDouble())
@@ -64,38 +64,34 @@ class AutoMixFilterProcessor : BaseAudioProcessor() {
             )
             return AudioProcessor.AudioFormat.NOT_SET
         }
+        releaseNative()
         channelCount = inputAudioFormat.channelCount
         sampleRate = inputAudioFormat.sampleRate
         isFloat = inputAudioFormat.encoding == C.ENCODING_PCM_FLOAT
-        lowLow = FloatArray(channelCount)
-        lowBand = FloatArray(channelCount)
-        highLow = FloatArray(channelCount)
-        highBand = FloatArray(channelCount)
-        currentLowPassHz = targetLowPassHz
-        currentHighPassHz = targetHighPassHz
-        updateCoefficients()
+        nativeHandle = if (nativeAvailable) {
+            nativeCreateFilter(channelCount, sampleRate)
+        } else {
+            0L
+        }
+        if (nativeHandle != 0L) {
+            nativeSetFilterCutoffs(nativeHandle, targetLowPassHz, targetHighPassHz)
+        }
         return inputAudioFormat
     }
 
     override fun onFlush() {
-        lowLow.fill(0f)
-        lowBand.fill(0f)
-        highLow.fill(0f)
-        highBand.fill(0f)
-        currentLowPassHz = targetLowPassHz
-        currentHighPassHz = targetHighPassHz
-        updateCoefficients()
+        val h = nativeHandle
+        if (h != 0L) {
+            nativeFlushFilter(h)
+        }
     }
 
     override fun onReset() {
         targetLowPassHz = OPEN_HZ
         targetHighPassHz = OFF_HZ
-        currentLowPassHz = OPEN_HZ
-        currentHighPassHz = OFF_HZ
-        lowLow = FloatArray(0)
-        lowBand = FloatArray(0)
-        highLow = FloatArray(0)
-        highBand = FloatArray(0)
+        releaseNative()
+        shortScratch = ShortArray(0)
+        floatScratch = FloatArray(0)
     }
 
     override fun queueInput(inputBuffer: ByteBuffer) {
@@ -106,12 +102,8 @@ class AutoMixFilterProcessor : BaseAudioProcessor() {
         if (frameCount == 0) return
         val outputBuffer = replaceOutputBuffer(frameCount * bytesPerFrame)
 
-        val targetLow = targetLowPassHz
-        val targetHigh = targetHighPassHz
-
-        val parked = targetLow >= OPEN_HZ && targetHigh <= OFF_HZ &&
-            currentLowPassHz >= OPEN_HZ - SETTLED_HZ && currentHighPassHz <= OFF_HZ + SETTLED_HZ
-        if (parked) {
+        val h = nativeHandle
+        if (h == 0L || nativeIsFilterParked(h)) {
             outputBuffer.put(inputBuffer)
             outputBuffer.flip()
             return
@@ -120,84 +112,81 @@ class AutoMixFilterProcessor : BaseAudioProcessor() {
         inputBuffer.order(ByteOrder.nativeOrder())
         outputBuffer.order(ByteOrder.nativeOrder())
 
-        val lowActive = targetLow < OPEN_HZ - SETTLED_HZ || currentLowPassHz < OPEN_HZ - SETTLED_HZ
-        val highActive = targetHigh > OFF_HZ + SETTLED_HZ || currentHighPassHz > OFF_HZ + SETTLED_HZ
-
-        var frame = 0
-        while (frame < frameCount) {
-            if (frame % GLIDE_FRAMES == 0) {
-                currentLowPassHz += (targetLow - currentLowPassHz) * GLIDE_ALPHA
-                currentHighPassHz += (targetHigh - currentHighPassHz) * GLIDE_ALPHA
-                updateCoefficients()
+        val sampleCount = frameCount * channelCount
+        if (isFloat) {
+            if (floatScratch.size < sampleCount) {
+                floatScratch = FloatArray(sampleCount)
             }
-            for (channel in 0 until channelCount) {
-                val input = if (isFloat) inputBuffer.float else inputBuffer.short / 32768f
-                var sample = input
-                if (lowActive) sample = lowPassSample(channel, sample)
-                if (highActive) sample = highPassSample(channel, sample)
-                if (isFloat) {
-                    outputBuffer.putFloat(sample)
-                } else {
-                    outputBuffer.putShort((sample.coerceIn(-1f, 1f) * 32767f).toInt().toShort())
-                }
+            inputBuffer.asFloatBuffer().get(floatScratch, 0, sampleCount)
+            inputBuffer.position(inputBuffer.position() + sampleCount * FLOAT_BYTES)
+            nativeProcessFilterFloat(h, floatScratch, sampleCount)
+            outputBuffer.asFloatBuffer().put(floatScratch, 0, sampleCount)
+            outputBuffer.position(sampleCount * FLOAT_BYTES)
+        } else {
+            if (shortScratch.size < sampleCount) {
+                shortScratch = ShortArray(sampleCount)
             }
-            frame++
+            inputBuffer.asShortBuffer().get(shortScratch, 0, sampleCount)
+            inputBuffer.position(inputBuffer.position() + sampleCount * SHORT_BYTES)
+            nativeProcessFilterShort(h, shortScratch, sampleCount)
+            outputBuffer.asShortBuffer().put(shortScratch, 0, sampleCount)
+            outputBuffer.position(sampleCount * SHORT_BYTES)
         }
 
         outputBuffer.flip()
     }
 
-    private fun lowPassSample(
-        channel: Int,
-        input: Float,
-    ): Float {
-        val low = lowLow[channel]
-        val band = lowBand[channel]
-        val newLow = low + lowF * band
-        val newBand = band + lowF * (input - newLow - DAMPING * band)
-        lowLow[channel] = newLow
-        lowBand[channel] = newBand
-        return newLow
+    private fun releaseNative() {
+        val h = nativeHandle
+        nativeHandle = 0L
+        if (h != 0L) {
+            nativeReleaseFilter(h)
+        }
     }
 
-    private fun highPassSample(
-        channel: Int,
-        input: Float,
-    ): Float {
-        val low = highLow[channel]
-        val band = highBand[channel]
-        val newLow = low + highF * band
-        val newBand = band + highF * (input - newLow - DAMPING * band)
-        highLow[channel] = newLow
-        highBand[channel] = newBand
-        return input - newLow - DAMPING * newBand
-    }
+    private external fun nativeCreateFilter(
+        channels: Int,
+        sampleRate: Int,
+    ): Long
 
-    private fun updateCoefficients() {
-        val nyquist = sampleRate / 2f
-        val lowHz = currentLowPassHz.coerceIn(MIN_HZ, nyquist * 0.45f)
-        val highHz = currentHighPassHz.coerceIn(MIN_HZ, nyquist * 0.45f)
-        lowF = (2f * sin(FLOAT_PI * lowHz / sampleRate)).coerceAtMost(MAX_F)
-        highF = (2f * sin(FLOAT_PI * highHz / sampleRate)).coerceAtMost(MAX_F)
-    }
+    private external fun nativeSetFilterCutoffs(
+        handle: Long,
+        lowPassHz: Float,
+        highPassHz: Float,
+    )
+
+    private external fun nativeFlushFilter(handle: Long)
+
+    private external fun nativeIsFilterParked(handle: Long): Boolean
+
+    private external fun nativeProcessFilterShort(
+        handle: Long,
+        samples: ShortArray,
+        count: Int,
+    ): Boolean
+
+    private external fun nativeProcessFilterFloat(
+        handle: Long,
+        samples: FloatArray,
+        count: Int,
+    ): Boolean
+
+    private external fun nativeReleaseFilter(handle: Long)
 
     companion object {
         private const val TAG = "AutoMixFilter"
 
+        private val nativeAvailable: Boolean =
+            runCatching {
+                System.loadLibrary("archivetune_automix")
+            }.isSuccess
+
         const val OPEN_HZ = 20_000f
-
         const val OFF_HZ = 10f
-
         const val MIN_HZ = 20f
         const val MAX_HIGH_PASS_HZ = 7_000f
 
         private const val SHORT_BYTES = 2
         private const val FLOAT_BYTES = 4
-        private const val SETTLED_HZ = 400f
-        private const val GLIDE_FRAMES = 64
-        private const val GLIDE_ALPHA = 0.25f
-        private const val DAMPING = 1.0f
-        private const val MAX_F = 0.8f
-        private const val FLOAT_PI = Math.PI.toFloat()
     }
 }

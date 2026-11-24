@@ -85,8 +85,55 @@ class LocalAudioMetadataReader @Inject constructor(
                 Timber.w(error, "Unable to release local audio metadata reader")
             }
         }
+        if (metadata.title == null || metadata.artist == null || metadata.durationSeconds == null) {
+            metadata = enrichWithNativeTags(uri, metadata)
+        }
         currentCoroutineContext().ensureActive()
         metadata
+    }
+
+    private fun enrichWithNativeTags(
+        uri: Uri,
+        current: LocalAudioMetadata,
+    ): LocalAudioMetadata {
+        val headerBytes =
+            runCatching {
+                context.contentResolver.openInputStream(uri)?.use { stream ->
+                    val buffer = ByteArray(NativeProbeMaxBytes)
+                    var total = 0
+                    while (total < buffer.size) {
+                        val read = stream.read(buffer, total, buffer.size - total)
+                        if (read <= 0) break
+                        total += read
+                    }
+                    buffer.copyOf(total)
+                }
+            }.getOrNull() ?: return current
+        val parsed = moe.rukamori.archivetune.utils.NativeMediaUtils.parseAudioTags(headerBytes)
+        val fallbackGuess =
+            if (parsed?.title == null && current.title == null) {
+                uri.lastPathSegment?.let {
+                    moe.rukamori.archivetune.utils.NativeMediaUtils.inferMetadataFromFilename(it)
+                }
+            } else {
+                null
+            }
+        val nativeDurationSec =
+            parsed?.durationMs
+                ?.takeIf { it > 0L }
+                ?.div(1_000L)
+                ?.takeIf { it <= Int.MAX_VALUE }
+                ?.toInt()
+        return current.copy(
+            title = current.title ?: parsed?.title ?: fallbackGuess?.title?.takeIf { it.isNotBlank() },
+            artist = current.artist ?: parsed?.artist ?: fallbackGuess?.artist,
+            albumArtist = current.albumArtist ?: parsed?.albumArtist,
+            album = current.album ?: parsed?.album,
+            trackNumber = current.trackNumber ?: parsed?.trackNumber ?: fallbackGuess?.trackNumber,
+            discNumber = current.discNumber ?: parsed?.discNumber,
+            year = current.year ?: parsed?.year,
+            durationSeconds = current.durationSeconds ?: nativeDurationSec,
+        )
     }
 
     private fun MediaMetadataRetriever.readTag(key: Int): String? =
@@ -158,6 +205,7 @@ class LocalAudioMetadataReader @Inject constructor(
 
     private companion object {
         const val MaxArtworkDimension = 1024
+        const val NativeProbeMaxBytes = 131_072
         val YearPattern = Regex("(?<!\\d)\\d{4}(?!\\d)")
         val UnknownValues = setOf("<unknown>", "unknown", "unknown artist", "unknown album", "unknown title")
     }

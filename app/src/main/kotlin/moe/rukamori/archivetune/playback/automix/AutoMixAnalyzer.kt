@@ -307,60 +307,8 @@ class AutoMixAnalyzer(
         val fluxArray = features.flux.toFloatArray()
         val tempo = AutoMixTempo.estimate(fluxArray, fluxRate)
         val energy = features.energyCurve.toFloatArray()
-        val vocal = normalizeVocalCurve(features.vocalCurve.toFloatArray())
-        val level = robustMean(energy.toList()).coerceAtLeast(1e-6f)
-        val floor = level * 0.10f
-        val active = level * 0.35f
-        val contentFloor = level * 0.15f
-
-        var audibleStart = 0L
-        var introEnd = 0L
-        for (i in energy.indices) {
-            if (energy[i] > floor) { audibleStart = i * AUTO_MIX_CURVE_STEP_MS; break }
-        }
-        for (i in energy.indices) {
-            if (energy[i] > active) { introEnd = i * AUTO_MIX_CURVE_STEP_MS; break }
-        }
-        var contentEnd = durationMs
-        for (i in energy.indices.reversed()) {
-            if (energy[i] > contentFloor) { contentEnd = (i + 1) * AUTO_MIX_CURVE_STEP_MS; break }
-        }
-        var outroStart = introEnd
-        for (i in energy.indices.reversed()) {
-            if (energy[i] > active) { outroStart = i * AUTO_MIX_CURVE_STEP_MS; break }
-        }
-        if (outroStart < introEnd) outroStart = introEnd
-
-        val mixOut = ArrayList<Long>(6)
-        val tailFrom = max(introEnd, contentEnd - 30_000L)
-        var i = (tailFrom / AUTO_MIX_CURVE_STEP_MS).toInt()
-        while (i < energy.size - 2 && mixOut.size < 5) {
-            val drop = energy[i] - energy[i + 1]
-            if (drop > active * 0.8f && energy[i + 1] < active) {
-                mixOut.add((i + 1) * AUTO_MIX_CURVE_STEP_MS)
-                i += 8
-            } else {
-                i += 1
-            }
-        }
-        mixOut.add((contentEnd - 12_000L).coerceAtLeast(introEnd))
-        mixOut.add(outroStart)
-
-        val finalFadeOnset = detectFinalFadeOnset(energy, introEnd, contentEnd)
-
-        val mixIn = ArrayList<Long>(6)
-        var j = (audibleStart / AUTO_MIX_CURVE_STEP_MS).toInt()
-        val headTo = min(introEnd + 24_000L, contentEnd)
-        while (j < energy.size - 1 && j * AUTO_MIX_CURVE_STEP_MS < headTo && mixIn.size < 4) {
-            val rise = energy[j + 1] - energy[j]
-            if (rise > active * 0.6f && energy[j] < active) {
-                mixIn.add((j + 1) * AUTO_MIX_CURVE_STEP_MS)
-                j += 8
-            } else {
-                j += 1
-            }
-        }
-        mixIn.add(introEnd)
+        val vocalRaw = features.vocalCurve.toFloatArray()
+        val summary = requireNotNull(AutoMixNativeDsp.analyzeCurves(energy, vocalRaw, durationMs))
 
         return AutoMixAnalysis(
             durationMs = durationMs,
@@ -368,83 +316,21 @@ class AutoMixAnalyzer(
             beatIntervalMs = tempo?.intervalMs ?: 0.0,
             beatConfidence = tempo?.confidence ?: 0.0,
             downbeatPhaseMs = tempo?.phaseMs ?: 0.0,
-            audibleStartMs = audibleStart,
-            introEndMs = introEnd,
-            outroStartMs = outroStart,
-            contentEndMs = contentEnd,
-            finalFadeOnsetMs = finalFadeOnset,
-            mixInCandidatesMs = mixIn.distinct().sorted(),
-            mixOutCandidatesMs = mixOut.distinct().sorted(),
+            audibleStartMs = summary.audibleStartMs,
+            introEndMs = summary.introEndMs,
+            outroStartMs = summary.outroStartMs,
+            contentEndMs = summary.contentEndMs,
+            finalFadeOnsetMs = summary.finalFadeOnsetMs,
+            mixInCandidatesMs = summary.mixInCandidatesMs,
+            mixOutCandidatesMs = summary.mixOutCandidatesMs,
             energyCurve = energy.toList(),
-            vocalActivity = vocal.toList(),
+            vocalActivity = summary.normalizedVocal,
         )
     }
 
-    private fun detectFinalFadeOnset(
-        energy: FloatArray,
-        introEndMs: Long,
-        contentEndMs: Long,
-    ): Long {
-        if (energy.isEmpty() || contentEndMs <= introEndMs) return contentEndMs
-        val endIdx = (contentEndMs / AUTO_MIX_CURVE_STEP_MS).toInt().coerceAtMost(energy.size - 1)
-        val startIdx =
-            (maxOf(introEndMs, contentEndMs - FINAL_FADE_WINDOW_MS) / AUTO_MIX_CURVE_STEP_MS)
-                .toInt().coerceIn(0, endIdx)
-        if (endIdx <= startIdx) return contentEndMs
-        val window = energy.sliceArray(startIdx..endIdx)
-        if (window.size < 4) return contentEndMs
-
-        val smooth = smoothCurve(window, FINAL_FADE_SMOOTHING_SPAN)
-        val sorted = smooth.sorted()
-        val loud = sorted[sorted.size * 9 / 10].coerceAtLeast(1e-6f)
-        val quiet = loud * FINAL_FADE_QUIET_RATIO
-
-        var lastLoudIdx = -1
-        for (idx in smooth.indices) {
-            if (smooth[idx] >= quiet) lastLoudIdx = idx
-        }
-        if (lastLoudIdx < 0 || lastLoudIdx >= smooth.size - 1) return contentEndMs
-        return ((startIdx + lastLoudIdx + 1) * AUTO_MIX_CURVE_STEP_MS).coerceAtMost(contentEndMs)
-    }
-
-    private fun smoothCurve(
-        curve: FloatArray,
-        span: Int,
-    ): FloatArray {
-        if (curve.isEmpty() || span <= 0) return curve.copyOf()
-        val out = FloatArray(curve.size)
-        var acc = 0f
-        var count = 0
-        for (j in 0..span.coerceAtMost(curve.size - 1)) {
-            acc += curve[j]
-            count++
-        }
-        for (idx in curve.indices) {
-            out[idx] = acc / count
-            val add = idx + span + 1
-            val remove = idx - span
-            if (add < curve.size) {
-                acc += curve[add]
-                count++
-            }
-            if (remove >= 0) {
-                acc -= curve[remove]
-                count--
-            }
-        }
-        return out
-    }
-
-    private fun normalizeVocalCurve(raw: FloatArray): FloatArray {
-        if (raw.isEmpty()) return raw
-        val sorted = raw.sorted()
-        val median = sorted[sorted.size / 2]
-        val spread = sorted[sorted.size * 19 / 20] - median
-        if (spread <= 1e-6f) return FloatArray(raw.size) { 0.5f }
-        return FloatArray(raw.size) { ((it - median) / spread).coerceIn(0f, 1f) }
-    }
-
     private fun cacheKey(trackId: String): String {
+        moe.rukamori.archivetune.utils.NativeMediaUtils.sha256Hex(trackId.toByteArray(Charsets.UTF_8))
+            ?.let { return it }
         val digest = MessageDigest.getInstance("SHA-256")
             .digest(trackId.toByteArray(Charsets.UTF_8))
         return digest.joinToString("") { "%02x".format(it) }
@@ -506,9 +392,5 @@ class AutoMixAnalyzer(
     private companion object {
         private const val TAG = "AutoMix"
         private const val MAX_PERSISTED_ANALYSES = 600
-
-        private const val FINAL_FADE_WINDOW_MS = 15_000L
-        private const val FINAL_FADE_SMOOTHING_SPAN = 4
-        private const val FINAL_FADE_QUIET_RATIO = 0.60f
     }
 }

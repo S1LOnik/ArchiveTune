@@ -47,12 +47,13 @@ fun MorphingPlayPauseIcon(
     val animatedMorph by animateFloatAsState(
         targetValue = if (isPlaying) 1f else 0f,
         animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
+            dampingRatio = Spring.DampingRatioNoBouncy,
             stiffness = Spring.StiffnessMedium,
         ),
         label = "playPauseMorph",
     )
-    val morph = if (motionConfig.animationsEnabled) animatedMorph else if (isPlaying) 1f else 0f
+    val morph = (if (motionConfig.animationsEnabled) animatedMorph else if (isPlaying) 1f else 0f)
+        .coerceIn(0f, 1f)
 
     Canvas(
         modifier =
@@ -73,7 +74,7 @@ fun MorphingPlayPauseIcon(
         val h = this.size.height
         val cx = w / 2f
         val cy = h / 2f
-        val t = morph
+        val t = morph.coerceIn(0f, 1f)
 
         // Play triangle vertices
         val pTop = Offset(cx - w * 0.20f, cy - h * 0.26f)
