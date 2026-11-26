@@ -815,6 +815,7 @@ class MusicService :
         private set
     private lateinit var castPlaybackRepository: CastPlaybackRepository
     private lateinit var mediaSession: MediaLibrarySession
+    private lateinit var coilBitmapLoader: CoilBitmapLoader
 
     private var isAudioEffectSessionOpened = false
     private var openedAudioSessionId: Int? = null
@@ -1270,8 +1271,9 @@ class MusicService :
             toggleLibrary = ::toggleLibrary
             carMediaButtonPreferences = ::buildAndroidAutoButtons
         }
+        coilBitmapLoader = CoilBitmapLoader(this, scope)
         val mediaSessionBuilder = MediaLibrarySession.Builder(this, player, mediaLibrarySessionCallback)
-            .setBitmapLoader(CoilBitmapLoader(this, scope))
+            .setBitmapLoader(coilBitmapLoader)
         if (BuildConfig.DEVICE != "automotive") {
             mediaSessionBuilder.setSessionActivity(
                     PendingIntent.getActivity(
@@ -1329,7 +1331,10 @@ class MusicService :
 
         scope.launch {
             connectivityObserver.networkStatus.collect { isConnected ->
-                if (isConnected) resumePlaybackAfterReconnect()
+                if (isConnected) {
+                    resumePlaybackAfterReconnect()
+                    retryFailedArtworkIfNeeded()
+                }
             }
         }
 
@@ -9176,12 +9181,28 @@ class MusicService :
         val result = super.onBind(intent) ?: binder
         if (player.mediaItemCount > 0 && player.currentMediaItem != null) {
             currentMediaMetadata.value = player.currentMetadata
+            retryFailedArtworkIfNeeded()
             scope.launch {
                 delay(50)
                 updateNotification()
             }
         }
         return result
+    }
+
+    private fun retryFailedArtworkIfNeeded() {
+        if (!::coilBitmapLoader.isInitialized) return
+        val artworkUri = player.currentMediaItem?.mediaMetadata?.artworkUri ?: return
+        if (!coilBitmapLoader.consumeFailedArtworkUri(artworkUri)) return
+        scope.launch(SilentHandler) {
+            val recovered =
+                runCatching {
+                    coilBitmapLoader.loadBitmapAsync(artworkUri)
+                }.isSuccess
+            if (recovered && player.currentMediaItem?.mediaMetadata?.artworkUri == artworkUri) {
+                updateNotification()
+            }
+        }
     }
 
     override fun onUnbind(intent: Intent?): Boolean {

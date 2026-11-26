@@ -13,21 +13,37 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.media3.common.util.BitmapLoader
 import coil3.imageLoader
+import coil3.network.HttpException
+import coil3.request.CachePolicy
 import coil3.request.ErrorResult
 import coil3.request.ImageRequest
 import coil3.request.SuccessResult
 import coil3.request.allowHardware
 import coil3.toBitmap
 import com.google.common.util.concurrent.ListenableFuture
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.guava.future
 import kotlinx.coroutines.withContext
+import moe.rukamori.archivetune.ui.utils.YTThumbQuality
+import moe.rukamori.archivetune.ui.utils.YtimgResizePolicy
+import moe.rukamori.archivetune.ui.utils.getNextFallbackUrl
+import moe.rukamori.archivetune.ui.utils.resize
+import moe.rukamori.archivetune.ui.utils.resolveMaxresFallback
+import timber.log.Timber
+import java.util.Locale
 import kotlin.math.roundToInt
 
 internal const val NotificationArtworkSizePx = 1080
 private const val LegacyMediaMetadataBitmapMaxSizeDp = 320
+private const val ArtworkMemoryCacheEntries = 8
+private const val FallbackGoogleCdnDimensionPx = 544
+private val TransientRetryDelaysMs = longArrayOf(300L, 900L)
 
 class CoilBitmapLoader(
     context: Context,
@@ -35,6 +51,16 @@ class CoilBitmapLoader(
 ) : BitmapLoader {
     private val applicationContext = context.applicationContext
     private val maximumArtworkDimensionPx = context.resolveMaximumArtworkDimensionPx()
+    private val stateLock = Any()
+    private val inFlightRequests = mutableMapOf<String, Deferred<Bitmap>>()
+    private val bitmapCache =
+        object : LinkedHashMap<String, Bitmap>(ArtworkMemoryCacheEntries, 0.75f, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Bitmap>?): Boolean =
+                size > ArtworkMemoryCacheEntries
+        }
+
+    @Volatile
+    private var lastFailedArtworkUrl: String? = null
 
     override fun supportsMimeType(mimeType: String): Boolean = mimeType.startsWith("image/")
 
@@ -53,26 +79,177 @@ class CoilBitmapLoader(
 
     override fun loadBitmap(uri: Uri): ListenableFuture<Bitmap> =
         scope.future(Dispatchers.IO) {
-            val request =
-                ImageRequest
-                    .Builder(applicationContext)
-                    .data(uri)
-                    .allowHardware(false)
-                    .size(maximumArtworkDimensionPx, maximumArtworkDimensionPx)
-                    .build()
+            loadBitmapAsync(uri)
+        }
 
-            when (val result = applicationContext.imageLoader.execute(request)) {
-                is SuccessResult -> withContext(Dispatchers.Default) {
-                    ensureActive()
-                    result.image
-                        .toBitmap()
-                        .scaleToNotificationArtwork(maximumArtworkDimensionPx)
-                        .toOwnedMediaSessionBitmap()
+    internal suspend fun loadBitmapAsync(uri: Uri): Bitmap {
+        val rawUrl = uri.toString().trim()
+        require(rawUrl.isNotEmpty()) { "Empty artwork URI" }
+
+        cachedBitmapFor(rawUrl)?.let { return it }
+
+        val deferred =
+            synchronized(stateLock) {
+                inFlightRequests[rawUrl]?.takeIf { it.isActive }
+                    ?: scope.async(Dispatchers.IO) {
+                        loadBitmapWithFallbackAndRetry(rawUrl)
+                    }.also { created ->
+                        inFlightRequests[rawUrl] = created
+                        created.invokeOnCompletion {
+                            synchronized(stateLock) {
+                                if (inFlightRequests[rawUrl] === created) {
+                                    inFlightRequests.remove(rawUrl)
+                                }
+                            }
+                        }
+                    }
+            }
+
+        return deferred.await().toOwnedMediaSessionBitmap()
+    }
+
+    internal fun consumeFailedArtworkUri(uri: Uri): Boolean {
+        val rawUrl = uri.toString().trim()
+        if (rawUrl.isEmpty()) return false
+        synchronized(stateLock) {
+            if (lastFailedArtworkUrl != rawUrl) return false
+            lastFailedArtworkUrl = null
+            return true
+        }
+    }
+
+    private fun cachedBitmapFor(rawUrl: String): Bitmap? =
+        synchronized(stateLock) {
+            bitmapCache[rawUrl]?.takeUnless { it.isRecycled }?.toOwnedMediaSessionBitmap()
+                ?: run {
+                    bitmapCache.remove(rawUrl)
+                    null
                 }
+        }
 
-                is ErrorResult -> throw result.throwable
+    private suspend fun loadBitmapWithFallbackAndRetry(rawUrl: String): Bitmap {
+        cachedBitmapFor(rawUrl)?.let { return it }
+
+        val candidates = buildArtworkCandidateUrls(rawUrl)
+        var lastError: Throwable? = null
+
+        for (candidateUrl in candidates) {
+            var attempt = 0
+            while (true) {
+                try {
+                    val bitmap = executeArtworkRequest(candidateUrl)
+                    synchronized(stateLock) {
+                        bitmapCache[rawUrl] = bitmap
+                        if (lastFailedArtworkUrl == rawUrl) {
+                            lastFailedArtworkUrl = null
+                        }
+                    }
+                    return bitmap
+                } catch (cancellation: CancellationException) {
+                    throw cancellation
+                } catch (throwable: Throwable) {
+                    lastError = throwable
+                    val statusCode = (throwable as? HttpException)?.response?.code
+                    if (isPermanentArtworkHttpError(statusCode) || attempt >= TransientRetryDelaysMs.size) {
+                        Timber.tag("CoilBitmapLoader").d(
+                            throwable,
+                            "Artwork candidate failed (status=%s): %s",
+                            statusCode,
+                            candidateUrl,
+                        )
+                        break
+                    }
+                    delay(TransientRetryDelaysMs[attempt])
+                    attempt++
+                }
             }
         }
+
+        synchronized(stateLock) {
+            lastFailedArtworkUrl = rawUrl
+        }
+        throw lastError ?: IllegalStateException("Could not load artwork for $rawUrl")
+    }
+
+    private suspend fun executeArtworkRequest(candidateUrl: String): Bitmap {
+        val request =
+            ImageRequest
+                .Builder(applicationContext)
+                // Pass String so DownloadedArtworkRepository.coilMapper() (Mapper<String, Any>)
+                // and offline disk cache keys match the in-app image requests.
+                .data(candidateUrl)
+                .memoryCacheKey(candidateUrl)
+                .diskCacheKey(candidateUrl)
+                .diskCachePolicy(CachePolicy.ENABLED)
+                .networkCachePolicy(CachePolicy.ENABLED)
+                .allowHardware(false)
+                .size(maximumArtworkDimensionPx, maximumArtworkDimensionPx)
+                .build()
+
+        return when (val result = applicationContext.imageLoader.execute(request)) {
+            is SuccessResult -> withContext(Dispatchers.Default) {
+                ensureActive()
+                result.image
+                    .toBitmap()
+                    .scaleToNotificationArtwork(maximumArtworkDimensionPx)
+                    .toOwnedMediaSessionBitmap()
+            }
+
+            is ErrorResult -> throw result.throwable
+        }
+    }
+}
+
+internal fun isPermanentArtworkHttpError(statusCode: Int?): Boolean =
+    statusCode != null && statusCode in 400..499 && statusCode != 408 && statusCode != 429
+
+internal fun buildArtworkCandidateUrls(rawUrl: String): List<String> {
+    val trimmed = rawUrl.trim()
+    if (trimmed.isEmpty()) return emptyList()
+
+    val lower = trimmed.lowercase(Locale.ROOT)
+    if (!lower.startsWith("http://") && !lower.startsWith("https://")) {
+        return listOf(trimmed)
+    }
+
+    val candidates = LinkedHashSet<String>()
+    candidates.add(trimmed)
+
+    if (lower.contains("i.ytimg.com/vi/")) {
+        var current: String? = trimmed
+        while (current != null) {
+            val next = getNextFallbackUrl(current) ?: break
+            if (next.contains("/mqdefault.", ignoreCase = true)) {
+                resolveMaxresFallback(trimmed, YTThumbQuality.HQ)?.let(candidates::add)
+            }
+            candidates.add(next)
+            current = next
+        }
+        resolveMaxresFallback(trimmed, YTThumbQuality.HQ)?.let(candidates::add)
+        resolveMaxresFallback(trimmed, YTThumbQuality.MQ)?.let(candidates::add)
+        resolveMaxresFallback(trimmed, YTThumbQuality.DEFAULT)?.let(candidates::add)
+    } else if (lower.contains("sndcdn.com")) {
+        if (trimmed.contains("-original.")) {
+            candidates.add(trimmed.replace("-original.", "-t500x500."))
+            candidates.add(trimmed.replace("-original.", "-large."))
+        }
+        if (trimmed.contains("-t500x500.")) {
+            candidates.add(trimmed.replace("-t500x500.", "-t300x300."))
+            candidates.add(trimmed.replace("-t500x500.", "-large."))
+        }
+    } else if (lower.contains("googleusercontent.com") || lower.contains("ggpht.com")) {
+        val medium =
+            trimmed.resize(
+                width = FallbackGoogleCdnDimensionPx,
+                height = FallbackGoogleCdnDimensionPx,
+                ytimgResizePolicy = YtimgResizePolicy.PreserveOriginal,
+            )
+        if (medium != trimmed) {
+            candidates.add(medium)
+        }
+    }
+
+    return candidates.toList()
 }
 
 private fun decodeSampledBitmap(
